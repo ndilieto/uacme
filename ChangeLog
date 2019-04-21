@@ -1,2 +1,7 @@
 2019-04-21 Nicola Di Lieto <nicola.dilieto@gmail.com>
+	* Release 1.0.1
+	- fix acme challenge web server path
+	- fix spelling in help text
+
+2019-04-21 Nicola Di Lieto <nicola.dilieto@gmail.com>
 	* First public release (1.0)

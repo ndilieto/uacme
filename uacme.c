@@ -1091,7 +1091,7 @@ void usage(const char *progname)
             "\t[-f|--force] [-h|--hook PROGRAM] [-n|--never-create] [-s|--staging]\n"
             "\t[-v|--verbose ...] [-V|--version] [-y|--yes] [-?|--help] new [EMAIL]\n"
             "\t| update [EMAIL] | deactivate | issue DOMAIN [ALTNAME ...]]\n"
-            "\t| revoke [CERTFILE]\n", progname);
+            "\t| revoke CERTFILE\n", progname);
 }
 
 int main(int argc, char **argv)

@@ -2,7 +2,7 @@ UACME(1)
 ========
 :doctype: manpage
 :man source:   uacme
-:man version:  1.0
+:man version:  1.0.1
 :man manual:   User Commands
 
 
@@ -162,7 +162,7 @@ provided a web server for the domain being validated runs on the
 same machine, with webroot at /var/www
 
     #!/bin/sh
-    CHALLENGE_PATH=/var/www/acme
+    CHALLENGE_PATH=/var/www/.well-known/acme-challenge
     ARGS=5
     E_BADARGS=85
     
