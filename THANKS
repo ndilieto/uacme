@@ -1,0 +1,9 @@
+Thanks are due to the following
+
+* Serge Zaitsev <zaitsev.serge@gmail.com>
+    for jsmn, the world's fastest JSON parser/tokenizer.
+
+* The authors of libcurl <https://curl.haxx.se/libcurl/>
+
+* The authors of gnutls <https://gnutls.org/>
+

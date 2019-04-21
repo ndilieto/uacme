@@ -1,0 +1,390 @@
+'\" t
+.\"     Title: uacme
+.\"    Author: [see the "AUTHOR" section]
+.\" Generator: DocBook XSL Stylesheets v1.78.1 <http://docbook.sf.net/>
+.\"      Date: 04/21/2019
+.\"    Manual: User Commands
+.\"    Source: uacme 1.0
+.\"  Language: English
+.\"
+.TH "UACME" "1" "04/21/2019" "uacme 1\&.0" "User Commands"
+.\" -----------------------------------------------------------------
+.\" * Define some portability stuff
+.\" -----------------------------------------------------------------
+.\" ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+.\" http://bugs.debian.org/507673
+.\" http://lists.gnu.org/archive/html/groff/2009-02/msg00013.html
+.\" ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+.ie \n(.g .ds Aq \(aq
+.el       .ds Aq '
+.\" -----------------------------------------------------------------
+.\" * set default formatting
+.\" -----------------------------------------------------------------
+.\" disable hyphenation
+.nh
+.\" disable justification (adjust text to left margin only)
+.ad l
+.\" -----------------------------------------------------------------
+.\" * MAIN CONTENT STARTS HERE *
+.\" -----------------------------------------------------------------
+.SH "NAME"
+uacme \- ACMEv2 client written in plain C code with minimal dependencies
+.SH "SYNOPSIS"
+.sp
+\fBuacme\fR [\fB\-a\fR|\fB\-\-acme\-url\fR \fIURL\fR] [\fB\-c\fR|\fB\-\-confdir\fR \fIDIR\fR] [\fB\-d\fR|\fB\-\-days\fR \fIDAYS\fR] [\fB\-f\fR|\fB\-\-force\fR] [\fB\-h\fR|\fB\-\-hook\fR \fIPROGRAM\fR] [\fB\-n\fR|\fB\-\-never\fR] [\fB\-s\fR|\fB\-\-staging\fR] [\fB\-v\fR|\fB\-\-verbose\fR \&...] [\fB\-V\fR|\fB\-\-version\fR] [\fB\-y\fR|\fB\-\-yes\fR] [\fB\-?\fR|\fB\-\-help\fR] \fInew\fR [\fIEMAIL\fR] | \fBupdate\fR [\fIEMAIL\fR] | \fBdeactivate\fR | \fBissue\fR \fIDOMAIN\fR [\fIALTNAME\fR \&...]] | \fBrevoke\fR \fICERTFILE\fR
+.SH "DESCRIPTION"
+.sp
+\fBuacme\fR is a client for the ACMEv2 protocol described in RFC8555, written in plain C code with minimal dependencies (libcurl, gnutls)\&. The ACMEv2 protocol allows a Certificate Authority (https://letsencrypt\&.org/ is a popular one) and an applicant to automate the process of verification and certificate issuance\&. The protocol also provides facilities for other certificate management functions, such as certificate revocation\&. For more information see https://tools\&.ietf\&.org/html/rfc8555
+.SH "OPTIONS"
+.PP
+\fB\-a, \-\-acme\-url\fR=\fIURL\fR
+.RS 4
+ACMEv2 server directory object
+\fIURL\fR\&. If not specified
+\fBuacme\fR
+uses one of the following:
+.PP
+\fIhttps://acme\-v02\&.api\&.letsencrypt\&.org/directory\fR
+.RS 4
+production URL
+.RE
+.PP
+\fIhttps://acme\-staging\-v02\&.api\&.letsencrypt\&.org/directory\fR
+.RS 4
+staging URL (see
+\fB\-s, \-\-staging\fR
+below)
+.RE
+.RE
+.PP
+\fB\-c, \-\-confdir\fR=\fICONFDIR\fR
+.RS 4
+Use configuration directory
+\fICONFDIR\fR
+(default
+\fI/etc/ssl/uacme\fR)\&. The structure is as follows (multiple
+\fIDOMAIN\fR
+allowed)
+.PP
+\fICONFDIR/private/key\&.pem\fR
+.RS 4
+ACME account private key
+.RE
+.PP
+\fICONFDIR/private/DOMAIN/key\&.pem\fR
+.RS 4
+certificate key for
+\fIDOMAIN\fR
+.RE
+.PP
+\fICONFDIR/DOMAIN/cert\&.pem\fR
+.RS 4
+certificate for
+\fIDOMAIN\fR
+.RE
+.RE
+.PP
+\fB\-d, \-\-days\fR=\fIDAYS\fR
+.RS 4
+Do not reissue certificates that are still valid for longer than
+\fIDAYS\fR
+(default 30)\&.
+.RE
+.PP
+\fB\-f, \-\-force\fR
+.RS 4
+Force certificate reissuance regardless of expiration date
+.RE
+.PP
+\fB\-h, \-\-hook\fR=\fIPROGRAM\fR
+.RS 4
+Challenge hook program\&. If not specified
+\fBuacme\fR
+interacts with the user for every ACME challenge, printing information about the challenge type, token and authorization on stderr\&. If specified,
+\fBuacme\fR
+executes
+\fIPROGRAM\fR
+(a binary, a shell script or any file that can be executed by the operating system) for every challenge with the following 5 string arguments:
+.PP
+\fIMETHOD\fR
+.RS 4
+one of
+\fBbegin\fR,
+\fBdone\fR
+or
+\fBfailed\fR\&.
+.PP
+\fBbegin\fR
+.RS 4
+is called at the beginning of the challenge\&.
+\fIPROGRAM\fR
+must return 0 to accept it\&. Any other return code declines the challenge\&. Neither
+\fBdone\fR
+nor
+\fBfailed\fR
+method calls are made for declined challenges\&.
+.RE
+.PP
+\fBdone\fR
+.RS 4
+is called upon successful completion of an accepted challenge\&.
+.RE
+.PP
+\fBfailed\fR
+.RS 4
+is called upon failure of an accepted challenge\&.
+.RE
+.RE
+.PP
+\fITYPE\fR
+.RS 4
+challenge type (for example
+\fBdns\-01\fR
+or
+\fBhttp\-01\fR)
+.RE
+.PP
+\fIIDENT\fR
+.RS 4
+The identifier the challenge refers to
+.RE
+.PP
+\fITOKEN\fR
+.RS 4
+The challenge token
+.RE
+.PP
+\fIAUTH\fR
+.RS 4
+The key authorization (for
+\fBdns\-01\fR
+already converted to the base64\-encoded SHA256 digest format to be provisioned as _acme\-challenge DNS TXT record)\&.
+.RE
+.RE
+.PP
+\fB\-?, \-\-help\fR
+.RS 4
+Print a brief usage text on stderr and exit
+.RE
+.PP
+\fB\-n, \-\-never\-create\fR
+.RS 4
+By default
+\fBuacme\fR
+creates directories/keys if they do not exist\&. When this option is specified,
+\fBuacme\fR
+never does so and instead exits with an error if anything required is missing\&.
+.RE
+.PP
+\fB\-s, \-\-staging\fR
+.RS 4
+Use Let\(cqs Encrypt staging URL for testing\&. This only works if
+\fB\-a, \-\-acme\-url\fR
+is
+\fBNOT\fR
+specified\&.
+.RE
+.PP
+\fB\-v, \-\-verbose\fR
+.RS 4
+By default
+\fBuacme\fR
+only produces output upon errors or when user interaction is required\&. When this option is specified
+\fBuacme\fR
+prints information about what is going on on stderr\&. This option can be specified more than once to increase verbosity\&.
+.RE
+.PP
+\fB\-V, \-\-version\fR
+.RS 4
+Print program version on stderr and exit
+.RE
+.PP
+\fB\-y, \-\-yes\fR
+.RS 4
+Autoaccept ACME server terms (if any) upon new account creation
+.RE
+.SH "USAGE"
+.PP
+\fBuacme\fR [\fIOPTIONS\fR \&...] \fBnew\fR [\fIEMAIL\fR]
+.RS 4
+Create a new ACME account with optional
+\fIEMAIL\fR
+contact\&. If the account private key does not exist at
+\fICONFDIR/private/key\&.pem\fR
+a new key is generated unless
+\fB\-n, \-\-never\-create\fR
+is specified\&. A valid account must be created
+\fBbefore\fR
+any other operation can succeed\&. Any certificate issued by the ACME server is associated with a single account\&. An account can be associated with multiple certificates, subject of course to the rate limits imposed by the ACME server\&.
+.RE
+.PP
+\fBuacme\fR [\fIOPTIONS\fR \&...] \fBupdate\fR [\fIEMAIL\fR]
+.RS 4
+Update the
+\fIEMAIL\fR
+associated with the ACME account corresponding to the account private key\&. If
+\fIEMAIL\fR
+is not specified, the account contact email will be dropped\&.
+.RE
+.PP
+\fBuacme\fR [\fIOPTIONS\fR \&...] \fBdeactivate\fR
+.RS 4
+Deactivate the ACME account corresponding to the account private key\&.
+\fBWARNING\fR
+this action is irreversible\&. Users may wish to do this when the account key is compromised or decommissioned\&. A deactivated account can no longer request certificate issuances and revocations or access resources related to the account\&.
+.RE
+.PP
+\fBuacme\fR [\fIOPTIONS\fR \&...] \fBissue\fR \fIDOMAIN\fR [\fIALTNAME\fR \&...]
+.RS 4
+Issue a certificate for
+\fIDOMAIN\fR
+with zero or more
+\fIALTNAME\fR\&. If a certificate is already available at
+\fICONFDIR/DOMAIN/cert\&.pem\fR
+for the specified
+\fIDOMAIN\fR
+and
+\fIALTNAME\fR, and is still valid for longer than
+\fIDAYS\fR, no action is taken unless
+\fB\-f, \-\-force\fR
+is specified\&. The new certificate is saved to
+\fICONFDIR/DOMAIN/cert\&.pem\fR\&. If the certificate file already exists, it is hardlinked to
+\fICONFDIR/DOMAIN/cert\-TIMESTAMP\&.pem\fR
+before overwriting\&. The private key for the certificate is loaded from
+\fICONFDIR/private/DOMAIN/key\&.pem\fR\&. If no such file exists, a new key is generated unless
+\fB\-n, \-\-never\-create\fR
+is specified\&.
+.RE
+.PP
+\fBuacme\fR [\fIOPTIONS\fR \&...] \fBrevoke\fR \fICERTFILE\fR
+.RS 4
+Revoke the certificate stored in
+\fICERTFILE\fR\&. Only certificates associated with the account can be revoked\&.
+.RE
+.SH "EXIT STATUS"
+.PP
+\fB0\fR
+.RS 4
+Success
+.RE
+.PP
+\fB1\fR
+.RS 4
+Failure (syntax or usage error; configuration error; processing failure; unexpected error)\&.
+.RE
+.SH "EXAMPLE HOOK SCRIPT"
+.sp
+The \fIuacme\&.sh\fR hook script included in the distribution can be used to automate the certificate issuance with \fIhttp\-01\fR challenges, provided a web server for the domain being validated runs on the same machine, with webroot at /var/www
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+#!/bin/sh
+CHALLENGE_PATH=/var/www/acme
+ARGS=5
+E_BADARGS=85
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+if test $# \-ne "$ARGS"
+then
+    echo "Usage: `basename $0` method type ident token auth" 1>&2
+    exit $E_BADARGS
+fi
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+METHOD=$1
+TYPE=$2
+IDENT=$3
+TOKEN=$4
+AUTH=$5
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+case "$METHOD" in
+    "begin")
+        case "$TYPE" in
+            http\-01)
+                echo \-n "${AUTH}" > ${CHALLENGE_PATH}/${TOKEN}
+                exit $?
+                ;;
+            *)
+                exit 1
+                ;;
+        esac
+        ;;
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+"done"|"failed")
+    case "$TYPE" in
+        http\-01)
+            rm ${CHALLENGE_PATH}/${TOKEN}
+            exit $?
+            ;;
+        *)
+            exit 1
+            ;;
+    esac
+    exit 0
+    ;;
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+    *)
+        echo "$0: invalid method" 1>&2
+        exit 1
+esac
+.fi
+.if n \{\
+.RE
+.\}
+.SH "BUGS"
+.sp
+If you believe you have found a bug, please create a new issue at https://github\&.com/ndilieto/uacme/issues with any applicable information\&.
+.SH "AUTHOR"
+.sp
+\fBuacme\fR was written by Nicola Di Lieto
+.SH "COPYRIGHT"
+.sp
+Copyright \(co 2019 Nicola Di Lieto <nicola\&.dilieto@gmail\&.com>
+.sp
+This file is part of \fBuacme\fR\&.
+.sp
+\fBuacme\fR is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version\&.
+.sp
+\fBuacme\fR is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE\&. See the GNU General Public License for more details\&.
+.sp
+You should have received a copy of the GNU General Public License along with this program\&. If not, see http://www\&.gnu\&.org/licenses/\&.

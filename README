@@ -1,0 +1,74 @@
+uacme README 
+Copyright (C) 2019 Nicola Di Lieto <nicola.dilieto@gmail.com>
+
+uacme is a client for the RFC8555 ACMEv2 protocol. Additional
+information can be found at <https://github.com/ndilieto/uacme>
+and the manual page at <https://ndilieto.github.io/uacme.1.html>
+
+
+README
+------
+This README is targeted for users of the software who build from
+sources but do not necessarily develop.
+
+
+COMPILATION
+-----------
+A typical command sequence for building uacme is shown below.
+A complete list of options available for configure can be found
+by running './configure --help'.
+
+    cd uacme-<version>
+    ./configure
+    make
+    sudo make install
+
+The software depends on libcurl and gnutls. 
+ * libcurl: the multiprotocol file transfer library 
+    https://curl.haxx.se/libcurl
+ * gnutls: for cryptographic algorithms
+    https://gnutls.org
+
+
+DOCUMENTATION
+-------------
+See the documentation in the manual page included in the distribution
+(uacme.1)
+
+
+LICENSING
+---------
+See the COPYING file for licensing information
+
+
+BUGS
+----
+If you believe you have found a bug, please create a new issue
+at https://github.com/ndilieto/uacme/issue with any applicable
+information. 
+
+Applicable information would include why the issue is a uacme bug (if
+not readily apparent), output from 'uname -a', the version of uacme
+being used, a stack trace if available ('bt full' if under gdb or
+valgrind output), and perhaps a network trace.  Vague queries or
+piecemeal messages are difficult to act upon and don't help the
+development effort.
+
+
+PATCHES
+-------
+Patches are welcome and encouraged. Patches can be submitted by 
+creating a pull request at https://github.com/ndilieto/uacme/pulls
+
+When submitting patches, please be sure to use sources from the git
+repository, and preferrably from the master branch.  To create a patch
+for the project from a local git repository, please use the following
+commands. 'uacme' should be the local directory of a previous git clone.
+
+    cd uacme
+    git add the-file-you-modified.c another-file.c
+    git commit the-file-you-modified.c another-file.c
+
+For more information on use of Git, visit http://git-scm.com/
+
+
