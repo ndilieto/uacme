@@ -35,7 +35,7 @@ uacme.1: uacme.1.txt
 	$(A2X) -d manpage -f manpage $<
 
 uacme.1.html: uacme.1.txt
-	$(ASCIIDOC) -d manpage $<
+	$(ASCIIDOC) -d manpage -b html5 $<
 
 .PHONY: valgrind
 valgrind: uacme

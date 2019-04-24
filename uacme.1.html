@@ -1,9 +1,8 @@
-<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.1//EN"
-    "http://www.w3.org/TR/xhtml11/DTD/xhtml11.dtd">
-<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en">
+<!DOCTYPE html>
+<html lang="en">
 <head>
-<meta http-equiv="Content-Type" content="application/xhtml+xml; charset=UTF-8" />
-<meta name="generator" content="AsciiDoc 8.6.9" />
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<meta name="generator" content="AsciiDoc 8.6.9">
 <title>UACME(1)</title>
 <style type="text/css">
 /* Shared CSS for AsciiDoc xhtml11 and html5 backends */
@@ -1095,31 +1094,31 @@ to automate the certificate issuance with <em>http-01</em> challenges,
 provided a web server for the domain being validated runs on the
 same machine, with webroot at /var/www</p></div>
 <div class="literalblock">
-<div class="content">
-<pre><code>#!/bin/sh
+<div class="content monospaced">
+<pre>#!/bin/sh
 CHALLENGE_PATH=/var/www/.well-known/acme-challenge
 ARGS=5
-E_BADARGS=85</code></pre>
+E_BADARGS=85</pre>
 </div></div>
 <div class="literalblock">
-<div class="content">
-<pre><code>if test $# -ne "$ARGS"
+<div class="content monospaced">
+<pre>if test $# -ne "$ARGS"
 then
     echo "Usage: `basename $0` method type ident token auth" 1&gt;&amp;2
     exit $E_BADARGS
-fi</code></pre>
+fi</pre>
 </div></div>
 <div class="literalblock">
-<div class="content">
-<pre><code>METHOD=$1
+<div class="content monospaced">
+<pre>METHOD=$1
 TYPE=$2
 IDENT=$3
 TOKEN=$4
-AUTH=$5</code></pre>
+AUTH=$5</pre>
 </div></div>
 <div class="literalblock">
-<div class="content">
-<pre><code>case "$METHOD" in
+<div class="content monospaced">
+<pre>case "$METHOD" in
     "begin")
         case "$TYPE" in
             http-01)
@@ -1130,11 +1129,11 @@ AUTH=$5</code></pre>
                 exit 1
                 ;;
         esac
-        ;;</code></pre>
+        ;;</pre>
 </div></div>
 <div class="literalblock">
-<div class="content">
-<pre><code>"done"|"failed")
+<div class="content monospaced">
+<pre>"done"|"failed")
     case "$TYPE" in
         http-01)
             rm ${CHALLENGE_PATH}/${TOKEN}
@@ -1145,14 +1144,14 @@ AUTH=$5</code></pre>
             ;;
     esac
     exit 0
-    ;;</code></pre>
+    ;;</pre>
 </div></div>
 <div class="literalblock">
-<div class="content">
-<pre><code>    *)
+<div class="content monospaced">
+<pre>    *)
         echo "$0: invalid method" 1&gt;&amp;2
         exit 1
-esac</code></pre>
+esac</pre>
 </div></div>
 </div>
 </div>
@@ -1188,7 +1187,7 @@ along with this program.  If not, see <a href="http://www.gnu.org/licenses/">htt
 </div>
 </div>
 </div>
-<div id="footnotes"><hr /></div>
+<div id="footnotes"><hr></div>
 <div id="footer">
 <div id="footer-text">
 Last updated
