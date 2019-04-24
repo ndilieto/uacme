@@ -92,7 +92,7 @@ void crypto_deinit(void)
 }
 
 static int mbedtls_hash_fast(mbedtls_md_type_t md_alg,
-        const unsigned char *input, size_t len, unsigned char *output)
+        const void *input, size_t len, unsigned char *output)
 {
     const mbedtls_md_info_t *mdi =
         mbedtls_md_info_from_type(md_alg);
@@ -559,7 +559,7 @@ bool key_gen(const char *keyfile)
 {
     bool success = false;
     int r;
-    unsigned char *pem_data = NULL;
+    void *pem_data = NULL;
     size_t pem_size = 0;
     msg(1, "generating new key");
 #if defined(USE_GNUTLS)
@@ -665,7 +665,7 @@ privkey_t key_load(bool gen_if_needed, const char *format, ...)
     int r;
     privkey_t key = NULL;
     char *keyfile = NULL;
-    unsigned char *keydata = NULL;
+    void *keydata = NULL;
     size_t keysize = 0;
     va_list ap;
     va_start(ap, format);
@@ -681,7 +681,7 @@ privkey_t key_load(bool gen_if_needed, const char *format, ...)
     }
 
     msg(1, "loading key from %s", keyfile);
-    while (!(keydata = (unsigned char *)read_file(keyfile, &keysize)))
+    while (!(keydata = read_file(keyfile, &keysize)))
     {
         if (errno != ENOENT)
         {
@@ -783,7 +783,7 @@ out:
 char *csr_gen(const char * const *names, privkey_t key)
 {
     char *req = NULL;
-    unsigned char *csrdata = NULL;
+    void *csrdata = NULL;
     size_t csrsize = 0;
     int r;
 #if defined(USE_GNUTLS)
@@ -906,7 +906,8 @@ char *csr_gen(const char * const *names, privkey_t key)
     while (count)
     {
         count--;
-        r = mbedtls_asn1_write_raw_buffer(&p, buf, names[count],
+        r = mbedtls_asn1_write_raw_buffer(&p, buf,
+                (const unsigned char *)names[count],
                 strlen(names[count]));
         if (r >= 0)
         {
@@ -1100,7 +1101,7 @@ static mbedtls_x509_crt *cert_load(const char *format, ...)
     mbedtls_x509_crt *crt = NULL;
 #endif
     char *certfile = NULL;
-    unsigned char *certdata = NULL;
+    void *certdata = NULL;
     size_t certsize = 0;
     int r;
     va_list ap;
@@ -1117,7 +1118,7 @@ static mbedtls_x509_crt *cert_load(const char *format, ...)
         goto out;
     }
 
-    certdata = (unsigned char *)read_file(certfile, &certsize);
+    certdata = read_file(certfile, &certsize);
     if (!certdata)
     {
         if (errno == ENOENT)
@@ -1266,7 +1267,8 @@ out:
         {
             for (cur = &crt->subject_alt_names; cur; cur = cur->next)
             {
-                if (strncasecmp(*names, cur->buf.p, strlen(*names)) == 0)
+                if (strncasecmp(*names, (const char *)cur->buf.p,
+                            strlen(*names)) == 0)
                 {
                     break;
                 }
@@ -1275,7 +1277,8 @@ out:
         else for (name = &crt->subject; name != NULL; name = name->next)
         {
             if (MBEDTLS_OID_CMP(MBEDTLS_OID_AT_CN, &name->oid) == 0 &&
-                    strncasecmp(*names, name->val.p, strlen(*names)) == 0)
+                    strncasecmp(*names, (const char *)name->val.p,
+                        strlen(*names)) == 0)
             {
                 break;
             }
@@ -1302,7 +1305,7 @@ out:
 char *cert_der_base64url(const char *certfile)
 {
     char *ret = NULL;
-    unsigned char *certdata = NULL;
+    void *certdata = NULL;
     size_t certsize = 0;
     int r;
 #if defined(USE_GNUTLS)
