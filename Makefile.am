@@ -48,4 +48,4 @@ valgrind: uacme
 
 EXTRA_DIST = GNUmakefile build-aux/git-version-gen uacme.sh uacme.1.txt \
 	     uacme.1 uacme.1.html
-CLEANFILES = uacme.1 uacme.1.html valgrind.log
+CLEANFILES = valgrind.log
