@@ -39,8 +39,8 @@ static int json_build(const char *js, jsmntok_t *t, size_t count,
     {
         case JSMN_PRIMITIVE:
             value->type = JSON_PRIMITIVE;
-            value->value = strndup(js+t->start, t->end - t->start);
-            if (!value->value)
+            value->v.value = strndup(js+t->start, t->end - t->start);
+            if (!value->v.value)
             {
                 warn("json_build: strndup failed");
                 return -1;
@@ -49,8 +49,8 @@ static int json_build(const char *js, jsmntok_t *t, size_t count,
 
         case JSMN_STRING:
             value->type = JSON_STRING;
-            value->value = strndup(js+t->start, t->end - t->start);
-            if (!value->value)
+            value->v.value = strndup(js+t->start, t->end - t->start);
+            if (!value->v.value)
             {
                 warn("json_build: strndup failed");
                 return -1;
@@ -59,38 +59,38 @@ static int json_build(const char *js, jsmntok_t *t, size_t count,
 
         case JSMN_OBJECT:
             value->type = JSON_OBJECT;
-            value->object.size = t->size;
-            value->object.names = calloc(t->size, sizeof(json_value_t));
-            value->object.values = calloc(t->size, sizeof(json_value_t));
-            if (!value->object.names || !value->object.values)
+            value->v.object.size = t->size;
+            value->v.object.names = calloc(t->size, sizeof(json_value_t));
+            value->v.object.values = calloc(t->size, sizeof(json_value_t));
+            if (!value->v.object.names || !value->v.object.values)
             {
                 warn("json_build: calloc failed");
                 return -1;
             }
             for (j = i = 0; i < t->size; i++)
             {
-                value->object.names[i].parent = value;
-                value->object.values[i].parent = value;
-                k = json_build(js, t+1+j, count-j, value->object.names+i);
+                value->v.object.names[i].parent = value;
+                value->v.object.values[i].parent = value;
+                k = json_build(js, t+1+j, count-j, value->v.object.names+i);
                 if (k < 0) return k; else j += k;
-                k = json_build(js, t+1+j, count-j, value->object.values+i);
+                k = json_build(js, t+1+j, count-j, value->v.object.values+i);
                 if (k < 0) return k; else j += k;
             }
             return j+1;
 
         case JSMN_ARRAY:
             value->type = JSON_ARRAY;
-            value->array.size = t->size;
-            value->array.values = calloc(t->size, sizeof(json_value_t));
-            if (!value->array.values)
+            value->v.array.size = t->size;
+            value->v.array.values = calloc(t->size, sizeof(json_value_t));
+            if (!value->v.array.values)
             {
                 warn("json_build: calloc failed");
                 return -1;
             }
             for (j = i = 0; i < t->size; i++)
             {
-                value->array.values[i].parent = value;
-                k = json_build(js, t+1+j, count-j, value->array.values+i);
+                value->v.array.values[i].parent = value;
+                k = json_build(js, t+1+j, count-j, value->v.array.values+i);
                 if (k < 0) return k; else j += k;
             }
             return j+1;
@@ -108,22 +108,22 @@ static void _json_dump(FILE *f, const json_value_t *value, int indent)
     switch (value->type)
     {
         case JSON_PRIMITIVE:
-            fprintf(f, value->value);
+            fprintf(f, value->v.value);
             return;
 
         case JSON_STRING:
-            fprintf(f, "\"%s\"", value->value);
+            fprintf(f, "\"%s\"", value->v.value);
             return;
 
         case JSON_OBJECT:
             fprintf(f, "{\n");
-            for (i = 0; i < value->object.size; i++)
+            for (i = 0; i < value->v.object.size; i++)
             {
                 for (j=0; j<4*(indent+1); j++) fputc(' ', f);
-                _json_dump(f, value->object.names+i, indent + 1);
+                _json_dump(f, value->v.object.names+i, indent + 1);
                 fprintf(f, ": ");
-                _json_dump(f, value->object.values+i, indent + 1);
-                if (i < value->object.size - 1) fputc(',', f);
+                _json_dump(f, value->v.object.values+i, indent + 1);
+                if (i < value->v.object.size - 1) fputc(',', f);
                 fputc('\n', f);
             }
             for (j=0; j<4*indent; j++) fputc(' ', f);
@@ -136,11 +136,11 @@ static void _json_dump(FILE *f, const json_value_t *value, int indent)
 
         case JSON_ARRAY:
             fprintf(f, "[\n");
-            for (i = 0; i < value->array.size; i++)
+            for (i = 0; i < value->v.array.size; i++)
             {
                 for (j=0; j<4*(indent+1); j++) fputc(' ', f);
-                _json_dump(f, value->array.values+i, indent + 1);
-                if (i < value->array.size - 1) fputc(',', f);
+                _json_dump(f, value->v.array.values+i, indent + 1);
+                if (i < value->v.array.size - 1) fputc(',', f);
                 fputc('\n', f);
             }
             for (j=0; j<4*indent; j++) fputc(' ', f);
@@ -169,25 +169,28 @@ void json_free(json_value_t *value)
     {
         case JSON_PRIMITIVE:
         case JSON_STRING:
-            free(value->value);
+            free(value->v.value);
             break;
 
         case JSON_OBJECT:
-            for (i = 0; i < value->object.size; i++)
+            for (i = 0; i < value->v.object.size; i++)
             {
-                json_free(value->object.names+i);
-                json_free(value->object.values+i);
+                json_free(value->v.object.names+i);
+                json_free(value->v.object.values+i);
             }
-            free(value->object.names);
-            free(value->object.values);
+            free(value->v.object.names);
+            free(value->v.object.values);
             break;
 
         case JSON_ARRAY:
-            for (i = 0; i < value->array.size; i++)
+            for (i = 0; i < value->v.array.size; i++)
             {
-                json_free(value->array.values+i);
+                json_free(value->v.array.values+i);
             }
-            free(value->array.values);
+            free(value->v.array.values);
+            break;
+
+        default:
             break;
     }
     if (!value->parent)
@@ -203,11 +206,11 @@ const json_value_t *json_find(const json_value_t *haystack,
     {
         return NULL;
     }
-    for (int i=0; i<haystack->object.size; i++)
+    for (int i=0; i<haystack->v.object.size; i++)
     {
-        if (strcmp(haystack->object.names[i].value, needle) == 0)
+        if (strcmp(haystack->v.object.names[i].v.value, needle) == 0)
         {
-            return haystack->object.values + i;
+            return haystack->v.object.values + i;
         }
     }
     return NULL;
@@ -220,12 +223,12 @@ const char *json_find_string(const json_value_t *haystack,
     {
         return NULL;
     }
-    for (int i=0; i<haystack->object.size; i++)
+    for (int i=0; i<haystack->v.object.size; i++)
     {
-        if (haystack->object.values[i].type == JSON_STRING &&
-                strcmp(haystack->object.names[i].value, needle) == 0)
+        if (haystack->v.object.values[i].type == JSON_STRING &&
+                strcmp(haystack->v.object.names[i].v.value, needle) == 0)
         {
-            return haystack->object.values[i].value;
+            return haystack->v.object.values[i].v.value;
         }
     }
     return NULL;

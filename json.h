@@ -30,19 +30,19 @@ typedef enum
     JSON_PRIMITIVE = 4
 } json_type_t;
 
-typedef struct json_value json_value_t;
+struct json_value;
 
 typedef struct json_object
 {
     size_t size;
-    json_value_t *names;
-    json_value_t *values;
+    struct json_value *names;
+    struct json_value *values;
 } json_object_t;
 
 typedef struct json_array
 {
     size_t size;
-    json_value_t *values;
+    struct json_value *values;
 } json_array_t;
 
 typedef struct json_value
@@ -53,7 +53,7 @@ typedef struct json_value
         json_object_t object;
         json_array_t array;
         char *value;
-    };
+    } v;
     struct json_value *parent;
 } json_value_t;
 

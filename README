@@ -33,7 +33,7 @@ The software depends on libcurl and gnutls.
 DOCUMENTATION
 -------------
 See the documentation in the manual page included in the distribution
-(uacme.1)
+(uacme.1 or uacme.1.html)
 
 
 LICENSING

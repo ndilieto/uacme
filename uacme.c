@@ -24,6 +24,7 @@
 #include <getopt.h>
 #include <locale.h>
 #include <regex.h>
+#include <stdarg.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -45,8 +46,8 @@
 
 typedef struct acme
 {
-    gnutls_privkey_t key;
-    gnutls_privkey_t dkey;
+    privkey_t key;
+    privkey_t dkey;
     json_value_t *json;
     json_value_t *account;
     json_value_t *dir;
@@ -301,7 +302,7 @@ int hook_run(const char *prog, const char *method, const char *type,
 
 bool check_or_mkdir(bool allow_create, const char *dir, mode_t mode)
 {
-    if (access(dir, R_OK) < 0)
+    if (access(dir, F_OK) < 0)
     {
         if (!allow_create)
         {
@@ -314,6 +315,17 @@ bool check_or_mkdir(bool allow_create, const char *dir, mode_t mode)
             return false;
         }
         msg(1, "created directory %s", dir);
+    }
+    struct stat st;
+    if (stat(dir, &st) != 0)
+    {
+        warn("failed to stat %s", dir);
+        return false;
+    }
+    if (!S_ISDIR(st.st_mode))
+    {
+        warnx("%s is not a directory", dir);
+        return false;
     }
     return true;
 }
@@ -558,27 +570,28 @@ bool account_update(acme_t *a)
     }
     if (a->email && strlen(a->email) > 0)
     {
-        if (!contacts || contacts->array.size == 0)
+        if (!contacts || contacts->v.array.size == 0)
         {
             email_update = true;
         }
-        else for (int i=0; i<contacts->array.size; i++)
+        else for (int i=0; i<contacts->v.array.size; i++)
         {
-            if (contacts->array.values[i].type != JSON_STRING ||
-                    contacts->array.values[i].value !=
-                    strcasestr(contacts->array.values[i].value, "mailto:"))
+            if (contacts->v.array.values[i].type != JSON_STRING ||
+                    contacts->v.array.values[i].v.value !=
+                    strcasestr(contacts->v.array.values[i].v.value,
+                        "mailto:"))
             {
                 warnx("failed to parse account contacts");
                 return false;
             }
-            if (strcasecmp(contacts->array.values[i].value + strlen("mailto:"),
-                        a->email))
+            if (strcasecmp(contacts->v.array.values[i].v.value
+                        + strlen("mailto:"), a->email))
             {
                 email_update = true;
             }
         }
     }
-    else if (contacts && contacts->array.size > 0)
+    else if (contacts && contacts->v.array.size > 0)
     {
         email_update = true;
     }
@@ -650,19 +663,19 @@ bool authorize(acme_t *a)
         goto out;
     }
 
-    for (int i=0; i<auths->array.size; i++)
+    for (int i=0; i<auths->v.array.size; i++)
     {
-        if (auths->array.values[i].type != JSON_STRING)
+        if (auths->v.array.values[i].type != JSON_STRING)
         {
             warnx("failed to parse authorizations URL");
             goto out;
         }
         msg(1, "retrieving authorization at %s",
-                auths->array.values[i].value);
-        if (200 != acme_post(a, auths->array.values[i].value, ""))
+                auths->v.array.values[i].v.value);
+        if (200 != acme_post(a, auths->v.array.values[i].v.value, ""))
         {
             warnx("failed to retrieve auth %s",
-                    auths->array.values[i].value);
+                    auths->v.array.values[i].v.value);
             acme_error(a);
             goto out;
         }
@@ -674,7 +687,8 @@ bool authorize(acme_t *a)
         if (!status || strcmp(status, "pending") != 0)
         {
             warnx("unexpected auth status (%s) at %s",
-                status ? status : "unknown", auths->array.values[i].value);
+                status ? status : "unknown",
+                auths->v.array.values[i].v.value);
             acme_error(a);
             goto out;
         }
@@ -682,21 +696,21 @@ bool authorize(acme_t *a)
         if (json_compare_string(ident, "type", "dns") != 0)
         {
             warnx("no valid identifier in auth %s",
-                    auths->array.values[i].value);
+                    auths->v.array.values[i].v.value);
             goto out;
         }
         const char *ident_value = json_find_string(ident, "value");
         if (!ident_value || strlen(ident_value) <= 0)
         {
             warnx("no valid identifier in auth %s",
-                    auths->array.values[i].value);
+                    auths->v.array.values[i].v.value);
             goto out;
         }
         const json_value_t *chlgs = json_find(a->json, "challenges");
         if (!chlgs || chlgs->type != JSON_ARRAY)
         {
             warnx("no challenges in auth %s",
-                    auths->array.values[i].value);
+                    auths->v.array.values[i].v.value);
             goto out;
         }
         json_free(auth);
@@ -704,14 +718,17 @@ bool authorize(acme_t *a)
         a->json = NULL;
 
         bool chlg_done = false;
-        for (int j=0; j<chlgs->array.size && !chlg_done; j++)
+        for (int j=0; j<chlgs->v.array.size && !chlg_done; j++)
         {
-            if (json_compare_string(chlgs->array.values+j, "status", "pending") == 0)
+            if (json_compare_string(chlgs->v.array.values+j,
+                        "status", "pending") == 0)
             {
-                int c = 0;
-                const char *url = json_find_string(chlgs->array.values+j, "url");
-                const char *type = json_find_string(chlgs->array.values+j, "type");
-                const char *token = json_find_string(chlgs->array.values+j, "token");
+                const char *url = json_find_string(
+                        chlgs->v.array.values+j, "url");
+                const char *type = json_find_string(
+                        chlgs->v.array.values+j, "type");
+                const char *token = json_find_string(
+                        chlgs->v.array.values+j, "token");
                 char *key_auth = NULL;
                 if (!type || !url || !token)
                 {
@@ -1096,14 +1113,6 @@ void usage(const char *progname)
 
 int main(int argc, char **argv)
 {
-    int ret = EXIT_FAILURE;
-    bool never = false;
-    bool force = false;
-    bool version = false;
-    bool yes = false;
-    int days = 30;
-    const char *revokefile = NULL;
-    acme_t a;
     static struct option options[] =
     {
         {"acme-url",     required_argument, NULL, 'a'},
@@ -1120,9 +1129,15 @@ int main(int argc, char **argv)
         {NULL,           0,                 NULL, 0}
     };
 
-    gnutls_global_init();
-    curl_global_init(CURL_GLOBAL_DEFAULT);
+    int ret = EXIT_FAILURE;
+    bool never = false;
+    bool force = false;
+    bool version = false;
+    bool yes = false;
+    int days = 30;
+    const char *revokefile = NULL;
 
+    acme_t a;
     memset(&a, 0, sizeof(a));
     a.directory = PRODUCTION_URL;
     a.confdir = DEFAULT_CONFDIR;
@@ -1130,7 +1145,20 @@ int main(int argc, char **argv)
     if (argc < 2)
     {
         usage(basename(argv[0]));
-        goto out;
+        return ret;
+    }
+
+    if (!crypto_init())
+    {
+        warnx("failed to initialize crypto library");
+        return ret;
+    }
+
+    if (curl_global_init(CURL_GLOBAL_DEFAULT) != CURLE_OK)
+    {
+        warnx("failed to initialize libcurl");
+        crypto_deinit();
+        return ret;
     }
 
     while (1)
@@ -1309,18 +1337,19 @@ int main(int argc, char **argv)
         }
     }
 
-    if (!check_or_mkdir(!never, a.confdir,
+    bool is_new = strcmp(action, "new") == 0;
+    if (!check_or_mkdir(is_new && !never, a.confdir,
                 S_IRWXU|S_IRGRP|S_IXGRP|S_IROTH|S_IXOTH))
     {
         goto out;
     }
 
-    if (!check_or_mkdir(!never, a.keydir, S_IRWXU))
+    if (!check_or_mkdir(is_new && !never, a.keydir, S_IRWXU))
     {
         goto out;
     }
 
-    if (!(a.key = key_load(!never, "%s/key.pem", a.keydir)))
+    if (!(a.key = key_load(is_new && !never, "%s/key.pem", a.keydir)))
     {
         goto out;
     }
@@ -1394,8 +1423,8 @@ int main(int argc, char **argv)
     }
 
 out:
-    if (a.key) gnutls_privkey_deinit(a.key);
-    if (a.dkey) gnutls_privkey_deinit(a.dkey);
+    if (a.key) privkey_deinit(a.key);
+    if (a.dkey) privkey_deinit(a.dkey);
     json_free(a.json);
     json_free(a.account);
     json_free(a.dir);
@@ -1409,7 +1438,7 @@ out:
     free(a.dkeydir);
     free(a.certdir);
     curl_global_cleanup();
-    gnutls_global_deinit();
+    crypto_deinit();
     exit(ret);
 }
 

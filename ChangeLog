@@ -1,3 +1,9 @@
+2019-04-24 Nicola Di Lieto <nicola.dilieto@gmail.com>
+	* Release 1.0.2
+	- allow choosing between GnuTLS and mbedTLS at compile time
+	- improved directory existence check
+	- fixed -Wall -pedantic gcc warnings
+
 2019-04-21 Nicola Di Lieto <nicola.dilieto@gmail.com>
 	* Release 1.0.1
 	- fix acme challenge web server path

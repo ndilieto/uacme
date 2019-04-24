@@ -15,13 +15,10 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-AM_CPPFLAGS = $(CURL_CFLAGS) $(GNUTLS_CFLAGS)
-AM_LDFLAGS = $(CURL_LIBS) $(GNUTLS_LIBS)
-
 bin_PROGRAMS = uacme
 uacme_SOURCES = uacme.c base64.c base64.h crypto.c crypto.h \
 		curlwrap.c curlwrap.h json.c json.h jsmn.h \
-		msg.c msg.h
+		msg.c msg.h read-file.c read-file.h
 
 BUILT_SOURCES = $(top_srcdir)/.version
 $(top_srcdir)/.version:
@@ -32,9 +29,20 @@ dist-hook:
 
 dist_man1_MANS = uacme.1
 dist_pkgdata_SCRIPTS = uacme.sh
+dist_html_DATA = uacme.1.html
 
 uacme.1: uacme.1.txt
 	$(A2X) -d manpage -f manpage $<
 
-EXTRA_DIST = GNUmakefile build-aux/git-version-gen uacme.sh uacme.1.txt uacme.1
-CLEANFILES = uacme.1
+uacme.1.html: uacme.1.txt
+	$(ASCIIDOC) -d manpage $<
+
+.PHONY: valgrind
+valgrind: uacme
+	valgrind --tool=memcheck --leak-check=yes --show-reachable=yes \
+	    --num-callers=20 --track-fds=yes --log-file=valgrind.log \
+	    $(builddir)/uacme $(VALGRIND_UACME_ARGS)
+
+EXTRA_DIST = GNUmakefile build-aux/git-version-gen uacme.sh uacme.1.txt \
+	     uacme.1 uacme.1.html
+CLEANFILES = uacme.1 uacme.1.html valgrind.log

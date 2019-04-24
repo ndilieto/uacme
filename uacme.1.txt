@@ -2,7 +2,7 @@ UACME(1)
 ========
 :doctype: manpage
 :man source:   uacme
-:man version:  1.0.1
+:man version:  1.0.2
 :man manual:   User Commands
 
 
@@ -22,8 +22,8 @@ SYNOPSIS
 DESCRIPTION
 -----------
 *uacme* is a client for the ACMEv2 protocol described in RFC8555,
-written in plain C code with minimal dependencies (libcurl, gnutls).
-The ACMEv2 protocol allows a Certificate Authority 
+written in plain C code with minimal dependencies (libcurl and 
+GnuTLS or mbedTLS). The ACMEv2 protocol allows a Certificate Authority 
 (<https://letsencrypt.org/> is a popular one) and an applicant to
 automate the process of verification and certificate issuance.
 The protocol also provides facilities for other certificate management

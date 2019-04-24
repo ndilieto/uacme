@@ -3,7 +3,14 @@ Thanks are due to the following
 * Serge Zaitsev <zaitsev.serge@gmail.com>
     for jsmn, the world's fastest JSON parser/tokenizer.
 
+* The authors of libsodium <https://libsodium.org/>
+    for the base64 encoding/decoding routines.
+
 * The authors of libcurl <https://curl.haxx.se/libcurl/>
 
-* The authors of gnutls <https://gnutls.org/>
+* The authors of GnuTLS <https://gnutls.org/>
 
+* The authors of mbedTLS <https://tls.mbed.org/>
+
+(this list may not be complete, if you think something is missing
+please submit a pull request!)

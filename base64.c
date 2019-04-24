@@ -371,7 +371,7 @@ char *encode_base64url(const char *str)
     {
         return NULL;
     }
-    return bin2base64(encoded, encoded_len, str, strlen(str),
-            base64_VARIANT_URLSAFE_NO_PADDING);
+    return bin2base64(encoded, encoded_len, (const unsigned char *)str,
+            strlen(str), base64_VARIANT_URLSAFE_NO_PADDING);
 }
 
