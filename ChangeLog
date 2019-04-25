@@ -1,3 +1,8 @@
+2019-04-25 Nicola Di Lieto <nicola.dilieto@gmail.com>
+	* Release 1.0.3
+	- fixed more -pedantic gcc warnings
+	- html manpage in html5; copy as doc/html for github hosting
+
 2019-04-24 Nicola Di Lieto <nicola.dilieto@gmail.com>
 	* Release 1.0.2
 	- allow choosing between GnuTLS and mbedTLS at compile time
