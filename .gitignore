@@ -1,9 +1,0 @@
-.version
-.tarball-version
-.deps
-Makefile
-config.log
-config.status
-autom4te.cache
-uacme
-*.o
