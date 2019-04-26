@@ -1,3 +1,10 @@
+2019-04-26 Nicola Di Lieto <nicola.dilieto@gmail.com>
+	* Release 1.0.4
+	- debian packaging
+	- fix potential uninitialized var access in acme_get()
+	- fix fprintf format string in _json_dump()
+	- copy doc/index.html on demand only
+
 2019-04-25 Nicola Di Lieto <nicola.dilieto@gmail.com>
 	* Release 1.0.3
 	- fixed more -pedantic gcc warnings

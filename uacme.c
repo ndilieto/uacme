@@ -101,6 +101,7 @@ char *find_header(const char *headers, const char *name)
 int acme_get(acme_t *a, const char *url)
 {
     int ret = 0;
+    curldata_t *c = NULL;
 
     json_free(a->json);
     a->json = NULL;
@@ -120,7 +121,7 @@ int acme_get(acme_t *a, const char *url)
     {
         warnx("acme_get: url=%s", url);
     }
-    curldata_t *c = curl_get(url);
+    c = curl_get(url);
     if (!c)
     {
         warnx("acme_get: curl_get failed");

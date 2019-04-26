@@ -60,8 +60,8 @@ if test X"$OPT_LIBCURL" = Xno; then
 fi
 if test X"$OPT_LIBCURL" = Xyes; then
     if test X"$PKGCONFIG" != Xno; then
-        AC_MSG_CHECKING([for libcurl >= 7.0])
-        itexists=`$PKGCONFIG --exists 'libcurl >= 7.0' >/dev/null 2>&1 && echo 1`
+        AC_MSG_CHECKING([for libcurl >= 7.38])
+        itexists=`$PKGCONFIG --exists 'libcurl >= 7.38' >/dev/null 2>&1 && echo 1`
         if test -z "$itexists"; then
             AC_MSG_RESULT([no])
             AC_MSG_ERROR([libcurl not found])

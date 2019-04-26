@@ -1,0 +1,23 @@
+Source: uacme
+Section: net
+Priority: optional
+Maintainer: Nicola Di Lieto <nicola.dilieto@gmail.com>
+Build-Depends: debhelper (>= 9), autotools-dev, libgnutls28-dev (>= 3.3), libcurl4-gnutls-dev (>= 7.38)
+Standards-Version: 3.9.5
+Homepage: https://github.com/ndilieto/uacme
+Vcs-Git: git://github.com/ndilieto/uacme
+Vcs-Browser: https://github.com/ndilieto/uacme
+
+Package: uacme
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: Lightweight client for the RFC8555 ACMEv2 protocol
+ uacme is a client for the ACMEv2 protocol described in RFC8555,
+ written in plain C code with minimal dependencies (libcurl and 
+ GnuTLS or mbedTLS).  The ACMEv2 protocol allows a Certificate
+ Authority (<https://letsencrypt.org> is a popular one) and an
+ applicant to automate the process of verification and certificate
+ issuance.  The protocol also provides facilities for other
+ certificate management functions, such as certificate revocation.
+ For more information see <https://tools.ietf.org/html/rfc8555>
+

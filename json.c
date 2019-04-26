@@ -108,7 +108,7 @@ static void _json_dump(FILE *f, const json_value_t *value, int indent)
     switch (value->type)
     {
         case JSON_PRIMITIVE:
-            fprintf(f, value->v.value);
+            fprintf(f, "\"%s\"", value->v.value);
             return;
 
         case JSON_STRING:

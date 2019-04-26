@@ -20,11 +20,12 @@ uacme_SOURCES = uacme.c base64.c base64.h crypto.c crypto.h \
 		curlwrap.c curlwrap.h json.c json.h jsmn.h \
 		msg.c msg.h read-file.c read-file.h
 
-BUILT_SOURCES = $(top_srcdir)/.version $(top_srcdir)/docs/index.html
+BUILT_SOURCES = $(top_srcdir)/.version
 $(top_srcdir)/.version:
 	echo $(VERSION) > $@-t && mv $@-t $@
 
 $(top_srcdir)/docs/index.html: uacme.1.html
+	mkdir -p docs
 	cp uacme.1.html $@
 
 dist-hook:

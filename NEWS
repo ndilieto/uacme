@@ -1,11 +1,15 @@
 uacme NEWS
 Copyright (C) 2019 Nicola Di Lieto <nicola.dilieto@gmail.com>
 
-* Version 1.0.3 (released 2019-04-21)
+* Version 1.0.4 (released 2019-04-26)
+
+** uacme: debian packaging
+
+* Version 1.0.3 (released 2019-04-25)
 
 ** uacme: fixed gcc -pedantic warnings
 
-* Version 1.0.2 (released 2019-04-21)
+* Version 1.0.2 (released 2019-04-24)
 
 ** uacme: added support for mbedTLS as alternative to GnuTLS
 
