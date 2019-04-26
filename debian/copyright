@@ -20,10 +20,6 @@ Files: jsmn.h
 Copyright: 2010 Serge Zaitsev
 License: MIT
 
-Files: GNUMakefile
-Copyright: 2001, 2003, 2006-2012 Free Software Foundation, Inc.
-License: GPL-3.0+
-
 Files: build-aux/*
 Copyright: 1999-2013 Free Software Foundation, Inc.
 License: GPL-3.0+
@@ -32,7 +28,7 @@ Files: build-aux/install-sh
 Copyright: 1994 X Consortium
 License: MIT
 
-Files: build-aux/m4/ax_check_enable_debug
+Files: build-aux/m4/ax_check_enable_debug.m4
 Copyright: 2011 Rhys Ulerich <rhys.ulerich@gmail.com>
            2014, 2015 Philip Withnall <philip@tecnocode.co.uk>
 License: permissive
@@ -40,7 +36,7 @@ License: permissive
  are permitted in any medium without royalty provided the copyright
  notice and this notice are preserved.
 
-Files: build-aux/m4/ax_is_release
+Files: build-aux/m4/ax_is_release.m4
 Copyright: 2015 Philip Withnall <philip@tecnocode.co.uk>
            2016 Collabora Ltd.
 License: permissive
