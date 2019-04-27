@@ -1,3 +1,8 @@
+2019-04-27 Nicola Di Lieto <nicola.dilieto@gmail.com>
+	* Release 1.0.5
+	- add AM_MAINTAINER_MODE to configure.ac
+	- minor cosmetic change to json primitive dump
+
 2019-04-26 Nicola Di Lieto <nicola.dilieto@gmail.com>
 	* Release 1.0.4
 	- debian packaging
