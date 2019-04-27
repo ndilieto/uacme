@@ -648,7 +648,7 @@ bool account_deactivate(acme_t *a)
 
 bool authorize(acme_t *a)
 {
-    bool success;
+    bool success = false;
     char *thumbprint = NULL;
     json_value_t *auth = NULL;
     const json_value_t *auths = json_find(a->order, "authorizations");
