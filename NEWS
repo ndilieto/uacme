@@ -1,6 +1,10 @@
 uacme NEWS
 Copyright (C) 2019 Nicola Di Lieto <nicola.dilieto@gmail.com>
 
+* Version 1.0.5 (released 2019-04-27)
+
+** uacme: autoconf mainteiner mode and cosmetic change to json primitive dump
+
 * Version 1.0.4 (released 2019-04-26)
 
 ** uacme: debian packaging
