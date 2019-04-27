@@ -2,7 +2,7 @@ UACME(1)
 ========
 :doctype: manpage
 :man source:   uacme
-:man version:  1.0.5
+:man version:  1.0.6
 :man manual:   User Commands
 
 
