@@ -1,3 +1,12 @@
+uacme (1.0.7-1) unstable; urgency=medium
+
+  * Release 1.0.7
+    - added HTTP User-Agent: header to all requests
+    - added --disable-docs configure option
+    - manpage version now updated automatically
+
+ -- Nicola Di Lieto <nicola.dilieto@gmail.com>  Mon, 29 Apr 2019 19:38:14 +0200
+
 uacme (1.0.6-1) unstable; urgency=medium
 
   * Fix uninitialized variable in authorize()
