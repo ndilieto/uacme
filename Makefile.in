@@ -101,7 +101,7 @@ DIST_COMMON = INSTALL NEWS README AUTHORS ChangeLog \
 	$(srcdir)/Makefile.in $(srcdir)/Makefile.am \
 	$(top_srcdir)/configure $(am__configure_deps) \
 	$(dist_pkgdata_SCRIPTS) $(top_srcdir)/build-aux/depcomp \
-	$(dist_man1_MANS) $(dist_html_DATA) COPYING THANKS \
+	$(dist_man1_MANS) $(am__dist_html_DATA_DIST) COPYING THANKS \
 	build-aux/compile build-aux/depcomp build-aux/install-sh \
 	build-aux/missing $(top_srcdir)/build-aux/compile \
 	$(top_srcdir)/build-aux/install-sh \
@@ -192,6 +192,7 @@ am__can_run_installinfo = \
 man1dir = $(mandir)/man1
 NROFF = nroff
 MANS = $(dist_man1_MANS)
+am__dist_html_DATA_DIST = uacme.1.html
 DATA = $(dist_html_DATA)
 am__tagged_files = $(HEADERS) $(SOURCES) $(TAGS_FILES) $(LISP)
 # Read a list of newline-separated strings from the standard input,
@@ -330,9 +331,9 @@ uacme_SOURCES = uacme.c base64.c base64.h crypto.c crypto.h \
 		msg.c msg.h read-file.c read-file.h
 
 BUILT_SOURCES = $(top_srcdir)/.version
-dist_man1_MANS = uacme.1
 dist_pkgdata_SCRIPTS = uacme.sh
-dist_html_DATA = uacme.1.html
+@ENABLE_DOCS_TRUE@dist_man1_MANS = uacme.1
+@ENABLE_DOCS_TRUE@dist_html_DATA = uacme.1.html
 EXTRA_DIST = GNUmakefile build-aux/git-version-gen uacme.sh uacme.1.txt \
 	     uacme.1 uacme.1.html
 
@@ -917,18 +918,18 @@ uninstall-man: uninstall-man1
 $(top_srcdir)/.version:
 	echo $(VERSION) > $@-t && mv $@-t $@
 
-$(top_srcdir)/docs/index.html: uacme.1.html
-	mkdir -p docs
-	cp uacme.1.html $@
-
 dist-hook:
 	echo $(VERSION) > $(distdir)/.tarball-version
 
-uacme.1: uacme.1.txt
-	$(A2X) -d manpage -f manpage $<
+@ENABLE_DOCS_TRUE@uacme.1: uacme.1.txt $(top_srcdir)/.version
+@ENABLE_DOCS_TRUE@	$(A2X) -d manpage -f manpage -a revision=$(VERSION) $<
 
-uacme.1.html: uacme.1.txt
-	$(ASCIIDOC) -d manpage -b html5 $<
+@ENABLE_DOCS_TRUE@uacme.1.html: uacme.1.txt $(top_srcdir)/.version
+@ENABLE_DOCS_TRUE@	$(ASCIIDOC) -d manpage -b html5 -a revision=$(VERSION) $<
+
+@ENABLE_DOCS_TRUE@$(top_srcdir)/docs/index.html: uacme.1.html
+@ENABLE_DOCS_TRUE@	mkdir -p docs
+@ENABLE_DOCS_TRUE@	cp uacme.1.html $@
 
 .PHONY: valgrind
 valgrind: uacme

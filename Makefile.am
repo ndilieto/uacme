@@ -24,22 +24,26 @@ BUILT_SOURCES = $(top_srcdir)/.version
 $(top_srcdir)/.version:
 	echo $(VERSION) > $@-t && mv $@-t $@
 
+dist-hook:
+	echo $(VERSION) > $(distdir)/.tarball-version
+
+dist_pkgdata_SCRIPTS = uacme.sh
+
+if ENABLE_DOCS
+dist_man1_MANS = uacme.1
+dist_html_DATA = uacme.1.html
+
+uacme.1: uacme.1.txt $(top_srcdir)/.version
+	$(A2X) -d manpage -f manpage -a revision=$(VERSION) $<
+
+uacme.1.html: uacme.1.txt $(top_srcdir)/.version
+	$(ASCIIDOC) -d manpage -b html5 -a revision=$(VERSION) $<
+
 $(top_srcdir)/docs/index.html: uacme.1.html
 	mkdir -p docs
 	cp uacme.1.html $@
 
-dist-hook:
-	echo $(VERSION) > $(distdir)/.tarball-version
-
-dist_man1_MANS = uacme.1
-dist_pkgdata_SCRIPTS = uacme.sh
-dist_html_DATA = uacme.1.html
-
-uacme.1: uacme.1.txt
-	$(A2X) -d manpage -f manpage $<
-
-uacme.1.html: uacme.1.txt
-	$(ASCIIDOC) -d manpage -b html5 $<
+endif
 
 .PHONY: valgrind
 valgrind: uacme

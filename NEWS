@@ -1,6 +1,12 @@
 uacme NEWS
 Copyright (C) 2019 Nicola Di Lieto <nicola.dilieto@gmail.com>
 
+* Version 1.0.7 (released 2019-04-29)
+
+** uacme: added HTTP User-Agent: header to all requests
+          added --disable-docs configure option
+          manpage version now updated automatically
+
 * Version 1.0.6 (released 2019-04-27)
 
 ** uacme: fixed uninitialized variable in authorize() function
