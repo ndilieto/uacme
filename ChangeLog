@@ -1,3 +1,9 @@
+2019-04-29 Nicola Di Lieto <nicola.dilieto@gmail.com>
+	* Release 1.0.7
+	- added HTTP User-Agent: header to all requests
+	- added --disable-docs configure option
+	- manpage version now updated automatically
+
 2019-04-27 Nicola Di Lieto <nicola.dilieto@gmail.com>
 	* Release 1.0.6
 	- fix uninitialized variable in authorize()
