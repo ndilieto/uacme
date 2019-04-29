@@ -25,6 +25,7 @@ AM_MAINTAINER_MODE([enable])
 AM_SILENT_RULES([yes])
 AX_IS_RELEASE([git-directory])
 AX_CHECK_ENABLE_DEBUG([yes])
+AC_REVISION([m4_esyscmd_s([git describe --always])])
 
 if test -z "$SED"; then
     AC_PATH_PROG([SED], [sed], [not_found],
@@ -52,8 +53,8 @@ else
 fi
 
 OPT_LIBCURL=yes
-AC_ARG_WITH(libcurl,dnl
-    AC_HELP_STRING([--with-libcurl=PATH],[PATH is libcurl installation root]),
+AC_ARG_WITH([libcurl],
+[AS_HELP_STRING([--with-libcurl=PATH],[PATH is libcurl installation root])],
     OPT_LIBCURL=$withval)
 
 if test X"$OPT_LIBCURL" = Xno; then
@@ -97,18 +98,18 @@ if test -n "$curllib"; then
 fi
 
 OPT_MBEDTLS=no
-AC_ARG_WITH(mbedtls,dnl
-    AC_HELP_STRING([--with-mbedtls=PATH],[enable mbedTLS, PATH is installation root])
-    AC_HELP_STRING([--without-mbedtls], [disable mbedTLS detection]),
+AC_ARG_WITH([mbedtls],
+[AS_HELP_STRING([--with-mbedtls=PATH],[enable mbedTLS, PATH is installation root])
+AS_HELP_STRING([--without-mbedtls], [disable mbedTLS detection])],
     OPT_MBEDTLS=$withval)
 if test "$OPT_MBEDTLS" = no; then
     OPT_GNUTLS=yes
 else
     OPT_GNUTLS=no
 fi
-AC_ARG_WITH(gnutls,dnl
-    AC_HELP_STRING([--with-gnutls=PATH],[enable GnuTLS, PATH is installation root])
-    AC_HELP_STRING([--without-gnutls], [disable GnuTLS detection]),
+AC_ARG_WITH([gnutls],
+[AS_HELP_STRING([--with-gnutls=PATH], [enable GnuTLS, PATH is installation root])
+AS_HELP_STRING([--without-gnutls], [disable GnuTLS detection])],
     OPT_GNUTLS=$withval)
 if test X"$OPT_GNUTLS" = Xno -a X"$OPT_MBEDTLS" = Xno; then
     AC_MSG_ERROR([Either GnuTLS or mbedTLS must be enabled])
@@ -210,11 +211,17 @@ if test X"$OPT_MBEDTLS" != Xno; then
     fi
 fi
 
-AC_REVISION([m4_esyscmd_s([git describe --always])])
-AC_PATH_PROG(A2X, a2x, :)
-AC_PATH_PROG(ASCIIDOC, asciidoc, :)
-AS_IF([test "$A2X" = :], [AC_MSG_WARN([Could not find a2x.])])
-AS_IF([test "$ASCIIDOC" = :], [AC_MSG_WARN([Could not find asciidoc.])])
+default_docs="yes"
+AC_ARG_ENABLE(docs,
+  [AC_HELP_STRING([--disable-docs], [do not build and install documentation])],
+    [],enable_docs=$default_docs)
+AM_CONDITIONAL(ENABLE_DOCS, test X"$enable_docs" = Xyes)
+if test X"$enable_docs" = Xyes; then
+    AC_PATH_PROG(A2X, a2x, :)
+    AC_PATH_PROG(ASCIIDOC, asciidoc, :)
+    AS_IF([test "$A2X" = :], [AC_MSG_WARN([Could not find a2x.])])
+    AS_IF([test "$ASCIIDOC" = :], [AC_MSG_WARN([Could not find asciidoc.])])
+fi
 AC_CONFIG_FILES([Makefile])
 AC_OUTPUT
 

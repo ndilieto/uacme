@@ -116,6 +116,8 @@ curldata_t *curl_get(const char *url)
         curl_easy_setopt(curl, CURLOPT_WRITEDATA, c);
         curl_easy_setopt(curl, CURLOPT_HEADERFUNCTION, curl_hcb);
         curl_easy_setopt(curl, CURLOPT_HEADERDATA, c);
+        curl_easy_setopt(curl, CURLOPT_USERAGENT,
+                "uacme/" VERSION " (https://github.com/ndilieto/uacme)");
         res = curl_easy_perform(curl);
         if (res != CURLE_OK)
         {
@@ -170,6 +172,8 @@ curldata_t *curl_post(const char *url, const char *post)
         curl_easy_setopt(curl, CURLOPT_WRITEDATA, c);
         curl_easy_setopt(curl, CURLOPT_HEADERFUNCTION, curl_hcb);
         curl_easy_setopt(curl, CURLOPT_HEADERDATA, c);
+        curl_easy_setopt(curl, CURLOPT_USERAGENT,
+                "uacme/" VERSION " (https://github.com/ndilieto/uacme)");
         curl_easy_setopt(curl, CURLOPT_POSTFIELDS, post);
         list = curl_slist_append(list, "Content-Type: application/jose+json");
         curl_easy_setopt(curl, CURLOPT_HTTPHEADER, list);
