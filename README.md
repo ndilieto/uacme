@@ -60,23 +60,23 @@ sudo dpkg -i uacme_1.0.7-1_amd64.deb
 
 Once you have obtained uacme (see Installation above), the next step is to use
 ```
-uacme -v -c ~/uacme.d new
+uacme -v -c /path/to/uacme.d new
 ```
 To create an ACME account. This will create the configuration folder and account
 private key:
 ```
-~/uacme.d/private/key.pem
+/path/to/uacme.d/private/key.pem
 ```
 You can then issue a certificate for your domain by doing 
 ```
-uacme -v -c ~/uacme.d issue www.your.domain.com
+uacme -v -c /path/to/uacme.d issue www.your.domain.com
 ```
 If everything goes well, uacme will ask you to complete a challenge, for example
 ```
 uacme: challenge=http-01 ident=www.your.domain.com token=kZjqYgAss_sl4XXDfFq-jeQV1_lqsE76v2BoCGegFk4
 key_auth=kZjqYgAss_sl4XXDfFq-jeQV1_lqsE76v2BoCGegFk4.2evcXalKLhAybRuxxE-HkSUihdzQ7ZDAKA9EZYrTXwU
 ```
-Note the challenge type is http-01 which means you should set up your web server
+Note the challenge type in the example is http-01 which means you should set up your web server
 to serve a URL based on the token:
 ```
 http://www.your.domain.com/.well-known/acme-challenge/kZjqYgAss_sl4XXDfFq-jeQV1_lqsE76v2BoCGegFk4
@@ -89,13 +89,13 @@ once you set up the above, you can then type 'y' followed by a newline on uacme'
 input and it will proceed with the challenge. If everything goes well, the following
 will be created:
 ```
-~/uacme.d/www.your.domain.com/cert.pem
-~/uacme.d/private/www.your.domain.com/key.pem
+/path/to/uacme.d/www.your.domain.com/cert.pem
+/path/to/uacme.d/private/www.your.domain.com/key.pem
 ```
 Note other types of challenges are possible, if you type anything other than 'y',
 uacme will skip the challenge and propose a different one. The easiest is http-01.
-Note also that challenge types may be served in random order. Do not make any
-assumptions and read uacme's output carefully.
+Note also that challenge types may be served in random order by the server.
+Do not make any assumptions and read uacme's output carefully.
 
 ## Automating updates
 Use the -h flag:
@@ -122,12 +122,14 @@ that uses the certificate, to make sure it uses the renewed certificate.
 This is system and installation dependent. I normally put the necessary
 instructions in another script (for example /usr/share/uacme/reload.sh
 ```
-23  5 * * * /usr/bin/uacme -c /path/to/uacme.d -h /usr/share/uacme/uacme.sh issue www.your.domain.com && /usr/share/uacme/reload.sh
+6 15 * * * /usr/bin/uacme -c /path/to/uacme.d -h /usr/share/uacme/uacme.sh issue www.your.domain.com && /usr/share/uacme/reload.sh
 ```
-## Bugs
-If you believe you have found a bug, please log it at https://github.com/ndilieto/uacme/issues
+## Documentation
 
 There is a regular unix man page in the distribution, also available
 [here](https://ndilieto.github.com/uacme)
+
+## Bugs and suggestions
+If you believe you have found a bug, please log it at https://github.com/ndilieto/uacme/issues
 
 If you have any suggestions for improvements, pull requests are welcome.
