@@ -100,11 +100,11 @@ assumptions and read uacme's output carefully.
 ## Automating updates
 Use the -h flag:
 ```
-uacme -v -c ~/uacme.d -h /usr/share/uacme/uacme.sh issue www.your.domain.com
+uacme -v -c /path/to/uacme.d -h /usr/share/uacme/uacme.sh issue www.your.domain.com
 ```
 or (depending on your installation)
 ```
-uacme -v -c ~/uacme.d -h /usr/local/share/uacme/uacme.sh issue www.your.domain.com
+uacme -v -c /path/to/uacme.d -h /usr/local/share/uacme/uacme.sh issue www.your.domain.com
 ```
 This will use the example uacme.sh script included in the distribution to 
 set up http-01 challenges. You might need to edit the script to match your
@@ -112,7 +112,7 @@ webserver's environment.
 
 Once everything works correctly you can also set up cron, for example
 ```
-6 15 * * * /usr/bin/uacme -c ~/uacme.d -h /usr/share/uacme/uacme.sh issue www.your.domain.com 
+6 15 * * * /usr/bin/uacme -c /path/to/uacme.d -h /usr/share/uacme/uacme.sh issue www.your.domain.com 
 ```
 The cron job will automatically update the certificate when needed. 
 Note the absence of -v flag, this makes uacme only produce output upon errors.
@@ -122,7 +122,7 @@ that uses the certificate, to make sure it uses the renewed certificate.
 This is system and installation dependent. I normally put the necessary
 instructions in another script (for example /usr/share/uacme/reload.sh
 ```
-23  5 * * * /usr/bin/uacme -c ~/uacme.d -h /usr/share/uacme/uacme.sh issue www.your.domain.com && /usr/share/uacme/reload.sh
+23  5 * * * /usr/bin/uacme -c /path/to/uacme.d -h /usr/share/uacme/uacme.sh issue www.your.domain.com && /usr/share/uacme/reload.sh
 ```
 ## Bugs
 If you believe you have found a bug, please log it at https://github.com/ndilieto/uacme/issues
