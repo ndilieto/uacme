@@ -1149,16 +1149,26 @@ int main(int argc, char **argv)
         return ret;
     }
 
-    if (!crypto_init())
+#if LIBCURL_VERSION_NUM < 0x072600
+#error libcurl version 7.38.0 or later is required
+#endif
+    const curl_version_info_data *cvid = curl_version_info(CURLVERSION_NOW);
+    if (!cvid || cvid->version_num < 0x072600)
     {
-        warnx("failed to initialize crypto library");
+        warnx("libcurl version 7.38.0 or later is required");
         return ret;
     }
 
     if (curl_global_init(CURL_GLOBAL_DEFAULT) != CURLE_OK)
     {
         warnx("failed to initialize libcurl");
-        crypto_deinit();
+        return ret;
+    }
+
+    if (!crypto_init())
+    {
+        warnx("failed to initialize crypto library");
+        curl_global_cleanup();
         return ret;
     }
 
@@ -1438,8 +1448,8 @@ out:
     free(a.keydir);
     free(a.dkeydir);
     free(a.certdir);
-    curl_global_cleanup();
     crypto_deinit();
+    curl_global_cleanup();
     exit(ret);
 }
 

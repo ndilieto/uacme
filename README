@@ -23,12 +23,15 @@ by running './configure --help'.
     make
     sudo make install
 
-The software depends on libcurl and GnuTLS or mbedTLS
+The software depends on libcurl and one of GnuTLS, OpenSSL or
+mbedTLS
 
  * libcurl: the multiprotocol file transfer library 
     https://curl.haxx.se/libcurl
  * GnuTLS: for cryptographic algorithms
     https://gnutls.org
+ * OpenSSL: alternative to GnuTLS
+    https://www.openssl.org
  * mbedTLS: lightweight alternative to GnuTLS
     https://tls.mbed.org
 

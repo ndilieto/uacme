@@ -1,7 +1,8 @@
 # uacme
 lightweight client for the [RFC8555](https://tools.ietf.org/html/rfc8555) 
 ACMEv2 protocol, written in plain C code with minimal dependencies
-([libcurl](https://curl.haxx.se/libcurl) and [GnuTLS](https://gnutls.org)
+([libcurl](https://curl.haxx.se/libcurl) and one of
+[GnuTLS](https://gnutls.org), [OpenSSL](https://www.openssl.org)
 or [mbedTLS](https://tls.mbed.org)). The ACMEv2 protocol allows a 
 Certificate Authority ([https://letsencrypt.org](https://letsencrypt.org)
 is a popular one) and an applicant to automate the process of 
@@ -12,14 +13,14 @@ certificate revocation.
 ## Features
 * **Written in C** - It runs on any unix machine, including Linux, BSD, ...
 * **Minimal dependencies** - Other than the standard C library, uacme 
-depends only on libcurl and either GnuTLS or mbedTLS. It does all the
-network communications and crypto without spawning external processes.
-Particularly when using mbedTLS, it is small enough to run on embedded
-systems with severe RAM and program memory restrictions (such as OpenWRT
-routers, for example).  This is in contrast to solutions based on python
-or shell scripts, which may well be a few hundred lines but are not only
-ugly and brittle, but also require many other large applications such
-as python or openssl to work.
+depends only on libcurl and one of GnuTLS, OpenSSL or mbedTLS. It does
+all the network communications and crypto without spawning external
+processes.  Particularly when using mbedTLS, it is small enough to run
+on embedded systems with severe RAM and program memory restrictions
+(such as OpenWRT routers, for example).  This is in contrast to
+solutions based on python or shell scripts, which may well be a few
+hundred lines but are not only ugly and brittle, but also require many
+other large applications such as python or openssl to work.
 * **Easily extensible** - It optionally calls an external hook program
 with the tokens required for domain authorization by the server. The 
 hook program can be an executable, shell script, perl script, python 
@@ -62,7 +63,7 @@ Once you have obtained uacme (see Installation above), the next step is to use
 ```
 uacme -v -c /path/to/uacme.d new
 ```
-To create an ACME account. This will create the configuration folder and account
+to create an ACME account. This will create the configuration folder and account
 private key:
 ```
 /path/to/uacme.d/private/key.pem
@@ -71,7 +72,7 @@ You can then issue a certificate for your domain by doing
 ```
 uacme -v -c /path/to/uacme.d issue www.your.domain.com
 ```
-If everything goes well, uacme will ask you to complete a challenge, for example
+If everything goes well, uacme will ask you to set up a challenge, for example
 ```
 uacme: challenge=http-01 ident=www.your.domain.com token=kZjqYgAss_sl4XXDfFq-jeQV1_lqsE76v2BoCGegFk4
 key_auth=kZjqYgAss_sl4XXDfFq-jeQV1_lqsE76v2BoCGegFk4.2evcXalKLhAybRuxxE-HkSUihdzQ7ZDAKA9EZYrTXwU
@@ -117,8 +118,8 @@ Once everything works correctly you can also set up cron, for example
 The cron job will automatically update the certificate when needed. 
 Note the absence of -v flag, this makes uacme only produce output upon errors.
 
-Note also that you will need to also restart or reload any service
-that uses the certificate, to make sure it uses the renewed certificate.
+Note also that you will need to restart or reload any service that 
+uses the certificate, to make sure it uses the renewed one.
 This is system and installation dependent. I normally put the necessary
 instructions in another script (for example /usr/share/uacme/reload.sh
 ```
