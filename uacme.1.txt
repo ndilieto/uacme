@@ -149,6 +149,9 @@ EXIT STATUS
     Success
 
 *1*::
+    Certificate not reissued because it is still current
+
+*2*::
     Failure (syntax or usage error; configuration error; 
     processing failure; unexpected error).
 

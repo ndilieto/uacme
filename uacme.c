@@ -1130,7 +1130,7 @@ int main(int argc, char **argv)
         {NULL,           0,                 NULL, 0}
     };
 
-    int ret = EXIT_FAILURE;
+    int ret = 2;
     bool never = false;
     bool force = false;
     bool version = false;
@@ -1369,21 +1369,21 @@ int main(int argc, char **argv)
     {
         if (acme_bootstrap(&a) && account_new(&a, yes))
         {
-            ret = EXIT_SUCCESS;
+            ret = 0;
         }
     }
     else if (strcmp(action, "update") == 0)
     {
         if (acme_bootstrap(&a) && account_retrieve(&a) && account_update(&a))
         {
-            ret = EXIT_SUCCESS;
+            ret = 0;
         }
     }
     else if (strcmp(action, "deactivate") == 0)
     {
         if (acme_bootstrap(&a) && account_retrieve(&a) && account_deactivate(&a))
         {
-            ret = EXIT_SUCCESS;
+            ret = 0;
         }
     }
     else if (strcmp(action, "issue") == 0)
@@ -1414,14 +1414,14 @@ int main(int argc, char **argv)
             else
             {
                 msg(1, "skipping %s/cert.pem", a.certdir);
-                ret = EXIT_SUCCESS;
+                ret = 1;
                 goto out;
             }
         }
 
         if (acme_bootstrap(&a) && account_retrieve(&a) && cert_issue(&a))
         {
-            ret = EXIT_SUCCESS;
+            ret = 0;
         }
     }
     else if (strcmp(action, "revoke") == 0)
@@ -1429,7 +1429,7 @@ int main(int argc, char **argv)
         if (acme_bootstrap(&a) && account_retrieve(&a) &&
                 cert_revoke(&a, revokefile, 0))
         {
-            ret = EXIT_SUCCESS;
+            ret = 0;
         }
     }
 

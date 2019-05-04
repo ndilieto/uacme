@@ -4,6 +4,7 @@ Copyright (C) 2019 Nicola Di Lieto <nicola.dilieto@gmail.com>
 * Version 1.0.8 (released 2019-05-02)
 
 ** uacme: added OpenSSL support (./configure --with-openssl)
+          exit codes: 0=success, 1=cert issuance skipped, 2=error
 
 * Version 1.0.7 (released 2019-04-29)
 
