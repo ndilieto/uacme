@@ -49,6 +49,7 @@
 #include <openssl/x509v3.h>
 #elif defined(USE_MBEDTLS)
 #include <mbedtls/asn1write.h>
+#include <mbedtls/base64.h>
 #include <mbedtls/ctr_drbg.h>
 #include <mbedtls/entropy.h>
 #include <mbedtls/error.h>
@@ -716,7 +717,20 @@ char *jws_encode(const char *protected, const char *payload,
         free(hash);
         goto out;
     }
-    signature = calloc(1, 4096);
+    switch (mbedtls_pk_get_type(key))
+    {
+        case MBEDTLS_PK_RSA:
+            signature = calloc(1, mbedtls_pk_get_len(key));
+            break;
+
+        case MBEDTLS_PK_ECDSA:
+        case MBEDTLS_PK_ECKEY_DH:
+        case MBEDTLS_PK_ECKEY:
+        default:
+            warnx("jws_encode: only RSA keys supported at this time");
+            free(hash);
+            goto out;
+    }
     if (!signature)
     {
         warn("jws_encode: calloc failed");
@@ -861,18 +875,30 @@ bool key_gen(const char *keyfile)
         goto out;
     }
     pem_size = 4096;
-    pem_data = calloc(1, pem_size);
-    if (!pem_data)
+    while (1)
     {
-        warn("key_gen: calloc failed");
-        goto out;
-    }
-    r = mbedtls_pk_write_key_pem(&key, pem_data, pem_size);
-    if (r)
-    {
-        warnx("key_gen: mbedtls_pk_write_key_pem failed: %s",
-                _mbedtls_strerror(r));
-        goto out;
+        pem_data = calloc(1, pem_size);
+        if (!pem_data)
+        {
+            warn("key_gen: calloc failed");
+            goto out;
+        }
+        r = mbedtls_pk_write_key_pem(&key, pem_data, pem_size);
+        if (r == 0)
+        {
+            break;
+        }
+        else if (r == MBEDTLS_ERR_BASE64_BUFFER_TOO_SMALL)
+        {
+            free(pem_data);
+            pem_size *= 2;
+        }
+        else
+        {
+            warnx("key_gen: mbedtls_pk_write_key_pem failed: %s",
+                    _mbedtls_strerror(r));
+            goto out;
+        }
     }
     pem_size = strlen(pem_data);
 #endif
@@ -1292,17 +1318,12 @@ char *csr_gen(const char * const *names, privkey_t key)
         goto out;
     }
 #elif defined(USE_MBEDTLS)
+    size_t buflen = 1024;
+    unsigned char *buf = NULL;
     mbedtls_x509write_csr csr;
     mbedtls_x509write_csr_init(&csr);
     mbedtls_x509write_csr_set_key(&csr, key);
     mbedtls_x509write_csr_set_md_alg(&csr, MBEDTLS_MD_SHA256);
-    size_t buflen = 4096;
-    unsigned char *buf = calloc(1, buflen);
-    if (!buf)
-    {
-        warn("csr_gen: calloc failed");
-        goto out;
-    }
 
     r = mbedtls_x509write_csr_set_subject_name(&csr, *names);
     if (r)
@@ -1312,91 +1333,145 @@ char *csr_gen(const char * const *names, privkey_t key)
         goto out;
     }
 
-    unsigned char *p = buf + buflen;
-    size_t len = 0;
-    size_t count = 0;
-    while (names[count]) count++;
-    while (count)
+    while (1)
     {
-        count--;
-        r = mbedtls_asn1_write_raw_buffer(&p, buf,
-                (const unsigned char *)names[count],
-                strlen(names[count]));
-        if (r >= 0)
+        buflen *= 2;
+        free(buf);
+        buf = calloc(1, buflen);
+        if (!buf)
         {
-            len += r;
-        }
-        else
-        {
-            warnx("csr_gen: mbedtls_asn1_write_raw_buffer failed: %s",
-                _mbedtls_strerror(r));
+            warn("csr_gen: calloc failed");
             goto out;
         }
-        r = mbedtls_asn1_write_len(&p, buf, strlen(names[count]));
+        unsigned char *p = buf + buflen;
+        size_t len = 0;
+        size_t count = 0;
+        while (names[count]) count++;
+        while (count)
+        {
+            count--;
+            r = mbedtls_asn1_write_raw_buffer(&p, buf,
+                    (const unsigned char *)names[count],
+                    strlen(names[count]));
+            if (r >= 0)
+            {
+                len += r;
+            }
+            else if (r == MBEDTLS_ERR_ASN1_BUF_TOO_SMALL)
+            {
+                break;
+            }
+            else
+            {
+                warnx("csr_gen: mbedtls_asn1_write_raw_buffer failed: %s",
+                        _mbedtls_strerror(r));
+                goto out;
+            }
+            r = mbedtls_asn1_write_len(&p, buf, strlen(names[count]));
+            if (r >= 0)
+            {
+                len += r;
+            }
+            else if (r == MBEDTLS_ERR_ASN1_BUF_TOO_SMALL)
+            {
+                break;
+            }
+            else
+            {
+                warnx("csr_gen: mbedtls_asn1_write_len failed: %s",
+                        _mbedtls_strerror(r));
+                goto out;
+            }
+            r = mbedtls_asn1_write_tag(&p, buf,
+                    MBEDTLS_ASN1_CONTEXT_SPECIFIC|2);
+            if (r >= 0)
+            {
+                len += r;
+            }
+            else if (r == MBEDTLS_ERR_ASN1_BUF_TOO_SMALL)
+            {
+                break;
+            }
+            else
+            {
+                warnx("csr_gen: mbedtls_asn1_write_tag failed: %s",
+                        _mbedtls_strerror(r));
+                goto out;
+            }
+        }
+        if (r == MBEDTLS_ERR_ASN1_BUF_TOO_SMALL)
+        {
+            continue;
+        }
+        r = mbedtls_asn1_write_len(&p, buf, len);
         if (r >= 0)
         {
             len += r;
+        }
+        else if (r == MBEDTLS_ERR_ASN1_BUF_TOO_SMALL)
+        {
+            continue;
         }
         else
         {
             warnx("csr_gen: mbedtls_asn1_write_len failed: %s",
-                _mbedtls_strerror(r));
+                    _mbedtls_strerror(r));
             goto out;
         }
-        r = mbedtls_asn1_write_tag(&p, buf, MBEDTLS_ASN1_CONTEXT_SPECIFIC|2);
+        r = mbedtls_asn1_write_tag(&p, buf,
+                MBEDTLS_ASN1_CONSTRUCTED | MBEDTLS_ASN1_SEQUENCE);
         if (r >= 0)
         {
             len += r;
         }
+        else if (r == MBEDTLS_ERR_ASN1_BUF_TOO_SMALL)
+        {
+            continue;
+        }
         else
         {
             warnx("csr_gen: mbedtls_asn1_write_tag failed: %s",
-                _mbedtls_strerror(r));
+                    _mbedtls_strerror(r));
             goto out;
         }
-    }
-    r = mbedtls_asn1_write_len(&p, buf, len);
-    if (r >= 0)
-    {
-        len += r;
-    }
-    else
-    {
-        warnx("csr_gen: mbedtls_asn1_write_len failed: %s",
-                _mbedtls_strerror(r));
-        goto out;
-    }
-    r = mbedtls_asn1_write_tag(&p, buf,
-            MBEDTLS_ASN1_CONSTRUCTED | MBEDTLS_ASN1_SEQUENCE);
-    if (r >= 0)
-    {
-        len += r;
-    }
-    else
-    {
-        warnx("csr_gen: mbedtls_asn1_write_tag failed: %s",
-                _mbedtls_strerror(r));
-        goto out;
+        r = mbedtls_x509write_csr_set_extension(&csr,
+                MBEDTLS_OID_SUBJECT_ALT_NAME,
+                MBEDTLS_OID_SIZE(MBEDTLS_OID_SUBJECT_ALT_NAME),
+                buf + buflen - len, len);
+        if (r)
+        {
+            warnx("csr_gen: mbedtls_x509write_csr_set_extension failed: %s",
+                    _mbedtls_strerror(r));
+            goto out;
+        }
+        break;
     }
 
-    r = mbedtls_x509write_csr_set_extension(&csr,
-            MBEDTLS_OID_SUBJECT_ALT_NAME,
-            MBEDTLS_OID_SIZE(MBEDTLS_OID_SUBJECT_ALT_NAME),
-            buf + buflen - len, len);
-    if (r)
+    while (1)
     {
-        warnx("csr_gen: mbedtls_x509write_csr_set_extension failed: %s",
-                _mbedtls_strerror(r));
-        goto out;
-    }
-
-    r = mbedtls_x509write_csr_der(&csr, buf, buflen,
-            mbedtls_ctr_drbg_random, &ctr_drbg);
-    if (r < 0)
-    {
-        warnx("csr_gen: mbedtls_x509write_csr_der failed: %s",
-                _mbedtls_strerror(r));
-        goto out;
+        r = mbedtls_x509write_csr_der(&csr, buf, buflen,
+                mbedtls_ctr_drbg_random, &ctr_drbg);
+        if (r > 0)
+        {
+            break;
+        }
+        else if (r == MBEDTLS_ERR_ASN1_BUF_TOO_SMALL)
+        {
+            free(buf);
+            buflen *= 2;
+            buf = calloc(1, buflen);
+            if (!buf)
+            {
+                warn("csr_gen: calloc failed");
+                goto out;
+            }
+        }
+        else
+        {
+            warnx("csr_gen: mbedtls_x509write_csr_der failed: %s",
+                    _mbedtls_strerror(r));
+            goto out;
+        }
     }
     csrsize = r;
     csrdata = calloc(1, csrsize);
