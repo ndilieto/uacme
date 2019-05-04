@@ -128,7 +128,7 @@ instructions in another script (for example /usr/share/uacme/reload.sh
 ## Documentation
 
 There is a regular unix man page in the distribution, also available
-[here](https://ndilieto.github.com/uacme)
+[here](https://ndilieto.github.io/uacme)
 
 ## Bugs and suggestions
 If you believe you have found a bug, please log it at https://github.com/ndilieto/uacme/issues
