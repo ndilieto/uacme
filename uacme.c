@@ -1130,7 +1130,7 @@ int main(int argc, char **argv)
         {NULL,           0,                 NULL, 0}
     };
 
-    int ret = EXIT_FAILURE;
+    int ret = 2;
     bool never = false;
     bool force = false;
     bool version = false;
@@ -1149,16 +1149,26 @@ int main(int argc, char **argv)
         return ret;
     }
 
-    if (!crypto_init())
+#if LIBCURL_VERSION_NUM < 0x072600
+#error libcurl version 7.38.0 or later is required
+#endif
+    const curl_version_info_data *cvid = curl_version_info(CURLVERSION_NOW);
+    if (!cvid || cvid->version_num < 0x072600)
     {
-        warnx("failed to initialize crypto library");
+        warnx("libcurl version 7.38.0 or later is required");
         return ret;
     }
 
     if (curl_global_init(CURL_GLOBAL_DEFAULT) != CURLE_OK)
     {
         warnx("failed to initialize libcurl");
-        crypto_deinit();
+        return ret;
+    }
+
+    if (!crypto_init())
+    {
+        warnx("failed to initialize crypto library");
+        curl_global_cleanup();
         return ret;
     }
 
@@ -1359,21 +1369,21 @@ int main(int argc, char **argv)
     {
         if (acme_bootstrap(&a) && account_new(&a, yes))
         {
-            ret = EXIT_SUCCESS;
+            ret = 0;
         }
     }
     else if (strcmp(action, "update") == 0)
     {
         if (acme_bootstrap(&a) && account_retrieve(&a) && account_update(&a))
         {
-            ret = EXIT_SUCCESS;
+            ret = 0;
         }
     }
     else if (strcmp(action, "deactivate") == 0)
     {
         if (acme_bootstrap(&a) && account_retrieve(&a) && account_deactivate(&a))
         {
-            ret = EXIT_SUCCESS;
+            ret = 0;
         }
     }
     else if (strcmp(action, "issue") == 0)
@@ -1404,14 +1414,14 @@ int main(int argc, char **argv)
             else
             {
                 msg(1, "skipping %s/cert.pem", a.certdir);
-                ret = EXIT_SUCCESS;
+                ret = 1;
                 goto out;
             }
         }
 
         if (acme_bootstrap(&a) && account_retrieve(&a) && cert_issue(&a))
         {
-            ret = EXIT_SUCCESS;
+            ret = 0;
         }
     }
     else if (strcmp(action, "revoke") == 0)
@@ -1419,7 +1429,7 @@ int main(int argc, char **argv)
         if (acme_bootstrap(&a) && account_retrieve(&a) &&
                 cert_revoke(&a, revokefile, 0))
         {
-            ret = EXIT_SUCCESS;
+            ret = 0;
         }
     }
 
@@ -1438,8 +1448,8 @@ out:
     free(a.keydir);
     free(a.dkeydir);
     free(a.certdir);
-    curl_global_cleanup();
     crypto_deinit();
+    curl_global_cleanup();
     exit(ret);
 }
 

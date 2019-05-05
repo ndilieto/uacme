@@ -1,3 +1,10 @@
+2019-05-04 Nicola Di Lieto <nicola.dilieto@gmail.com>
+	* Release 1.0.8
+	- added OpenSSL support (./configure --with-openssl)
+	- check libraries versions at both compile and run time
+	- exit codes: 0=success, 1=cert issuance skipped, 2=error
+	- mbedtls: dynamically grow buffers when needed
+
 2019-04-29 Nicola Di Lieto <nicola.dilieto@gmail.com>
 	* Release 1.0.7
 	- added HTTP User-Agent: header to all requests
