@@ -1,6 +1,12 @@
 uacme NEWS
 Copyright (C) 2019 Nicola Di Lieto <nicola.dilieto@gmail.com>
 
+* Version 1.0.8 (released 2019-05-05)
+
+** uacme: added OpenSSL support (./configure --with-openssl)
+          exit codes: 0=success, 1=cert issuance skipped, 2=error
+          mbedtls: dynamically grow buffers when needed
+
 * Version 1.0.7 (released 2019-04-29)
 
 ** uacme: added HTTP User-Agent: header to all requests

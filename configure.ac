@@ -62,8 +62,8 @@ if test X"$OPT_LIBCURL" = Xno; then
 fi
 if test X"$OPT_LIBCURL" = Xyes; then
     if test X"$PKGCONFIG" != Xno; then
-        AC_MSG_CHECKING([for libcurl >= 7.38])
-        itexists=`$PKGCONFIG --exists 'libcurl >= 7.38' >/dev/null 2>&1 && echo 1`
+        AC_MSG_CHECKING([for libcurl >= 7.38.0])
+        itexists=`$PKGCONFIG --exists 'libcurl >= 7.38.0' >/dev/null 2>&1 && echo 1`
         if test -z "$itexists"; then
             AC_MSG_RESULT([no])
             AC_MSG_ERROR([libcurl not found])
@@ -102,7 +102,14 @@ AC_ARG_WITH([mbedtls],
 [AS_HELP_STRING([--with-mbedtls=PATH],[enable mbedTLS, PATH is installation root])
 AS_HELP_STRING([--without-mbedtls], [disable mbedTLS detection])],
     OPT_MBEDTLS=$withval)
-if test "$OPT_MBEDTLS" = no; then
+
+OPT_OPENSSL=no
+AC_ARG_WITH([openssl],
+[AS_HELP_STRING([--with-openssl=PATH],[enable OpenSSL, PATH is installation root])
+AS_HELP_STRING([--without-openssl], [disable OpenSSL detection])],
+    OPT_OPENSSL=$withval)
+
+if test X"$OPT_MBEDTLS" = Xno -a X"$OPT_OPENSSL" = Xno; then
     OPT_GNUTLS=yes
 else
     OPT_GNUTLS=no
@@ -111,19 +118,26 @@ AC_ARG_WITH([gnutls],
 [AS_HELP_STRING([--with-gnutls=PATH], [enable GnuTLS, PATH is installation root])
 AS_HELP_STRING([--without-gnutls], [disable GnuTLS detection])],
     OPT_GNUTLS=$withval)
-if test X"$OPT_GNUTLS" = Xno -a X"$OPT_MBEDTLS" = Xno; then
-    AC_MSG_ERROR([Either GnuTLS or mbedTLS must be enabled])
+
+if test X"$OPT_GNUTLS" = Xno -a X"$OPT_MBEDTLS" = Xno -a X"$OPT_OPENSSL" = Xno; then
+    AC_MSG_ERROR([One of GnuTLS, OpenSSL or mbedTLS must be enabled])
 fi
 if test X"$OPT_GNUTLS" != Xno -a X"$OPT_MBEDTLS" != Xno; then
     AC_MSG_ERROR([GnuTLS and mbedTLS cannot be both enabled])
 fi
- 
+if test X"$OPT_GNUTLS" != Xno -a X"$OPT_OPENSSL" != Xno; then
+    AC_MSG_ERROR([GnuTLS and OpenSSL cannot be both enabled])
+fi
+if test X"$OPT_OPENSSL" != Xno -a X"$OPT_MBEDTLS" != Xno; then
+    AC_MSG_ERROR([OpenSSL and mbedTLS cannot be both enabled])
+fi
+
 if test X"$OPT_GNUTLS" != Xno; then
     addlib=""
     if test X"$OPT_GNUTLS" = Xyes; then
         if test X"$PKGCONFIG" != Xno; then
-            AC_MSG_CHECKING([for GnuTLS >= 3.3])
-            itexists=`$PKGCONFIG --exists 'gnutls >= 3.3' >/dev/null 2>&1 && echo 1`
+            AC_MSG_CHECKING([for GnuTLS >= 3.3.30])
+            itexists=`$PKGCONFIG --exists 'gnutls >= 3.3.30' >/dev/null 2>&1 && echo 1`
             if test -z "$itexists"; then
                 AC_MSG_RESULT([no])
                 AC_MSG_ERROR([gnutls not found])
@@ -160,6 +174,54 @@ if test X"$OPT_GNUTLS" != Xno; then
                     UACME_LIBRARY_PATH="$UACME_LIBRARY_PATH:$gtlslib"
                     export UACME_LIBRARY_PATH
                     AC_MSG_NOTICE([Added $gtlslib to UACME_LIBRARY_PATH])
+                fi
+            fi
+        fi
+    fi
+fi
+
+if test X"$OPT_OPENSSL" != Xno; then
+    addlib=""
+    if test X"$OPT_OPENSSL" = Xyes; then
+        if test X"$PKGCONFIG" != Xno; then
+            AC_MSG_CHECKING([for OpenSSL >= 1.1.1])
+            itexists=`$PKGCONFIG --exists 'openssl >= 1.1.1' >/dev/null 2>&1 && echo 1`
+            if test -z "$itexists"; then
+                AC_MSG_RESULT([no])
+                AC_MSG_ERROR([openssl not found])
+            else
+                addlib=`$PKGCONFIG --libs-only-l openssl`
+                addld=`$PKGCONFIG --libs-only-L openssl`
+                addcflags=`$PKGCONFIG --cflags-only-I openssl`
+                version=`$PKGCONFIG --modversion openssl`
+                openssllib=`echo $addld | $SED -e 's/-L//'`
+                AC_MSG_RESULT([found $version])
+            fi
+        fi
+    else
+        addlib="-lssl -lcrypto"
+        addld=-L$OPT_OPENSSL/lib$libsuff
+        addcflags=-I$OPT_OPENSSL/include
+        openssllib=$OPT_OPENSSL/lib$libsuff
+    fi
+    if test -n "$addlib"; then
+        LIBS="$addlib $LIBS"
+        LDFLAGS="$LDFLAGS $addld"
+        if test "$addcflags" != "-I/usr/include"; then
+            CPPFLAGS="$CPPFLAGS $addcflags"
+        fi
+        AC_CHECK_LIB(ssl, OpenSSL_version_num,
+                     [AC_DEFINE(USE_OPENSSL, 1, [if OpenSSL is enabled])
+                      AC_SUBST(USE_OPENSSL, [1])
+                      OPENSSL_ENABLED=1
+                      USE_OPENSSL="yes"],
+                     [AC_MSG_ERROR([openssl check failed])])
+        if test X"$USE_OPENSSL" = Xyes; then
+            if test -n "$openssllib"; then
+                if test X"$cross_compiling" != Xyes; then
+                    UACME_LIBRARY_PATH="$UACME_LIBRARY_PATH:$openssllib"
+                    export UACME_LIBRARY_PATH
+                    AC_MSG_NOTICE([Added $openssllib to UACME_LIBRARY_PATH])
                 fi
             fi
         fi

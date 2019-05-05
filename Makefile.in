@@ -283,6 +283,7 @@ SHELL = @SHELL@
 STRIP = @STRIP@
 USE_GNUTLS = @USE_GNUTLS@
 USE_MBEDTLS = @USE_MBEDTLS@
+USE_OPENSSL = @USE_OPENSSL@
 VERSION = @VERSION@
 abs_builddir = @abs_builddir@
 abs_srcdir = @abs_srcdir@

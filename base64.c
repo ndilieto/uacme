@@ -60,7 +60,7 @@ char *bin2hex(char *const hex, const size_t hex_maxlen,
     int          c;
 
     if (bin_len >= SIZE_MAX / 2 || hex_maxlen <= bin_len * 2U) {
-        errx(EXIT_FAILURE, "bin2hex length wrong");
+        errx(2, "bin2hex length wrong");
     }
     while (i < bin_len) {
         c = bin[i] & 0xf;
@@ -197,7 +197,7 @@ static void base64_check_variant(const int variant)
 {
     if ((((unsigned int) variant) & ~ 0x6U) != 0x1U)
     {
-        errx(EXIT_FAILURE, "base64_check_variant: invalid variant");
+        errx(2, "base64_check_variant: invalid variant");
     }
 }
 
@@ -232,7 +232,7 @@ char *bin2base64(char * const b64, const size_t b64_maxlen,
     }
     if (b64_maxlen <= b64_len)
     {
-        errx(EXIT_FAILURE, "bin2base64: maxlen < len");
+        errx(2, "bin2base64: maxlen < len");
     }
     if ((((unsigned int) variant) & VARIANT_URLSAFE_MASK) != 0U) {
         while (bin_pos < bin_len) {

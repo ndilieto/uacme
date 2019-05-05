@@ -24,15 +24,27 @@
 #include <stdbool.h>
 
 #if defined(USE_GNUTLS)
-#if defined(USE_MBEDTLS)
-#error only one of USE_GNUTLS and USE_MBEDTLS must be defined
+#if defined(USE_OPENSSL) || defined(USE_MBEDTLS)
+#error only one of USE_GNUTLS, USE_MBEDTLS or USE_OPENSSL must be defined
 #endif
 #include <gnutls/abstract.h>
 
 typedef gnutls_privkey_t privkey_t;
 #define privkey_deinit gnutls_privkey_deinit
 
+#elif defined(USE_OPENSSL)
+#if defined(USE_GNUTLS) || defined(USE_MBEDTLS)
+#error only one of USE_GNUTLS, USE_MBEDTLS or USE_OPENSSL must be defined
+#endif
+#include <openssl/evp.h>
+
+typedef EVP_PKEY *privkey_t;
+#define privkey_deinit EVP_PKEY_free
+
 #elif defined(USE_MBEDTLS)
+#if defined(USE_OPENSSL) || defined(USE_GNUTLS)
+#error only one of USE_GNUTLS, USE_MBEDTLS or USE_OPENSSL must be defined
+#endif
 #include <mbedtls/pk.h>
 
 typedef mbedtls_pk_context *privkey_t;
@@ -43,7 +55,7 @@ static inline void privkey_deinit(privkey_t key)
 }
 
 #else
-#error either USE_GNUTLS or USE_MBEDTLS must be defined
+#error either USE_GNUTLS or USE_MBEDTLS or USE_OPENSSL must be defined
 #endif
 
 bool crypto_init(void);
