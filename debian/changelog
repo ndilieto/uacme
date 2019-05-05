@@ -1,3 +1,12 @@
+uacme (1.0.8-1) unstable; urgency=medium
+
+  * added README.md with usage hints
+  * added OpenSSL support (./configure --with-openssl)
+  * improved exit codes
+  * mbedtls: dynamically grow buffers when needed
+
+ -- Nicola Di Lieto <nicola.dilieto@gmail.com>  Sun, 05 May 2019 08:18:12 +0200
+
 uacme (1.0.7-1) unstable; urgency=medium
 
   * Release 1.0.7
