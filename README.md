@@ -41,8 +41,8 @@ by specifying the **--verbose** flag once or more.
 
 ## Installation
 ```
-wget -O - https://github.com/ndilieto/uacme/archive/upstream/1.0.7.tar.gz | tar zx
-cd uacme-1.0.7
+wget -O - https://github.com/ndilieto/uacme/archive/upstream/1.0.8.tar.gz | tar zx
+cd uacme-1.0.8
 ./configure
 make install
 ```
@@ -52,9 +52,9 @@ git clone -b upstream/latest https://github.com/ndilieto/uacme
 ```
 and a precompiled debian jessie amd64 package
 ```
-wget https://github.com/ndilieto/uacme/releases/download/debian/1.0.7-1/uacme_1.0.7-1_amd64.deb
+wget https://github.com/ndilieto/uacme/releases/download/debian/1.0.8-1/uacme_1.0.8-1_amd64.deb
 sudo apt-get install libgnutls-deb0-28 libcurl3-gnutls 
-sudo dpkg -i uacme_1.0.7-1_amd64.deb
+sudo dpkg -i uacme_1.0.8-1_amd64.deb
 ```
 
 ## Getting started
