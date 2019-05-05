@@ -121,7 +121,9 @@ Note the absence of -v flag, this makes uacme only produce output upon errors.
 Note also that you will need to restart or reload any service that 
 uses the certificate, to make sure it uses the renewed one.
 This is system and installation dependent. I normally put the necessary
-instructions in another script (for example /usr/share/uacme/reload.sh
+instructions in another script (for example /usr/share/uacme/reload.sh)
+that is executed when uacme returns 0 (indicating the certificate has
+been reissued).
 ```
 6 15 * * * /usr/bin/uacme -c /path/to/uacme.d -h /usr/share/uacme/uacme.sh issue www.your.domain.com && /usr/share/uacme/reload.sh
 ```
