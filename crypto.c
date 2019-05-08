@@ -31,10 +31,13 @@
 #include "base64.h"
 #include "crypto.h"
 #include "msg.h"
+#if !defined(USE_OPENSSL)
 #include "read-file.h"
+#endif
 
 #if defined(USE_GNUTLS)
 #include <gnutls/crypto.h>
+#include <libtasn1.h>
 #elif defined(USE_OPENSSL)
 #include <openssl/asn1.h>
 #include <openssl/crypto.h>
@@ -304,7 +307,7 @@ static bool rsa_params(privkey_t key, char **m, char **e)
             NULL, NULL, NULL, NULL, NULL, NULL);
     if (r < 0)
     {
-        warnx("rsa_params: gnutls_privkey_export: %s",
+        warnx("rsa_params: gnutls_privkey_export_rsa_raw: %s",
                 gnutls_strerror(r));
         goto out;
     }
@@ -322,10 +325,10 @@ static bool rsa_params(privkey_t key, char **m, char **e)
     }
 #elif defined(USE_OPENSSL)
     unsigned char *data = NULL;
-    RSA *rsa = EVP_PKEY_get1_RSA(key);
+    RSA *rsa = EVP_PKEY_get0_RSA(key);
     if (!rsa)
     {
-        openssl_error("rsa_param");
+        openssl_error("rsa_params");
         goto out;
     }
     r = BN_num_bytes(RSA_get0_n(rsa));
@@ -337,7 +340,7 @@ static bool rsa_params(privkey_t key, char **m, char **e)
     }
     if (BN_bn2bin(RSA_get0_n(rsa), data) != r)
     {
-        openssl_error("rsa_param");
+        openssl_error("rsa_params");
         goto out;
     }
     _m = bn2str(data, r);
@@ -356,7 +359,7 @@ static bool rsa_params(privkey_t key, char **m, char **e)
     }
     if (BN_bn2bin(RSA_get0_e(rsa), data) != r)
     {
-        openssl_error("rsa_param");
+        openssl_error("rsa_params");
         goto out;
     }
     _e = bn2str(data, r);
@@ -422,10 +425,6 @@ out:
     free(exp.data);
 #elif defined(USE_OPENSSL)
     free(data);
-    if (rsa)
-    {
-        RSA_free(rsa);
-    }
 #elif defined(USE_MBEDTLS)
     free(data);
 #endif
@@ -443,68 +442,267 @@ out:
     }
 }
 
-static char *jws_jwk(privkey_t key)
+static bool ec_params(privkey_t key, char **x, char **y)
 {
-    char *ret = NULL;
-    char *m = NULL;
-    char *e = NULL;
+    int r;
+    char *_x = NULL;
+    char *_y = NULL;
+#if defined(USE_GNUTLS)
+    gnutls_ecc_curve_t curve;
+    gnutls_datum_t dx = {NULL, 0};
+    gnutls_datum_t dy = {NULL, 0};
+    if (gnutls_privkey_get_pk_algorithm(key, NULL) != GNUTLS_PK_EC)
+    {
+        warnx("ec_params: not a EC key");
+        goto out;
+    }
+    r = gnutls_privkey_export_ecc_raw(key, &curve, &dx, &dy, NULL);
+    if (r < 0)
+    {
+        warnx("ec_params: gnutls_privkey_export_ecc_raw: %s",
+                gnutls_strerror(r));
+        goto out;
+    }
+    if (curve != GNUTLS_ECC_CURVE_SECP256R1)
+    {
+        warnx("ec_params: only \"prime256v1\" Elliptic Curve supported");
+        goto out;
+    }
+    _x = bn2str(dx.data, dx.size);
+    if (!_x)
+    {
+        warnx("ec_params: bn2str failed");
+        goto out;
+    }
+    _y = bn2str(dy.data, dy.size);
+    if (!_y)
+    {
+        warnx("ec_params: bn2str failed");
+        goto out;
+    }
+#elif defined(USE_OPENSSL)
+    unsigned char *data = NULL;
+    BIGNUM *bx = BN_new();
+    BIGNUM *by = BN_new();
+    if (!bx || !by)
+    {
+        openssl_error("ec_params");
+        goto out;
+    }
+    EC_KEY *ec = EVP_PKEY_get0_EC_KEY(key);
+    if (!ec)
+    {
+        openssl_error("ec_params");
+        goto out;
+    }
+    const EC_GROUP *g = EC_KEY_get0_group(ec);
+    if (!g || EC_GROUP_get_curve_name(g) != NID_X9_62_prime256v1)
+    {
+        openssl_error("ec_params");
+        warnx("ec_params: only \"prime256v1\" Elliptic Curve supported");
+        goto out;
+    }
+    const EC_POINT *pubkey = EC_KEY_get0_public_key(ec);
+    if (!pubkey)
+    {
+        openssl_error("ec_params");
+        goto out;
+    }
+    if (!EC_POINT_get_affine_coordinates(g, pubkey, bx, by, NULL))
+    {
+        openssl_error("ec_params");
+        goto out;
+    }
+    r = BN_num_bytes(bx);
+    data = calloc(1, r);
+    if (!data)
+    {
+        warn("ec_params: calloc failed");
+        goto out;
+    }
+    if (BN_bn2bin(bx, data) != r)
+    {
+        openssl_error("ec_params");
+        goto out;
+    }
+    _x = bn2str(data, r);
+    if (!_x)
+    {
+        warnx("ec_params: bn2str failed");
+        goto out;
+    }
+    free(data);
+    r = BN_num_bytes(by);
+    data = calloc(1, r);
+    if (!data)
+    {
+        warn("ec_params: calloc failed");
+        goto out;
+    }
+    if (BN_bn2bin(by, data) != r)
+    {
+        openssl_error("ec_params");
+        goto out;
+    }
+    _y = bn2str(data, r);
+    if (!_y)
+    {
+        warnx("ec_params: bn2str failed");
+        goto out;
+    }
+#elif defined(USE_MBEDTLS)
+    unsigned char *data = NULL;
+    size_t len;
+    if (!mbedtls_pk_can_do(key, MBEDTLS_PK_ECKEY))
+    {
+        warnx("ec_params: not a EC key");
+        goto out;
+    }
+    const mbedtls_ecp_keypair *ec = mbedtls_pk_ec(*key);
+    if (ec->grp.id != MBEDTLS_ECP_DP_SECP256R1)
+    {
+        warnx("ec_params: only \"prime256v1\" Elliptic Curve supported");
+        goto out;
+    }
+    len = mbedtls_mpi_size(&ec->Q.X);
+    data = calloc(1, len);
+    if (!data)
+    {
+        warnx("ec_params: calloc failed");
+        goto out;
+    }
+    r = mbedtls_mpi_write_binary(&ec->Q.X, data, len);
+    if (r)
+    {
+        warnx("ec_params: mbedtls_mpi_write_binary failed: %s",
+                _mbedtls_strerror(r));
+        goto out;
+    }
+    _x = bn2str(data, len);
+    if (!_x)
+    {
+        warnx("ec_params: bn2str failed");
+        goto out;
+    }
+    free(data);
+    len = mbedtls_mpi_size(&ec->Q.Y);
+    data = calloc(1, len);
+    if (!data)
+    {
+        warnx("ec_params: calloc failed");
+        goto out;
+    }
+    r = mbedtls_mpi_write_binary(&ec->Q.Y, data, len);
+    if (r)
+    {
+        warnx("ec_params: mbedtls_mpi_write_binary failed: %s",
+                _mbedtls_strerror(r));
+        goto out;
+    }
+    _y = bn2str(data, len);
+    if (!_y)
+    {
+        warnx("ec_params: bn2str failed");
+        goto out;
+    }
+#endif
+out:
+#if defined(USE_GNUTLS)
+    free(dx.data);
+    free(dy.data);
+#elif defined(USE_OPENSSL)
+    if (bx) BN_free(bx);
+    if (by) BN_free(by);
+    free(data);
+#elif defined(USE_MBEDTLS)
+    free(data);
+#endif
+    if (_x && _y)
+    {
+        *x = _x;
+        *y = _y;
+        return true;
+    }
+    else
+    {
+        free(_x);
+        free(_y);
+        return false;
+    }
+}
+
+keytype_t key_type(privkey_t key)
+{
 #if defined(USE_GNUTLS)
     switch (gnutls_privkey_get_pk_algorithm(key, NULL))
     {
         case GNUTLS_PK_RSA:
-            if (!rsa_params(key, &m, &e))
-            {
-                warnx("jws_jwk: rsa_params failed");
-                goto out;
-            }
-            break;
-
-        case GNUTLS_PK_DSA:
-        case GNUTLS_PK_DH:
+            return PK_RSA;
         case GNUTLS_PK_EC:
+            return PK_EC;
 #elif defined(USE_OPENSSL)
     switch (EVP_PKEY_base_id(key))
     {
         case EVP_PKEY_RSA:
-            if (!rsa_params(key, &m, &e))
-            {
-                warnx("jws_jwk: rsa_params failed");
-                goto out;
-            }
-            break;
-
-        case EVP_PKEY_DSA:
-        case EVP_PKEY_DH:
+            return PK_RSA;
         case EVP_PKEY_EC:
+            return PK_EC;
 #elif defined(USE_MBEDTLS)
     switch (mbedtls_pk_get_type(key))
     {
         case MBEDTLS_PK_RSA:
-            if (!rsa_params(key, &m, &e))
+            return PK_RSA;
+        case MBEDTLS_PK_ECKEY:
+            return PK_EC;
+#endif
+        default:
+            return PK_NONE;
+    }
+}
+
+static char *jws_jwk(privkey_t key)
+{
+    char *ret = NULL;
+    char *p1 = NULL;
+    char *p2 = NULL;
+    switch (key_type(key))
+    {
+        case PK_RSA:
+            if (!rsa_params(key, &p1, &p2))
             {
                 warnx("jws_jwk: rsa_params failed");
                 goto out;
             }
+            if (asprintf(&ret, "\"jwk\":{\"kty\":\"RSA\","
+                        "\"n\":\"%s\",\"e\":\"%s\"}", p1, p2) < 0)
+            {
+                warnx("jws_jwk: asprintf failed");
+                ret = NULL;
+            }
             break;
 
-        case MBEDTLS_PK_ECDSA:
-        case MBEDTLS_PK_ECKEY_DH:
-        case MBEDTLS_PK_ECKEY:
-#endif
+        case PK_EC:
+            if (!ec_params(key, &p1, &p2))
+            {
+                warnx("jws_jwk: ec_params failed");
+                goto out;
+            }
+            if (asprintf(&ret, "\"jwk\":{\"kty\":\"EC\",\"crv\":\"P-256\","
+                        "\"x\":\"%s\",\"y\":\"%s\"}", p1, p2) < 0)
+            {
+                warnx("jws_jwk: asprintf failed");
+                ret = NULL;
+            }
+            break;
+
         default:
-            warnx("jws_jwk: only RSA keys supported at this time");
+            warnx("jws_jwk: only RSA/EC keys are supported");
             goto out;
             break;
     }
-    if (asprintf(&ret, "\"jwk\":{\"kty\":\"RSA\","
-                "\"e\":\"%s\",\"n\":\"%s\"}", e, m) < 0)
-    {
-        warnx("jws_jwk: asprintf failed");
-        ret = NULL;
-    }
 out:
-    free(e);
-    free(m);
+    free(p1);
+    free(p2);
     return ret;
 }
 
@@ -512,14 +710,27 @@ char *jws_protected_jwk(const char *nonce, const char *url,
         privkey_t key)
 {
     char *ret = NULL;
+    const char *alg = NULL;
     char *jwk = jws_jwk(key);
     if (!jwk)
     {
         warnx("jws_protected_jwk: jws_jwk failed");
         return NULL;
     }
-    if (asprintf(&ret, "{\"alg\":\"RS256\",\"nonce\":\"%s\","
-                "\"url\":\"%s\",%s}", nonce, url, jwk) < 0)
+    switch (key_type(key))
+    {
+        case PK_RSA:
+            alg = "RS256";
+            break;
+        case PK_EC:
+            alg = "ES256";
+            break;
+        default:
+            warnx("jws_protected_jwk: only RSA/EC keys are supported");
+            return ret;
+    }
+    if (asprintf(&ret, "{\"alg\":\"%s\",\"nonce\":\"%s\","
+                "\"url\":\"%s\",%s}", alg, nonce, url, jwk) < 0)
     {
         warnx("jws_protected_jwk: asprintf failed");
         ret = NULL;
@@ -529,11 +740,24 @@ char *jws_protected_jwk(const char *nonce, const char *url,
 }
 
 char *jws_protected_kid(const char *nonce, const char *url,
-        const char *kid)
+        const char *kid, keytype_t type)
 {
     char *ret = NULL;
-    if (asprintf(&ret, "{\"alg\":\"RS256\",\"nonce\":\"%s\","
-                "\"url\":\"%s\",\"kid\":\"%s\"}", nonce, url, kid) < 0)
+    const char *alg = NULL;
+    switch (type)
+    {
+        case PK_RSA:
+            alg = "RS256";
+            break;
+        case PK_EC:
+            alg = "ES256";
+            break;
+        default:
+            warnx("jws_protected_kid: only RSA/EC keys are supported");
+            return ret;
+    }
+    if (asprintf(&ret, "{\"alg\":\"%s\",\"nonce\":\"%s\","
+                "\"url\":\"%s\",\"kid\":\"%s\"}", alg, nonce, url, kid) < 0)
     {
         warnx("jws_protected_kid: asprintf failed");
         ret = NULL;
@@ -544,65 +768,47 @@ char *jws_protected_kid(const char *nonce, const char *url,
 char *jws_thumbprint(privkey_t key)
 {
     char *ret = NULL;
-    char *m = NULL;
-    char *e = NULL;
-#if defined(USE_GNUTLS)
-    switch (gnutls_privkey_get_pk_algorithm(key, NULL))
+    char *p1 = NULL;
+    char *p2 = NULL;
+    switch (key_type(key))
     {
-        case GNUTLS_PK_RSA:
-            if (!rsa_params(key, &m, &e))
+        case PK_RSA:
+            if (!rsa_params(key, &p1, &p2))
             {
                 warnx("jws_thumbprint: rsa_params failed");
                 goto out;
             }
-            break;
-
-        case GNUTLS_PK_DSA:
-        case GNUTLS_PK_DH:
-        case GNUTLS_PK_EC:
-#elif defined(USE_OPENSSL)
-    switch (EVP_PKEY_base_id(key))
-    {
-        case EVP_PKEY_RSA:
-            if (!rsa_params(key, &m, &e))
+            ret = sha256_base64url(
+                    "{\"e\":\"%s\",\"kty\":\"RSA\",\"n\":\"%s\"}", p2, p1);
+            if (!ret)
             {
-                warnx("jws_thumbprint: rsa_params failed");
-                goto out;
+                warnx("jws_thumbprint: sha256_base64url failed");
             }
             break;
 
-        case EVP_PKEY_DSA:
-        case EVP_PKEY_DH:
-        case EVP_PKEY_EC:
-#elif defined(USE_MBEDTLS)
-    switch (mbedtls_pk_get_type(key))
-    {
-        case MBEDTLS_PK_RSA:
-            if (!rsa_params(key, &m, &e))
+        case PK_EC:
+            if (!ec_params(key, &p1, &p2))
             {
-                warnx("jws_thumbprint: rsa_params failed");
+                warnx("jws_thumbprint: ec_params failed");
                 goto out;
+            }
+            ret = sha256_base64url("{\"crv\":\"P-256\",\"kty\":\"EC\","
+                    "\"x\":\"%s\",\"y\":\"%s\"}", p1, p2);
+            if (!ret)
+            {
+                warnx("jws_thumbprint: sha256_base64url failed");
             }
             break;
 
-        case MBEDTLS_PK_ECDSA:
-        case MBEDTLS_PK_ECKEY_DH:
-        case MBEDTLS_PK_ECKEY:
-#endif
+            break;
+
         default:
-            warnx("jws_thumbprint: only RSA keys supported at this time");
+            warnx("jws_thumbprint: only RSA/EC keys are supported");
             goto out;
-            break;
-    }
-    ret = sha256_base64url(
-            "{\"e\":\"%s\",\"kty\":\"RSA\",\"n\":\"%s\"}", e, m);
-    if (!ret)
-    {
-        warnx("jws_thumbprint: sha256_base64url failed");
     }
 out:
-    free(e);
-    free(m);
+    free(p1);
+    free(p2);
     return ret;
 }
 
@@ -623,6 +829,283 @@ static unsigned char *gnutls_datum_data(gnutls_datum_t *d, bool free)
     }
 out:
     return ret;
+}
+
+bool ec_decode(gnutls_datum_t *sig)
+{
+    int r, len;
+    unsigned char *p = sig->data;
+    int ps = sig->size;
+    unsigned long tag;
+    unsigned char cls;
+
+    r = asn1_get_tag_der(p, ps, &cls, &len, &tag);
+    if (r != ASN1_SUCCESS)
+    {
+        warnx("ec_decode: asn1_get_tag_der: %s", asn1_strerror(r));
+        return false;
+    }
+    if (cls != ASN1_CLASS_STRUCTURED || tag != ASN1_TAG_SEQUENCE)
+    {
+        warnx("ec_decode: unexpected ASN1 tag");
+        return false;
+    }
+    p += len;
+    ps -= len;
+
+    r = asn1_get_length_der(p, ps, &len);
+    if (r < 0)
+    {
+        warnx("ec_decode: asn1_get_length_der: %d", r);
+        return false;
+    }
+    p += len;
+    ps -= len;
+
+    if (p + r != sig->data + sig->size)
+    {
+        warnx("ec_decode: signature lenght mismatch");
+        return false;
+    }
+
+    size_t sz = 64; // 96 for ES384; 132 for ES512
+    unsigned char *tmp = calloc(1, sz);
+    if (!tmp)
+    {
+        warn("ec_decode: calloc failed");
+        return false;
+    }
+
+    r = asn1_get_tag_der(p, ps, &cls, &len, &tag);
+    if (r != ASN1_SUCCESS)
+    {
+        warnx("ec_decode: asn1_get_tag_der: %s", asn1_strerror(r));
+        free(tmp);
+        return false;
+    }
+    if (cls != ASN1_CLASS_UNIVERSAL || tag != ASN1_TAG_INTEGER)
+    {
+        warnx("ec_decode: unexpected ASN1 tag");
+        free(tmp);
+        return false;
+    }
+    p += len;
+    ps -= len;
+
+    r = asn1_get_length_der(p, ps, &len);
+    if (r < 0)
+    {
+        warnx("ec_decode: asn1_get_length_der: %d", r);
+        free(tmp);
+        return false;
+    }
+    p += len;
+    ps -= len;
+
+    if (r >= sz/2)
+    {
+        memcpy(tmp, p + r - sz/2, sz/2);
+    }
+    else
+    {
+        memcpy(tmp + sz/2 - r, p, r);
+    }
+    p += r;
+    ps -= r;
+
+    r = asn1_get_tag_der(p, ps, &cls, &len, &tag);
+    if (r != ASN1_SUCCESS)
+    {
+        warnx("ec_decode: asn1_get_tag_der: %s", asn1_strerror(r));
+        free(tmp);
+        return false;
+    }
+    if (cls != ASN1_CLASS_UNIVERSAL || tag != ASN1_TAG_INTEGER)
+    {
+        warnx("ec_decode: unexpected ASN1 tag");
+        free(tmp);
+        return false;
+    }
+    p += len;
+    ps -= len;
+
+    r = asn1_get_length_der(p, ps, &len);
+    if (r < 0)
+    {
+        warnx("ec_decode: asn1_get_length_der: %d", r);
+        free(tmp);
+        return false;
+    }
+    p += len;
+    ps -= len;
+
+    if (r >= sz/2)
+    {
+        memcpy(tmp + sz/2, p + r - sz/2, sz/2);
+    }
+    else
+    {
+        memcpy(tmp + sz - r, p, r);
+    }
+    p += r;
+    ps -= r;
+
+    if (ps != 0)
+    {
+        warnx("ec_decode: signature lenght mismatch");
+        free(tmp);
+        return false;
+    }
+
+    free(sig->data);
+    sig->data = tmp;
+    sig->size = sz;
+    return true;
+}
+#elif defined(USE_OPENSSL)
+bool ec_decode(unsigned char **sig, size_t *sig_len)
+{
+    int r;
+    const unsigned char *p = *sig;
+    ECDSA_SIG *s = d2i_ECDSA_SIG(NULL, &p, *sig_len);
+    if (!s)
+    {
+        openssl_error("ec_decode");
+        return false;
+    }
+    size_t sz = 64; // 96 for ES384; 132 for ES512
+    unsigned char *tmp = calloc(1, sz);
+    if (!tmp)
+    {
+        warn("ec_decode: calloc failed");
+        ECDSA_SIG_free(s);
+        return false;
+    }
+    r = BN_num_bytes(ECDSA_SIG_get0_r(s));
+    unsigned char *data = calloc(1, r);
+    if (!data)
+    {
+        warn("ec_decode: calloc failed");
+        ECDSA_SIG_free(s);
+        free(tmp);
+        return false;
+    }
+    if (BN_bn2bin(ECDSA_SIG_get0_r(s), data) != r)
+    {
+        openssl_error("ec_decode");
+        ECDSA_SIG_free(s);
+        free(data);
+        free(tmp);
+        return false;
+    }
+    if (r >= sz/2)
+    {
+        memcpy(tmp, data + r - sz/2, sz/2);
+    }
+    else
+    {
+        memcpy(tmp + sz/2 - r, data, r);
+    }
+    free(data);
+
+    r = BN_num_bytes(ECDSA_SIG_get0_s(s));
+    data = calloc(1, r);
+    if (!data)
+    {
+        warn("ec_decode: calloc failed");
+        ECDSA_SIG_free(s);
+        free(tmp);
+        return false;
+    }
+    if (BN_bn2bin(ECDSA_SIG_get0_s(s), data) != r)
+    {
+        openssl_error("ec_decode");
+        ECDSA_SIG_free(s);
+        free(data);
+        free(tmp);
+        return false;
+    }
+    if (r >= sz/2)
+    {
+        memcpy(tmp + sz/2, data + r - sz/2, sz/2);
+    }
+    else
+    {
+        memcpy(tmp + sz - r, data, r);
+    }
+
+    ECDSA_SIG_free(s);
+    free(data);
+    free(*sig);
+    *sig = tmp;
+    *sig_len = sz;
+    return true;
+}
+#elif defined(USE_MBEDTLS)
+bool ec_decode(unsigned char **sig, size_t *sig_len)
+{
+    int r;
+    unsigned char *p = *sig;
+    const unsigned char *end = p + *sig_len;
+    size_t len;
+    r = mbedtls_asn1_get_tag(&p, end, &len,
+            MBEDTLS_ASN1_CONSTRUCTED | MBEDTLS_ASN1_SEQUENCE);
+    if (r != 0)
+    {
+        warnx("ec_decode: mbedtls_asn1_get_tag failed: %s",
+                _mbedtls_strerror(r));
+        return false;
+    }
+    if (p + len != end)
+    {
+        warnx("ec_decode: signature lenght mismatch");
+        return false;
+    }
+    size_t sz = 64; // 96 for ES384; 132 for ES512
+    unsigned char *tmp = calloc(1, sz);
+    if (!tmp)
+    {
+        warn("ec_decode: calloc failed");
+        return false;
+    }
+    r = mbedtls_asn1_get_tag(&p, end, &len, MBEDTLS_ASN1_INTEGER);
+    if (r != 0)
+    {
+        warnx("ec_decode: mbedtls_asn1_get_tag failed: %s",
+                _mbedtls_strerror(r));
+        free(tmp);
+        return false;
+    }
+    if (len >= sz/2)
+    {
+        memcpy(tmp, p + len - sz/2, sz/2);
+    }
+    else
+    {
+        memcpy(tmp + sz/2 - len, p, len);
+    }
+    p += len;
+    r = mbedtls_asn1_get_tag(&p, end, &len, MBEDTLS_ASN1_INTEGER);
+    if (r != 0)
+    {
+        warnx("ec_decode: mbedtls_asn1_get_tag failed: %s",
+                _mbedtls_strerror(r));
+        free(tmp);
+        return false;
+    }
+    if (len >= sz/2)
+    {
+        memcpy(tmp + sz/2, p + len - sz/2, sz/2);
+    }
+    else
+    {
+        memcpy(tmp + sz - len, p, len);
+    }
+
+    free(*sig);
+    *sig = tmp;
+    *sig_len = sz;
+    return true;
 }
 #endif
 
@@ -664,6 +1147,11 @@ char *jws_encode(const char *protected, const char *payload,
         warnx("jws_encode: gnutls_privkey_sign_data: %s", gnutls_strerror(r));
         goto out;
     }
+    if (key_type(key) == PK_EC && !ec_decode(&sign))
+    {
+        warnx("jws_encode: ec_decode failed");
+        goto out;
+    }
     signature_size = sign.size;
     signature = gnutls_datum_data(&sign, true);
     if (!signature)
@@ -700,6 +1188,11 @@ char *jws_encode(const char *protected, const char *payload,
         goto out;
     }
     signature_size = len;
+    if (key_type(key) == PK_EC && !ec_decode(&signature, &signature_size))
+    {
+        warnx("jws_encode: ec_decode failed");
+        goto out;
+    }
 #elif defined(USE_MBEDTLS)
     size_t hash_len = 32;
     unsigned char *hash = calloc(1, hash_len);
@@ -723,11 +1216,12 @@ char *jws_encode(const char *protected, const char *payload,
             signature = calloc(1, mbedtls_pk_get_len(key));
             break;
 
-        case MBEDTLS_PK_ECDSA:
-        case MBEDTLS_PK_ECKEY_DH:
         case MBEDTLS_PK_ECKEY:
+            signature = calloc(1, 2*mbedtls_pk_get_len(key));
+            break;
+
         default:
-            warnx("jws_encode: only RSA keys supported at this time");
+            warnx("jws_encode: only RSA/EC keys are supported");
             free(hash);
             goto out;
     }
@@ -744,6 +1238,11 @@ char *jws_encode(const char *protected, const char *payload,
     {
         warnx("jws_encode: mbedtls_pk_sign failed: %s",
                 _mbedtls_strerror(r));
+        goto out;
+    }
+    if (key_type(key) == PK_EC && !ec_decode(&signature, &signature_size))
+    {
+        warnx("jws_encode: ec_decode failed");
         goto out;
     }
 #endif
@@ -778,6 +1277,7 @@ out:
     {
         EVP_MD_CTX_destroy(emc);
     }
+#elif defined(USE_MBEDTLS)
 #endif
     free(encoded_payload);
     free(encoded_protected);
@@ -787,7 +1287,7 @@ out:
     return jws;
 }
 
-bool key_gen(const char *keyfile)
+bool key_gen(keytype_t type, int bits, const char *keyfile)
 {
     bool success = false;
     int r;
@@ -805,7 +1305,19 @@ bool key_gen(const char *keyfile)
                 gnutls_strerror(r));
         goto out;
     }
-    r = gnutls_x509_privkey_generate(key, GNUTLS_PK_RSA, 4096, 0);
+    switch (type)
+    {
+        case PK_RSA:
+            r = gnutls_x509_privkey_generate(key, GNUTLS_PK_RSA, bits, 0);
+            break;
+        case PK_EC:
+            r = gnutls_x509_privkey_generate(key, GNUTLS_PK_EC,
+                    GNUTLS_CURVE_TO_BITS(GNUTLS_ECC_CURVE_SECP256R1), 0);
+            break;
+        default:
+            warnx("key_gen: only RSA/EC keys are supported");
+            goto out;
+    }
     if (r != GNUTLS_E_SUCCESS)
     {
         warnx("key_gen: gnutls_x509_privkey_generate: %s",
@@ -829,23 +1341,51 @@ bool key_gen(const char *keyfile)
     }
 #elif defined(USE_OPENSSL)
     EVP_PKEY *key = NULL;
-    EVP_PKEY_CTX *epc = EVP_PKEY_CTX_new_id(EVP_PKEY_RSA, NULL);
+    EVP_PKEY_CTX *epc = NULL;
+    switch (type)
+    {
+        case PK_RSA:
+            epc = EVP_PKEY_CTX_new_id(EVP_PKEY_RSA, NULL);
+            break;
+        case PK_EC:
+            epc = EVP_PKEY_CTX_new_id(EVP_PKEY_EC, NULL);
+            break;
+        default:
+            warnx("key_gen: only RSA/EC keys are supported");
+            goto out;
+    }
     if (!epc)
     {
         openssl_error("key_gen");
         goto out;
     }
-    if (EVP_PKEY_keygen_init(epc) <= 0)
+    if (!EVP_PKEY_keygen_init(epc))
     {
         openssl_error("key_gen");
         goto out;
     }
-    if (EVP_PKEY_CTX_set_rsa_keygen_bits(epc, 4096) <= 0)
+    switch (type)
     {
-        openssl_error("key_gen");
-        goto out;
+        case PK_RSA:
+            if (!EVP_PKEY_CTX_set_rsa_keygen_bits(epc, bits))
+            {
+                openssl_error("key_gen");
+                goto out;
+            }
+            break;
+        case PK_EC:
+            if (!EVP_PKEY_CTX_set_ec_paramgen_curve_nid(epc,
+                        NID_X9_62_prime256v1))
+            {
+                openssl_error("key_gen");
+                goto out;
+            }
+            break;
+        default:
+            warnx("key_gen: only RSA/EC keys are supported");
+            goto out;
     }
-    if (EVP_PKEY_keygen(epc, &key) <= 0)
+    if (!EVP_PKEY_keygen(epc, &key))
     {
         openssl_error("key_gen");
         goto out;
@@ -853,7 +1393,19 @@ bool key_gen(const char *keyfile)
  #elif defined(USE_MBEDTLS)
     mbedtls_pk_context key;
     mbedtls_pk_init(&key);
-    const mbedtls_pk_info_t *pki = mbedtls_pk_info_from_type(MBEDTLS_PK_RSA);
+    const mbedtls_pk_info_t *pki;
+    switch (type)
+    {
+        case PK_RSA:
+            pki = mbedtls_pk_info_from_type(MBEDTLS_PK_RSA);
+            break;
+        case PK_EC:
+            pki = mbedtls_pk_info_from_type(MBEDTLS_PK_ECKEY);
+            break;
+        default:
+            warnx("key_gen: only RSA/EC keys are supported");
+            goto out;
+    }
     if (!pki)
     {
         warnx("key_gen: mbedtls_pk_info_from_type failed");
@@ -866,13 +1418,31 @@ bool key_gen(const char *keyfile)
                 _mbedtls_strerror(r));
         goto out;
     }
-    r = mbedtls_rsa_gen_key(mbedtls_pk_rsa(key), mbedtls_ctr_drbg_random,
-            &ctr_drbg, 4096, 65537);
-    if (r)
+    switch (type)
     {
-        warnx("key_gen: mbedtls_rsa_genkey failed: %s",
-                _mbedtls_strerror(r));
-        goto out;
+        case PK_RSA:
+            r = mbedtls_rsa_gen_key(mbedtls_pk_rsa(key),
+                    mbedtls_ctr_drbg_random, &ctr_drbg, bits, 65537);
+            if (r)
+            {
+                warnx("key_gen: mbedtls_rsa_gen_key failed: %s",
+                        _mbedtls_strerror(r));
+                goto out;
+            }
+            break;
+        case PK_EC:
+            r = mbedtls_ecp_gen_key(MBEDTLS_ECP_DP_SECP256R1,
+                    mbedtls_pk_ec(key), mbedtls_ctr_drbg_random, &ctr_drbg);
+            if (r)
+            {
+                warnx("key_gen: mbedtls_ecp_gen_key failed: %s",
+                        _mbedtls_strerror(r));
+                goto out;
+            }
+            break;
+        default:
+            warnx("key_gen: only RSA/EC keys are supported");
+            goto out;
     }
     pem_size = 4096;
     while (1)
@@ -926,7 +1496,7 @@ bool key_gen(const char *keyfile)
     fclose(f);
     if (r != pem_size)
     {
-        warn("key_load: failed to write to %s", keyfile);
+        warn("key_gen: failed to write to %s", keyfile);
         unlink(keyfile);
         goto out;
     }
@@ -953,7 +1523,7 @@ out:
     return success;
 }
 
-privkey_t key_load(bool gen_if_needed, const char *format, ...)
+privkey_t key_load(keytype_t type, int bits, const char *format, ...)
 {
     privkey_t key = NULL;
     char *keyfile = NULL;
@@ -990,12 +1560,12 @@ privkey_t key_load(bool gen_if_needed, const char *format, ...)
             else
             {
                 msg(1, "%s not found", keyfile);
-                if (!gen_if_needed)
+                if (type == PK_NONE)
                 {
                     warnx("key_load: %s does not exist", keyfile);
                     goto out;
                 }
-                if (!key_gen(keyfile))
+                if (!key_gen(type, bits, keyfile))
                 {
                     warnx("key_load: key_gen failed");
                     goto out;
@@ -1025,12 +1595,12 @@ privkey_t key_load(bool gen_if_needed, const char *format, ...)
         else
         {
             msg(1, "%s not found", keyfile);
-            if (!gen_if_needed)
+            if (type == PK_NONE)
             {
                 warnx("key_load: %s does not exist", keyfile);
                 goto out;
             }
-            if (!key_gen(keyfile))
+            if (!key_gen(type, bits, keyfile))
             {
                 warnx("key_load: key_gen failed");
                 goto out;
@@ -1069,14 +1639,6 @@ privkey_t key_load(bool gen_if_needed, const char *format, ...)
         goto out;
     }
 
-    r = gnutls_privkey_get_pk_algorithm(key, NULL);
-    if (r != GNUTLS_PK_RSA)
-    {
-        warnx("key_load: only RSA keys supported at this time");
-        gnutls_privkey_deinit(key);
-        key = NULL;
-        goto out;
-    }
 #elif defined(USE_MBEDTLS)
     key = calloc(1, sizeof(*key));
     if (!key)
@@ -1094,27 +1656,18 @@ privkey_t key_load(bool gen_if_needed, const char *format, ...)
         key = NULL;
         goto out;
     }
-
-    if (!mbedtls_pk_can_do(key, MBEDTLS_PK_RSA))
-    {
-        warnx("key_load: only RSA keys supported at this time");
-        mbedtls_pk_free(key);
-        free(key);
-        key = NULL;
-        goto out;
-    }
-
-    r = mbedtls_rsa_check_privkey(mbedtls_pk_rsa(*key));
-    if (r)
-    {
-        warnx("key_load: mbedtls_rsa_check_privkey failed: %s",
-                _mbedtls_strerror(r));
-        mbedtls_pk_free(key);
-        free(key);
-        key = NULL;
-        goto out;
-    }
 #endif
+    switch (key_type(key))
+    {
+        case PK_RSA:
+        case PK_EC:
+            break;
+
+        default:
+            warnx("key_load: only RSA/EC keys are supported");
+            privkey_deinit(key);
+            key = NULL;
+    }
 out:
     free(keyfile);
 #if !defined(USE_OPENSSL)
@@ -1197,7 +1750,7 @@ char *csr_gen(const char * const *names, privkey_t key)
     }
     else if (dig != GNUTLS_DIG_SHA256)
     {
-        warnx("csr_gen: only SHA256 digest supported at this time");
+        warnx("csr_gen: only SHA256 digest is supported");
         goto out;
     }
 

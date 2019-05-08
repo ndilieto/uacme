@@ -629,6 +629,8 @@ A2X
 ENABLE_DOCS_FALSE
 ENABLE_DOCS_TRUE
 USE_MBEDTLS
+ENABLE_READFILE_FALSE
+ENABLE_READFILE_TRUE
 USE_OPENSSL
 USE_GNUTLS
 PKGCONFIG
@@ -5675,12 +5677,29 @@ $as_echo "no" >&6; }
                 { $as_echo "$as_me:${as_lineno-$LINENO}: result: found $version" >&5
 $as_echo "found $version" >&6; }
             fi
-        fi
+            { $as_echo "$as_me:${as_lineno-$LINENO}: checking for libtasn1 >= 4.2" >&5
+$as_echo_n "checking for libtasn1 >= 4.2... " >&6; }
+            itexists=`$PKGCONFIG --exists 'libtasn1 >= 4.2' >/dev/null 2>&1 && echo 1`
+            if test -z "$itexists"; then
+                { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
+$as_echo "no" >&6; }
+                as_fn_error $? "libtasn1 not found" "$LINENO" 5
+            else
+                addlib+=`$PKGCONFIG --libs-only-l libtasn1`
+                addld+=`$PKGCONFIG --libs-only-L libtasn1`
+                addcflags+=`$PKGCONFIG --cflags-only-I litasn1`
+                version+=`$PKGCONFIG --modversion libtasn1`
+                tasn1lib=`echo $addld | $SED -e 's/-L//'`
+                { $as_echo "$as_me:${as_lineno-$LINENO}: result: found $version" >&5
+$as_echo "found $version" >&6; }
+            fi
+         fi
     else
-        addlib=-lgnutls
+        addlib=-lgnutls -ltasn1
         addld=-L$OPT_GNUTLS/lib$libsuff
         addcflags=-I$OPT_GNUTLS/include
         gtlslib=$OPT_GNUTLS/lib$libsuff
+        tasn1lib=$OPT_GNUTLS/lib$libsuff
     fi
     if test -n "$addlib"; then
         LIBS="$addlib $LIBS"
@@ -5745,7 +5764,15 @@ fi
 $as_echo "$as_me: Added $gtlslib to UACME_LIBRARY_PATH" >&6;}
                 fi
             fi
-        fi
+            if test -n "$tasn1lib"; then
+                if test X"$cross_compiling" != Xyes; then
+                    UACME_LIBRARY_PATH="$UACME_LIBRARY_PATH:$tasn1lib"
+                    export UACME_LIBRARY_PATH
+                    { $as_echo "$as_me:${as_lineno-$LINENO}: Added $tasn1lib to UACME_LIBRARY_PATH" >&5
+$as_echo "$as_me: Added $tasn1lib to UACME_LIBRARY_PATH" >&6;}
+                fi
+            fi
+         fi
     fi
 fi
 
@@ -5842,6 +5869,14 @@ $as_echo "$as_me: Added $openssllib to UACME_LIBRARY_PATH" >&6;}
         fi
     fi
 fi
+ if test X"$USE_OPENSSL" != Xyes; then
+  ENABLE_READFILE_TRUE=
+  ENABLE_READFILE_FALSE='#'
+else
+  ENABLE_READFILE_TRUE='#'
+  ENABLE_READFILE_FALSE=
+fi
+
 
 if test X"$OPT_MBEDTLS" != Xno; then
     if test X"$OPT_MBEDTLS" = Xyes; then
@@ -6256,6 +6291,10 @@ Usually this means the macro was only invoked conditionally." "$LINENO" 5
 fi
 if test -z "${am__fastdepCC_TRUE}" && test -z "${am__fastdepCC_FALSE}"; then
   as_fn_error $? "conditional \"am__fastdepCC\" was never defined.
+Usually this means the macro was only invoked conditionally." "$LINENO" 5
+fi
+if test -z "${ENABLE_READFILE_TRUE}" && test -z "${ENABLE_READFILE_FALSE}"; then
+  as_fn_error $? "conditional \"ENABLE_READFILE\" was never defined.
 Usually this means the macro was only invoked conditionally." "$LINENO" 5
 fi
 if test -z "${ENABLE_DOCS_TRUE}" && test -z "${ENABLE_DOCS_FALSE}"; then

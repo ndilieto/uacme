@@ -2,12 +2,12 @@
 .\"     Title: uacme
 .\"    Author: [see the "AUTHOR" section]
 .\" Generator: DocBook XSL Stylesheets v1.78.1 <http://docbook.sf.net/>
-.\"      Date: 05/04/2019
+.\"      Date: 05/08/2019
 .\"    Manual: User Commands
 .\"    Source: uacme 1.0.8
 .\"  Language: English
 .\"
-.TH "UACME" "1" "05/04/2019" "uacme 1\&.0\&.8" "User Commands"
+.TH "UACME" "1" "05/08/2019" "uacme 1\&.0\&.8" "User Commands"
 .\" -----------------------------------------------------------------
 .\" * Define some portability stuff
 .\" -----------------------------------------------------------------
@@ -31,7 +31,7 @@
 uacme \- ACMEv2 client written in plain C code with minimal dependencies
 .SH "SYNOPSIS"
 .sp
-\fBuacme\fR [\fB\-a\fR|\fB\-\-acme\-url\fR \fIURL\fR] [\fB\-c\fR|\fB\-\-confdir\fR \fIDIR\fR] [\fB\-d\fR|\fB\-\-days\fR \fIDAYS\fR] [\fB\-f\fR|\fB\-\-force\fR] [\fB\-h\fR|\fB\-\-hook\fR \fIPROGRAM\fR] [\fB\-n\fR|\fB\-\-never\fR] [\fB\-s\fR|\fB\-\-staging\fR] [\fB\-v\fR|\fB\-\-verbose\fR \&...] [\fB\-V\fR|\fB\-\-version\fR] [\fB\-y\fR|\fB\-\-yes\fR] [\fB\-?\fR|\fB\-\-help\fR] \fInew\fR [\fIEMAIL\fR] | \fBupdate\fR [\fIEMAIL\fR] | \fBdeactivate\fR | \fBissue\fR \fIDOMAIN\fR [\fIALTNAME\fR \&...]] | \fBrevoke\fR \fICERTFILE\fR
+\fBuacme\fR [\fB\-a\fR|\fB\-\-acme\-url\fR \fIURL\fR] [\fB\-b\fR|\fB\-\-bits\fR \fIBITS\fR] [\fB\-c\fR|\fB\-\-confdir\fR \fIDIR\fR] [\fB\-d\fR|\fB\-\-days\fR \fIDAYS\fR] [\fB\-f\fR|\fB\-\-force\fR] [\fB\-h\fR|\fB\-\-hook\fR \fIPROGRAM\fR] [\fB\-n\fR|\fB\-\-never\fR] [\fB\-s\fR|\fB\-\-staging\fR] [\fB\-t\fR|\fB\-\-type\fR \fBRSA\fR|\fBEC\fR] [\fB\-v\fR|\fB\-\-verbose\fR \&...] [\fB\-V\fR|\fB\-\-version\fR] [\fB\-y\fR|\fB\-\-yes\fR] [\fB\-?\fR|\fB\-\-help\fR] \fBnew\fR [\fIEMAIL\fR] | \fBupdate\fR [\fIEMAIL\fR] | \fBdeactivate\fR | \fBissue\fR \fIDOMAIN\fR [\fIALTNAME\fR \&...]] | \fBrevoke\fR \fICERTFILE\fR
 .SH "DESCRIPTION"
 .sp
 \fBuacme\fR is a client for the ACMEv2 protocol described in RFC8555, written in plain C code with minimal dependencies (libcurl and one of GnuTLS, OpenSSL or mbedTLS)\&. The ACMEv2 protocol allows a Certificate Authority (https://letsencrypt\&.org/ is a popular one) and an applicant to automate the process of verification and certificate issuance\&. The protocol also provides facilities for other certificate management functions, such as certificate revocation\&. For more information see https://tools\&.ietf\&.org/html/rfc8555
@@ -55,6 +55,11 @@ staging URL (see
 \fB\-s, \-\-staging\fR
 below)
 .RE
+.RE
+.PP
+\fB\-b, \-\-bits\fR=\fIBITS\fR
+.RS 4
+RSA key bit length (default 2048)\&. Only applies to newly generated RSA keys\&.
 .RE
 .PP
 \fB\-c, \-\-confdir\fR=\fICONFDIR\fR
@@ -183,6 +188,14 @@ Use Let\(cqs Encrypt staging URL for testing\&. This only works if
 is
 \fBNOT\fR
 specified\&.
+.RE
+.PP
+\fB\-t, \-\-type\fR=\fBRSA\fR | \fBEC\fR
+.RS 4
+Key type, either RSA or EC\&. Only applies to newly generated keys\&. RSA bit length can be specified with
+\fB\-b, \-\-bits\fR\&. EC supports the
+\fINID_X9_62_prime256v1\fR
+curve only\&.
 .RE
 .PP
 \fB\-v, \-\-verbose\fR
@@ -338,36 +351,18 @@ case "$METHOD" in
                 ;;
         esac
         ;;
-.fi
-.if n \{\
-.RE
-.\}
-.sp
-.if n \{\
-.RS 4
-.\}
-.nf
-"done"|"failed")
-    case "$TYPE" in
-        http\-01)
-            rm ${CHALLENGE_PATH}/${TOKEN}
-            exit $?
-            ;;
-        *)
-            exit 1
-            ;;
-    esac
-    exit 0
-    ;;
-.fi
-.if n \{\
-.RE
-.\}
-.sp
-.if n \{\
-.RS 4
-.\}
-.nf
+    "done"|"failed")
+        case "$TYPE" in
+            http\-01)
+                rm ${CHALLENGE_PATH}/${TOKEN}
+                exit $?
+                ;;
+            *)
+                exit 1
+                ;;
+        esac
+        exit 0
+        ;;
     *)
         echo "$0: invalid method" 1>&2
         exit 1
