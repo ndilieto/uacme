@@ -1,3 +1,10 @@
+uacme (1.0.9-1) unstable; urgency=medium
+
+  * added ECC support (-t, --type=EC)
+  * added RSA key length option (-b, --bits=BITS, default 2048)
+
+ -- Nicola Di Lieto <nicola.dilieto@gmail.com>  Thu, 09 May 2019 09:20:05 +0200
+
 uacme (1.0.8-1) unstable; urgency=medium
 
   * added README.md with usage hints
