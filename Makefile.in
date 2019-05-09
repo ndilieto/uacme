@@ -96,6 +96,7 @@ NORMAL_UNINSTALL = :
 PRE_UNINSTALL = :
 POST_UNINSTALL = :
 bin_PROGRAMS = uacme$(EXEEXT)
+@ENABLE_READFILE_TRUE@am__append_1 = read-file.c read-file.h
 subdir = .
 DIST_COMMON = INSTALL NEWS README AUTHORS ChangeLog \
 	$(srcdir)/Makefile.in $(srcdir)/Makefile.am \
@@ -121,9 +122,13 @@ CONFIG_CLEAN_VPATH_FILES =
 am__installdirs = "$(DESTDIR)$(bindir)" "$(DESTDIR)$(pkgdatadir)" \
 	"$(DESTDIR)$(man1dir)" "$(DESTDIR)$(htmldir)"
 PROGRAMS = $(bin_PROGRAMS)
+am__uacme_SOURCES_DIST = uacme.c base64.c base64.h crypto.c crypto.h \
+	curlwrap.c curlwrap.h json.c json.h jsmn.h msg.c msg.h \
+	read-file.c read-file.h
+@ENABLE_READFILE_TRUE@am__objects_1 = read-file.$(OBJEXT)
 am_uacme_OBJECTS = uacme.$(OBJEXT) base64.$(OBJEXT) crypto.$(OBJEXT) \
 	curlwrap.$(OBJEXT) json.$(OBJEXT) msg.$(OBJEXT) \
-	read-file.$(OBJEXT)
+	$(am__objects_1)
 uacme_OBJECTS = $(am_uacme_OBJECTS)
 uacme_LDADD = $(LDADD)
 am__vpath_adj_setup = srcdirstrip=`echo "$(srcdir)" | sed 's|.|.|g'`;
@@ -183,7 +188,7 @@ am__v_CCLD_ = $(am__v_CCLD_@AM_DEFAULT_V@)
 am__v_CCLD_0 = @echo "  CCLD    " $@;
 am__v_CCLD_1 = 
 SOURCES = $(uacme_SOURCES)
-DIST_SOURCES = $(uacme_SOURCES)
+DIST_SOURCES = $(am__uacme_SOURCES_DIST)
 am__can_run_installinfo = \
   case $$AM_UPDATE_INFO_DIR in \
     n|no|NO) false;; \
@@ -327,10 +332,8 @@ target_alias = @target_alias@
 top_build_prefix = @top_build_prefix@
 top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
-uacme_SOURCES = uacme.c base64.c base64.h crypto.c crypto.h \
-		curlwrap.c curlwrap.h json.c json.h jsmn.h \
-		msg.c msg.h read-file.c read-file.h
-
+uacme_SOURCES = uacme.c base64.c base64.h crypto.c crypto.h curlwrap.c \
+	curlwrap.h json.c json.h jsmn.h msg.c msg.h $(am__append_1)
 BUILT_SOURCES = $(top_srcdir)/.version
 dist_pkgdata_SCRIPTS = uacme.sh
 @ENABLE_DOCS_TRUE@dist_man1_MANS = uacme.1

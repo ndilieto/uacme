@@ -58,15 +58,23 @@ static inline void privkey_deinit(privkey_t key)
 #error either USE_GNUTLS or USE_MBEDTLS or USE_OPENSSL must be defined
 #endif
 
+typedef enum
+{
+    PK_NONE = 0,
+    PK_RSA,
+    PK_EC
+} keytype_t;
+
 bool crypto_init(void);
 void crypto_deinit(void);
 char *sha256_base64url(const char *, ...);
 char *jws_protected_jwk(const char *, const char *, privkey_t);
-char *jws_protected_kid(const char *, const char *, const char *);
+char *jws_protected_kid(const char *, const char *, const char *, keytype_t);
 char *jws_thumbprint(privkey_t);
 char *jws_encode(const char *, const char *, privkey_t);
-bool key_gen(const char *);
-privkey_t key_load(bool, const char *, ...);
+bool key_gen(keytype_t, int bits, const char *);
+keytype_t key_type(privkey_t);
+privkey_t key_load(keytype_t, int bits, const char *, ...);
 char *csr_gen(const char * const *, privkey_t);
 bool cert_save(const char *, const char *);
 char *cert_der_base64url(const char *);

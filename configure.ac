@@ -149,12 +149,26 @@ if test X"$OPT_GNUTLS" != Xno; then
                 gtlslib=`echo $addld | $SED -e 's/-L//'`
                 AC_MSG_RESULT([found $version])
             fi
-        fi
+            AC_MSG_CHECKING([for libtasn1 >= 4.2])
+            itexists=`$PKGCONFIG --exists 'libtasn1 >= 4.2' >/dev/null 2>&1 && echo 1`
+            if test -z "$itexists"; then
+                AC_MSG_RESULT([no])
+                AC_MSG_ERROR([libtasn1 not found])
+            else
+                addlib+=`$PKGCONFIG --libs-only-l libtasn1`
+                addld+=`$PKGCONFIG --libs-only-L libtasn1`
+                addcflags+=`$PKGCONFIG --cflags-only-I libtasn1`
+                version=`$PKGCONFIG --modversion libtasn1`
+                tasn1lib=`echo $addld | $SED -e 's/-L//'`
+                AC_MSG_RESULT([found $version])
+            fi
+         fi
     else
-        addlib=-lgnutls
+        addlib=-lgnutls -ltasn1
         addld=-L$OPT_GNUTLS/lib$libsuff
         addcflags=-I$OPT_GNUTLS/include
         gtlslib=$OPT_GNUTLS/lib$libsuff
+        tasn1lib=$OPT_GNUTLS/lib$libsuff
     fi
     if test -n "$addlib"; then
         LIBS="$addlib $LIBS"
@@ -176,7 +190,14 @@ if test X"$OPT_GNUTLS" != Xno; then
                     AC_MSG_NOTICE([Added $gtlslib to UACME_LIBRARY_PATH])
                 fi
             fi
-        fi
+            if test -n "$tasn1lib"; then
+                if test X"$cross_compiling" != Xyes; then
+                    UACME_LIBRARY_PATH="$UACME_LIBRARY_PATH:$tasn1lib"
+                    export UACME_LIBRARY_PATH
+                    AC_MSG_NOTICE([Added $tasn1lib to UACME_LIBRARY_PATH])
+                fi
+            fi
+         fi
     fi
 fi
 
@@ -227,6 +248,7 @@ if test X"$OPT_OPENSSL" != Xno; then
         fi
     fi
 fi
+AM_CONDITIONAL(ENABLE_READFILE, test X"$USE_OPENSSL" != Xyes)
 
 if test X"$OPT_MBEDTLS" != Xno; then
     if test X"$OPT_MBEDTLS" = Xyes; then

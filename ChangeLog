@@ -1,3 +1,8 @@
+2019-05-09 Nicola Di Lieto <nicola.dilieto@gmail.com>
+	* Release 1.0.9
+	- added EC key/cert support (-t, --type=EC, default RSA)
+	- added RSA key length option (-b, --bits=BITS, default 2048)
+
 2019-05-04 Nicola Di Lieto <nicola.dilieto@gmail.com>
 	* Release 1.0.8
 	- added OpenSSL support (./configure --with-openssl)
