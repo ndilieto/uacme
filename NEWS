@@ -1,42 +1,52 @@
 uacme NEWS
 Copyright (C) 2019 Nicola Di Lieto <nicola.dilieto@gmail.com>
 
-* Version 1.0.8 (released 2019-05-05)
+## [1.0.9] - 2019-05-09
+### Added
+- EC key/cert support (-t, --type=EC, default RSA)
+- RSA key length option (-b, --bits=BITS, default 2048)
 
-** uacme: added OpenSSL support (./configure --with-openssl)
-          exit codes: 0=success, 1=cert issuance skipped, 2=error
-          mbedtls: dynamically grow buffers when needed
+## [1.0.8] - 2019-05-05
+### Added
+- OpenSSL support (./configure --with-openssl)
 
-* Version 1.0.7 (released 2019-04-29)
+### Changed
+- exit codes: 0=success, 1=cert issuance skipped, 2=error
+- mbedtls: dynamically grow buffers when needed
 
-** uacme: added HTTP User-Agent: header to all requests
-          added --disable-docs configure option
-          manpage version now updated automatically
+## [1.0.7] - 2019-04-29
+### Added
+- HTTP User-Agent: header in all requests
+- --disable-docs configure option
 
-* Version 1.0.6 (released 2019-04-27)
+### Changed
+- manpage version now updated automatically
 
-** uacme: fixed uninitialized variable in authorize() function
+## [1.0.6] - 2019-04-27
+### Changed
+- fixed uninitialized variable in authorize() function
 
-* Version 1.0.5 (released 2019-04-27)
+## [1.0.5] - 2019-04-27
+### Changed
+- autoconf maintainer mode
+- cosmetic change to json primitive dump
 
-** uacme: autoconf mainteiner mode and cosmetic change to json primitive dump
+## [1.0.4] - 2019-04-26
+### Added
+- debian packaging
 
-* Version 1.0.4 (released 2019-04-26)
+## [1.0.3] - 2019-04-25
+### Changed
+- fixed gcc -pedantic warnings
 
-** uacme: debian packaging
+## [1.0.2] - 2019-04-24
+### Added
+- support for mbedTLS (./configure --with-mbedtls)
 
-* Version 1.0.3 (released 2019-04-25)
+## [1.0.1] - 2019-04-21
+### Changed
+- minor fixes to links in documentation
 
-** uacme: fixed gcc -pedantic warnings
-
-* Version 1.0.2 (released 2019-04-24)
-
-** uacme: added support for mbedTLS as alternative to GnuTLS
-
-* Version 1.0.1 (released 2019-04-21)
-
-** uacme: minor fixes to links in documentation
-
-* Version 1.0 (released 2019-04-21)
-
-** uacme: first public release
+## [1.0] - 2019-04-21
+### Added
+- first public release

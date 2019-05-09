@@ -21,6 +21,8 @@ on embedded systems with severe RAM and program memory restrictions
 solutions based on python or shell scripts, which may well be a few
 hundred lines but are not only ugly and brittle, but also require many
 other large applications such as python or openssl to work.
+* **Native ECC support** - Elliptic Curve keys and certificates can be
+generated with a commmand line option (-t EC)
 * **Easily extensible** - It optionally calls an external hook program
 with the tokens required for domain authorization by the server. The 
 hook program can be an executable, shell script, perl script, python 
@@ -41,8 +43,8 @@ by specifying the **--verbose** flag once or more.
 
 ## Installation
 ```
-wget -O - https://github.com/ndilieto/uacme/archive/upstream/1.0.8.tar.gz | tar zx
-cd uacme-1.0.8
+wget -O - https://github.com/ndilieto/uacme/archive/upstream/1.0.9.tar.gz | tar zx
+cd uacme-1.0.9
 ./configure
 make install
 ```
@@ -52,9 +54,9 @@ git clone -b upstream/latest https://github.com/ndilieto/uacme
 ```
 and a precompiled debian jessie amd64 package
 ```
-wget https://github.com/ndilieto/uacme/releases/download/debian/1.0.8-1/uacme_1.0.8-1_amd64.deb
+wget https://github.com/ndilieto/uacme/releases/download/debian/1.0.9-1/uacme_1.0.9-1_amd64.deb
 sudo apt-get install libgnutls-deb0-28 libcurl3-gnutls 
-sudo dpkg -i uacme_1.0.8-1_amd64.deb
+sudo dpkg -i uacme_1.0.9-1_amd64.deb
 ```
 
 ## Getting started

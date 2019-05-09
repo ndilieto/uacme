@@ -746,10 +746,12 @@ UACME(1) Manual Page
 <div class="sect1">
 <h2 id="_synopsis">SYNOPSIS</h2>
 <div class="sectionbody">
-<div class="paragraph"><p><strong>uacme</strong> [<strong>-a</strong>|<strong>--acme-url</strong> <em>URL</em>] [<strong>-c</strong>|<strong>--confdir</strong> <em>DIR</em>] [<strong>-d</strong>|<strong>--days</strong> <em>DAYS</em>]
-    [<strong>-f</strong>|<strong>--force</strong>] [<strong>-h</strong>|<strong>--hook</strong> <em>PROGRAM</em>] [<strong>-n</strong>|<strong>--never</strong>] [<strong>-s</strong>|<strong>--staging</strong>]
-    [<strong>-v</strong>|<strong>--verbose</strong> &#8230;] [<strong>-V</strong>|<strong>--version</strong>] [<strong>-y</strong>|<strong>--yes</strong>] [<strong>-?</strong>|<strong>--help</strong>] <em>new</em> [<em>EMAIL</em>]
-    | <strong>update</strong> [<em>EMAIL</em>] | <strong>deactivate</strong> | <strong>issue</strong> <em>DOMAIN</em> [<em>ALTNAME</em> &#8230;]] | <strong>revoke</strong> <em>CERTFILE</em></p></div>
+<div class="paragraph"><p><strong>uacme</strong> [<strong>-a</strong>|<strong>--acme-url</strong> <em>URL</em>] [<strong>-b</strong>|<strong>--bits</strong> <em>BITS</em>] [<strong>-c</strong>|<strong>--confdir</strong> <em>DIR</em>]
+    [<strong>-d</strong>|<strong>--days</strong> <em>DAYS</em>] [<strong>-f</strong>|<strong>--force</strong>] [<strong>-h</strong>|<strong>--hook</strong> <em>PROGRAM</em>]
+    [<strong>-n</strong>|<strong>--never</strong>] [<strong>-s</strong>|<strong>--staging</strong>] [<strong>-t</strong>|<strong>--type</strong> <strong>RSA</strong>|<strong>EC</strong>]
+    [<strong>-v</strong>|<strong>--verbose</strong> &#8230;] [<strong>-V</strong>|<strong>--version</strong>] [<strong>-y</strong>|<strong>--yes</strong>] [<strong>-?</strong>|<strong>--help</strong>]
+    <strong>new</strong> [<em>EMAIL</em>] | <strong>update</strong> [<em>EMAIL</em>] | <strong>deactivate</strong> |
+    <strong>issue</strong> <em>DOMAIN</em> [<em>ALTNAME</em> &#8230;]] | <strong>revoke</strong> <em>CERTFILE</em></p></div>
 </div>
 </div>
 <div class="sect1">
@@ -795,6 +797,15 @@ production URL
 </p>
 </dd>
 </dl></div>
+</dd>
+<dt class="hdlist1">
+<strong>-b, --bits</strong>=<em>BITS</em>
+</dt>
+<dd>
+<p>
+    RSA key bit length (default 2048). Only applies to newly generated
+    RSA keys.
+</p>
 </dd>
 <dt class="hdlist1">
 <strong>-c, --confdir</strong>=<em>CONFDIR</em>
@@ -960,6 +971,16 @@ The key authorization (for <strong>dns-01</strong> already converted
 <p>
     Use Let&#8217;s Encrypt staging URL for testing. This only works if
     <strong>-a, --acme-url</strong> is <strong>NOT</strong> specified.
+</p>
+</dd>
+<dt class="hdlist1">
+<strong>-t, --type</strong>=<strong>RSA</strong> | <strong>EC</strong>
+</dt>
+<dd>
+<p>
+    Key type, either RSA or EC. Only applies to newly generated keys.
+    RSA bit length can be specified with <strong>-b, --bits</strong>. EC supports
+    the <em>NID_X9_62_prime256v1</em> curve only.
 </p>
 </dd>
 <dt class="hdlist1">
@@ -1137,26 +1158,20 @@ AUTH=$5</pre>
                 exit 1
                 ;;
         esac
-        ;;</pre>
-</div></div>
-<div class="literalblock">
-<div class="content monospaced">
-<pre>"done"|"failed")
-    case "$TYPE" in
-        http-01)
-            rm ${CHALLENGE_PATH}/${TOKEN}
-            exit $?
-            ;;
-        *)
-            exit 1
-            ;;
-    esac
-    exit 0
-    ;;</pre>
-</div></div>
-<div class="literalblock">
-<div class="content monospaced">
-<pre>    *)
+        ;;
+    "done"|"failed")
+        case "$TYPE" in
+            http-01)
+                rm ${CHALLENGE_PATH}/${TOKEN}
+                exit $?
+                ;;
+            *)
+                exit 1
+                ;;
+        esac
+        exit 0
+        ;;
+    *)
         echo "$0: invalid method" 1&gt;&amp;2
         exit 1
 esac</pre>
@@ -1198,9 +1213,9 @@ along with this program.  If not, see <a href="http://www.gnu.org/licenses/">htt
 <div id="footnotes"><hr></div>
 <div id="footer">
 <div id="footer-text">
-Version 1.0.8<br>
+Version 1.0.9<br>
 Last updated
- 2019-05-04 15:11:18 CEST
+ 2019-05-08 15:46:57 CEST
 </div>
 </div>
 </body>

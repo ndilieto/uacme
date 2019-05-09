@@ -1251,13 +1251,13 @@ char *jws_encode(const char *protected, const char *payload,
     encoded_signature = calloc(1, encoded_signature_len);
     if (!encoded_signature)
     {
-        warn("jsw_encode: calloc failed");
+        warn("jws_encode: calloc failed");
         goto out;
     }
     if (!bin2base64(encoded_signature, encoded_signature_len, signature,
                 signature_size, base64_VARIANT_URLSAFE_NO_PADDING))
     {
-        warnx("jsw_encode: bin2base64 failed");
+        warnx("jws_encode: bin2base64 failed");
         goto out;
     }
     if (asprintf(&jws,
@@ -1867,7 +1867,7 @@ char *csr_gen(const char * const *names, privkey_t key)
     unsigned char *tmp = csrdata;
     if (i2d_X509_REQ(crq, &tmp) != csrsize)
     {
-        warn("csr_gen: calloc failed");
+        openssl_error("csr_gen");
         goto out;
     }
 #elif defined(USE_MBEDTLS)

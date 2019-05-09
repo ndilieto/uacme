@@ -157,8 +157,8 @@ if test X"$OPT_GNUTLS" != Xno; then
             else
                 addlib+=`$PKGCONFIG --libs-only-l libtasn1`
                 addld+=`$PKGCONFIG --libs-only-L libtasn1`
-                addcflags+=`$PKGCONFIG --cflags-only-I litasn1`
-                version+=`$PKGCONFIG --modversion libtasn1`
+                addcflags+=`$PKGCONFIG --cflags-only-I libtasn1`
+                version=`$PKGCONFIG --modversion libtasn1`
                 tasn1lib=`echo $addld | $SED -e 's/-L//'`
                 AC_MSG_RESULT([found $version])
             fi
