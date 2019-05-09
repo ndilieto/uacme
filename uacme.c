@@ -31,7 +31,6 @@
 #include <string.h>
 #include <sys/stat.h>
 #include <sys/wait.h>
-#include <termios.h>
 #include <unistd.h>
 
 #include "base64.h"
@@ -197,7 +196,7 @@ int acme_post(acme_t *a, const char *url, const char *format, ...)
         goto out;
     }
     protected = (a->kid && *a->kid) ?
-        jws_protected_kid(a->nonce, url, a->kid) :
+        jws_protected_kid(a->nonce, url, a->kid, key_type(a->key)) :
         jws_protected_jwk(a->nonce, url, a->key);
     if (!protected)
     {
@@ -1105,11 +1104,11 @@ bool validate_domain_str(const char *s)
 
 void usage(const char *progname)
 {
-    fprintf(stderr, "usage: %s [-a|--acme-url URL] [-c|--confdir DIR] [-d|--days DAYS]\n"
-            "\t[-f|--force] [-h|--hook PROGRAM] [-n|--never-create] [-s|--staging]\n"
-            "\t[-v|--verbose ...] [-V|--version] [-y|--yes] [-?|--help] new [EMAIL]\n"
-            "\t| update [EMAIL] | deactivate | issue DOMAIN [ALTNAME ...]]\n"
-            "\t| revoke CERTFILE\n", progname);
+    fprintf(stderr, "usage: %s [-a|--acme-url URL] [-b|--bits BITS] [-c|--confdir DIR]\n"
+            "\t[-d|--days DAYS] [-f|--force] [-h|--hook PROGRAM] [-n|--never-create]\n"
+            "\t[-s|--staging] [-t|--type RSA | EC] [-v|--verbose ...] [-V|--version]\n"
+            "\t[-y|--yes] [-?|--help] new [EMAIL] | update [EMAIL] | deactivate\n"
+            "\t| issue DOMAIN [ALTNAME ...]] | revoke CERTFILE\n", progname);
 }
 
 int main(int argc, char **argv)
@@ -1117,6 +1116,7 @@ int main(int argc, char **argv)
     static struct option options[] =
     {
         {"acme-url",     required_argument, NULL, 'a'},
+        {"bits",         required_argument, NULL, 'b'},
         {"confdir",      required_argument, NULL, 'c'},
         {"days",         required_argument, NULL, 'd'},
         {"force",        no_argument,       NULL, 'f'},
@@ -1124,6 +1124,7 @@ int main(int argc, char **argv)
         {"hook",         required_argument, NULL, 'h'},
         {"never-create", no_argument,       NULL, 'n'},
         {"staging",      no_argument,       NULL, 's'},
+        {"type",         required_argument, NULL, 't'},
         {"verbose",      no_argument,       NULL, 'v'},
         {"version",      no_argument,       NULL, 'V'},
         {"yes",          no_argument,       NULL, 'y'},
@@ -1136,6 +1137,8 @@ int main(int argc, char **argv)
     bool version = false;
     bool yes = false;
     int days = 30;
+    int bits = 2048;
+    keytype_t type = PK_RSA;
     const char *revokefile = NULL;
 
     acme_t a;
@@ -1176,12 +1179,22 @@ int main(int argc, char **argv)
     {
         char *endptr;
         int option_index;
-        int c = getopt_long(argc, argv, "a:c:d:f?h:nsvVy", options, &option_index);
+        int c = getopt_long(argc, argv, "a:b:c:d:f?h:nst:vVy",
+                options, &option_index);
         if (c == -1) break;
         switch (c)
         {
             case 'a':
                 a.directory = optarg;
+                break;
+
+            case 'b':
+                bits = strtol(optarg, &endptr, 10);
+                if (*endptr != 0 || bits < 2048 || bits > 8192)
+                {
+                    warnx("bits must be between 2048 and 8192");
+                    goto out;
+                }
                 break;
 
             case 'c':
@@ -1217,7 +1230,23 @@ int main(int argc, char **argv)
                 a.directory = STAGING_URL;
                 break;
 
-            case 'V':
+            case 't':
+                if (strcasecmp(optarg, "RSA") == 0)
+                {
+                    type = PK_RSA;
+                }
+                else if (strcasecmp(optarg, "EC") == 0)
+                {
+                    type = PK_EC;
+                }
+                else
+                {
+                    warnx("type must be either RSA or EC");
+                    goto out;
+                }
+                break;
+
+             case 'V':
                 version = true;
                 break;
 
@@ -1315,7 +1344,6 @@ int main(int argc, char **argv)
     char buf[0x100];
     setlocale(LC_TIME, "C");
     strftime(buf, sizeof(buf), "%a, %d %b %Y %H:%M:%S %z", localtime(&now));
-    setlocale(LC_TIME, "");
     msg(1, "version " PACKAGE_VERSION " starting on %s", buf);
 
     if (a.hook && access(a.hook, R_OK | X_OK) < 0)
@@ -1360,7 +1388,8 @@ int main(int argc, char **argv)
         goto out;
     }
 
-    if (!(a.key = key_load(is_new && !never, "%s/key.pem", a.keydir)))
+    if (!(a.key = key_load((!is_new || never) ? PK_NONE : type,
+                    bits, "%s/key.pem", a.keydir)))
     {
         goto out;
     }
@@ -1399,7 +1428,8 @@ int main(int argc, char **argv)
             goto out;
         }
 
-        if (!(a.dkey = key_load(!never, "%s/key.pem", a.dkeydir)))
+        if (!(a.dkey = key_load(never ? PK_NONE : type,
+                        bits, "%s/key.pem", a.dkeydir)))
         {
             goto out;
         }

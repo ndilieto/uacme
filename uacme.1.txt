@@ -13,10 +13,12 @@ uacme - ACMEv2 client written in plain C code with minimal dependencies
 
 SYNOPSIS
 --------
-*uacme* [*-a*|*--acme-url* 'URL'] [*-c*|*--confdir* 'DIR'] [*-d*|*--days* 'DAYS']
-    [*-f*|*--force*] [*-h*|*--hook* 'PROGRAM'] [*-n*|*--never*] [*-s*|*--staging*]
-    [*-v*|*--verbose* ...] [*-V*|*--version*] [*-y*|*--yes*] [*-?*|*--help*] 'new' ['EMAIL']
-    | *update* ['EMAIL'] | *deactivate* | *issue* 'DOMAIN' ['ALTNAME' ...]] | *revoke* 'CERTFILE'
+*uacme* [*-a*|*--acme-url* 'URL'] [*-b*|*--bits* 'BITS'] [*-c*|*--confdir* 'DIR']
+    [*-d*|*--days* 'DAYS'] [*-f*|*--force*] [*-h*|*--hook* 'PROGRAM']
+    [*-n*|*--never*] [*-s*|*--staging*] [*-t*|*--type* *RSA*|*EC*]
+    [*-v*|*--verbose* ...] [*-V*|*--version*] [*-y*|*--yes*] [*-?*|*--help*]
+    *new* ['EMAIL'] | *update* ['EMAIL'] | *deactivate* |
+    *issue* 'DOMAIN' ['ALTNAME' ...]] | *revoke* 'CERTFILE'
 
 
 DESCRIPTION
@@ -39,6 +41,10 @@ OPTIONS
     'https://acme-v02.api.letsencrypt.org/directory'::: production URL
     'https://acme-staging-v02.api.letsencrypt.org/directory'::: 
     staging URL (see *-s, --staging* below)
+
+*-b, --bits*='BITS'::
+    RSA key bit length (default 2048). Only applies to newly generated
+    RSA keys.
 
 *-c, --confdir*='CONFDIR'::
     Use configuration directory 'CONFDIR' (default '/etc/ssl/uacme').
@@ -87,6 +93,11 @@ OPTIONS
 *-s, --staging*::
     Use Let's Encrypt staging URL for testing. This only works if
     *-a, --acme-url* is *NOT* specified.
+
+*-t, --type*=*RSA* | *EC*::
+    Key type, either RSA or EC. Only applies to newly generated keys.
+    RSA bit length can be specified with *-b, --bits*. EC supports
+    the 'NID_X9_62_prime256v1' curve only.
 
 *-v, --verbose*::
     By default *uacme* only produces output upon errors or when user
@@ -193,7 +204,6 @@ same machine, with webroot at /var/www
                     ;;
             esac
             ;;
-    
         "done"|"failed")
             case "$TYPE" in
                 http-01)
@@ -206,7 +216,6 @@ same machine, with webroot at /var/www
             esac
             exit 0
             ;;
-    
         *)
             echo "$0: invalid method" 1>&2 
             exit 1
