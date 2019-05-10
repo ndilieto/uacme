@@ -760,7 +760,7 @@ UACME(1) Manual Page
 <div class="paragraph"><p><strong>uacme</strong> is a client for the ACMEv2 protocol described in RFC8555,
 written in plain C code with minimal dependencies (libcurl and
 one of GnuTLS, OpenSSL or mbedTLS). The ACMEv2 protocol allows a
-Certificate Authority (<a href="https://letsencrypt.org/">https://letsencrypt.org/</a> is a popular one)
+Certificate Authority (<a href="https://letsencrypt.org">https://letsencrypt.org</a> is a popular one)
 and an applicant to automate the process of verification and certificate
 issuance. The protocol also provides facilities for other certificate
 management functions, such as certificate revocation. For more
@@ -803,8 +803,10 @@ production URL
 </dt>
 <dd>
 <p>
-    RSA key bit length (default 2048). Only applies to newly generated
-    RSA keys.
+    key bit length (default 2048 for RSA, 256 for EC). Only applies
+    to newly generated keys. RSA key length must be a multiple of 8
+    between 2048 and 8192. EC key length must be either 256
+    (<strong>NID_X9_62_prime256v1</strong> curve) or 384 (<strong>NID_secp384r1</strong> curve).
 </p>
 </dd>
 <dt class="hdlist1">
@@ -856,7 +858,7 @@ certificate for <em>DOMAIN</em>
 </dt>
 <dd>
 <p>
-    Force certificate reissuance regardless of expiration date
+    Force certificate reissuance regardless of expiration date.
 </p>
 </dd>
 <dt class="hdlist1">
@@ -951,7 +953,7 @@ The key authorization (for <strong>dns-01</strong> already converted
 </dt>
 <dd>
 <p>
-    Print a brief usage text on stderr and exit
+    Print a brief usage text on stderr and exit.
 </p>
 </dd>
 <dt class="hdlist1">
@@ -979,8 +981,7 @@ The key authorization (for <strong>dns-01</strong> already converted
 <dd>
 <p>
     Key type, either RSA or EC. Only applies to newly generated keys.
-    RSA bit length can be specified with <strong>-b, --bits</strong>. EC supports
-    the <em>NID_X9_62_prime256v1</em> curve only.
+    The bit length can be specified with <strong>-b, --bits</strong>.
 </p>
 </dd>
 <dt class="hdlist1">
@@ -999,7 +1000,7 @@ The key authorization (for <strong>dns-01</strong> already converted
 </dt>
 <dd>
 <p>
-    Print program version on stderr and exit
+    Print program version on stderr and exit.
 </p>
 </dd>
 <dt class="hdlist1">
@@ -1007,7 +1008,7 @@ The key authorization (for <strong>dns-01</strong> already converted
 </dt>
 <dd>
 <p>
-    Autoaccept ACME server terms (if any) upon new account creation
+    Autoaccept ACME server terms (if any) upon new account creation.
 </p>
 </dd>
 </dl></div>
@@ -1215,7 +1216,7 @@ along with this program.  If not, see <a href="http://www.gnu.org/licenses/">htt
 <div id="footer-text">
 Version 1.0.9<br>
 Last updated
- 2019-05-08 15:46:57 CEST
+ 2019-05-10 16:30:07 CEST
 </div>
 </div>
 </body>

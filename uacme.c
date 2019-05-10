@@ -21,6 +21,7 @@
 #include <ctype.h>
 #include <err.h>
 #include <errno.h>
+#include <fcntl.h>
 #include <getopt.h>
 #include <locale.h>
 #include <regex.h>
@@ -72,6 +73,7 @@ char *find_header(const char *headers, const char *name)
     char *regex = NULL;
     if (asprintf(&regex, "^%s: (.*)\r\n", name) < 0)
     {
+        warnx("find_header: asprintf failed");
         return NULL;
     }
     char *ret = NULL;
@@ -151,6 +153,18 @@ out:
             warnx("acme_get: HTTP body\n%s", a->body);
         }
     }
+    if (g_loglevel > 1)
+    {
+        warnx("acme_get: return code %d, json=", ret);
+        if (a->json)
+        {
+            json_dump(stderr, a->json);
+        }
+        else
+        {
+            fprintf(stderr, "<null>\n");
+        }
+    }
     if (!a->headers) a->headers = strdup("");
     if (!a->body) a->body = strdup("");
     if (!a->type) a->type = strdup("");
@@ -196,7 +210,7 @@ int acme_post(acme_t *a, const char *url, const char *format, ...)
         goto out;
     }
     protected = (a->kid && *a->kid) ?
-        jws_protected_kid(a->nonce, url, a->kid, key_type(a->key)) :
+        jws_protected_kid(a->nonce, url, a->kid, a->key) :
         jws_protected_jwk(a->nonce, url, a->key);
     if (!protected)
     {
@@ -211,8 +225,8 @@ int acme_post(acme_t *a, const char *url, const char *format, ...)
     }
     if (g_loglevel > 2)
     {
-        warnx("acme_post: url=%s payload=%s nonce=%s request=%s",
-                url, payload, a->nonce, jws);
+        warnx("acme_post: url=%s payload=%s protected=%s nonce=%s request=%s",
+                url, payload, protected, a->nonce, jws);
     }
     else if (g_loglevel > 1)
     {
@@ -737,7 +751,7 @@ bool authorize(acme_t *a)
                 }
                 if (strcmp(type, "dns-01") == 0)
                 {
-                    key_auth = sha256_base64url("%s.%s", token, thumbprint);
+                    key_auth = sha2_base64url(256, "%s.%s", token, thumbprint);
                 }
                 else if (asprintf(&key_auth, "%s.%s", token, thumbprint) < 0)
                 {
@@ -852,6 +866,11 @@ bool cert_issue(acme_t *a)
     bool success = false;
     char *csr = NULL;
     char *orderurl = NULL;
+    char *certfile = NULL;
+    char *bakfile = NULL;
+    char *tmpfile = NULL;
+    time_t t = time(NULL);
+    int fd = -1;
     char *ids = identifiers(a->names);
     if (!ids)
     {
@@ -1006,15 +1025,70 @@ bool cert_issue(acme_t *a)
         goto out;
     }
 
-    if (!cert_save(a->body, a->certdir))
+    if (asprintf(&certfile, "%s/cert.pem", a->certdir) < 0)
     {
-        warnx("failed to save certificate");
+        certfile = NULL;
+        warnx("cert_issue: vasprintf failed");
         goto out;
     }
 
-    success = true;
+    if (asprintf(&tmpfile, "%s/cert.pem.tmp", a->certdir) < 0)
+    {
+        tmpfile = NULL;
+        warnx("cert_issue: vasprintf failed");
+        goto out;
+    }
 
+    if (asprintf(&bakfile, "%s/cert-%llu.pem", a->certdir,
+                (unsigned long long)t) < 0)
+    {
+        bakfile = NULL;
+        warnx("cert_issue: vasprintf failed");
+        goto out;
+    }
+
+    if (link(certfile, bakfile) < 0 && errno != ENOENT)
+    {
+        warn("failed to link %s to %s", bakfile, certfile);
+        goto out;
+    }
+
+    fd = open(tmpfile, O_WRONLY|O_CREAT|O_TRUNC, S_IRUSR|S_IRGRP|S_IROTH);
+    if (fd < 0)
+    {
+        warn("failed to create %s", tmpfile);
+        goto out;
+    }
+
+    if (write(fd, a->body, strlen(a->body)) != strlen(a->body))
+    {
+        warn("failed to write to %s", tmpfile);
+        goto out;
+    }
+
+    if (close(fd) < 0)
+    {
+        warn("failed to close %s", tmpfile);
+        goto out;
+    }
+    else
+    {
+        fd = -1;
+    }
+
+    if (rename(tmpfile, certfile) < 0)
+    {
+        warn("failed to rename %s to %s", tmpfile, certfile);
+        goto out;
+    }
+    msg(1, "certificate saved to %s", certfile);
+
+    success = true;
 out:
+    if (fd >= 0) close(fd);
+    free(bakfile);
+    free(tmpfile);
+    free(certfile);
     free(csr);
     free(ids);
     free(orderurl);
@@ -1137,7 +1211,7 @@ int main(int argc, char **argv)
     bool version = false;
     bool yes = false;
     int days = 30;
-    int bits = 2048;
+    int bits = 0;
     keytype_t type = PK_RSA;
     const char *revokefile = NULL;
 
@@ -1190,9 +1264,9 @@ int main(int argc, char **argv)
 
             case 'b':
                 bits = strtol(optarg, &endptr, 10);
-                if (*endptr != 0 || bits < 2048 || bits > 8192)
+                if (*endptr != 0 || bits <= 0)
                 {
-                    warnx("bits must be between 2048 and 8192");
+                    warnx("BITS must be a positive integer");
                     goto out;
                 }
                 break;
@@ -1205,7 +1279,7 @@ int main(int argc, char **argv)
                 days = strtol(optarg, &endptr, 10);
                 if (*endptr != 0 || days <= 0)
                 {
-                    warnx("days must be a positive integer");
+                    warnx("DAYS must be a positive integer");
                     goto out;
                 }
                 break;
@@ -1264,6 +1338,47 @@ int main(int argc, char **argv)
     {
         msg(0, "version " VERSION);
         goto out;
+    }
+
+    switch (type)
+    {
+        case PK_RSA:
+            if (bits == 0)
+            {
+                bits = 2048;
+            }
+            else if (bits < 2048 || bits > 8192)
+            {
+                warnx("BITS must be between 2048 and 8192 for RSA keys");
+                goto out;
+            }
+            else if (bits & 7)
+            {
+                warnx("BITS must be a multiple of 8 for RSA keys");
+                goto out;
+            }
+            break;
+
+        case PK_EC:
+            switch (bits)
+            {
+                case 0:
+                    bits = 256;
+                    break;
+
+                case 256:
+                case 384:
+                    break;
+
+                default:
+                    warnx("BITS must be either 256 or 384 for EC keys");
+                    goto out;
+            }
+            break;
+
+        default:
+            warnx("key type must be either RSA or EC");
+            goto out;
     }
 
     if (optind == argc)
