@@ -467,8 +467,22 @@ out:
 #endif
     if (_e && _m)
     {
-        if (e) *e = _e;
-        if (m) *m = _m;
+        if (e)
+        {
+            *e = _e;
+        }
+        else
+        {
+            free(_e);
+        }
+        if (m)
+        {
+            *m = _m;
+        }
+        else
+        {
+            free(_m);
+        }
         return true;
     }
     else
@@ -690,8 +704,22 @@ out:
 #endif
     if (_x && _y)
     {
-        if (x) *x = _x;
-        if (y) *y = _y;
+        if (x)
+        {
+            *x = _x;
+        }
+        else
+        {
+            free(_x);
+        }
+        if (y)
+        {
+            *y = _y;
+        }
+        else
+        {
+            free(_y);
+        }
         return bits;
     }
     else
