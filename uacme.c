@@ -102,7 +102,6 @@ char *find_header(const char *headers, const char *name)
 int acme_get(acme_t *a, const char *url)
 {
     int ret = 0;
-    curldata_t *c = NULL;
 
     json_free(a->json);
     a->json = NULL;
@@ -122,7 +121,7 @@ int acme_get(acme_t *a, const char *url)
     {
         warnx("acme_get: url=%s", url);
     }
-    c = curl_get(url);
+    curldata_t *c = curl_get(url);
     if (!c)
     {
         warnx("acme_get: curl_get failed");
@@ -140,8 +139,8 @@ int acme_get(acme_t *a, const char *url)
     a->body = c->body;
     c->body = NULL;
     ret = c->code;
-out:
     curldata_free(c);
+out:
     if (g_loglevel > 2)
     {
         if (a->headers)
@@ -155,14 +154,14 @@ out:
     }
     if (g_loglevel > 1)
     {
-        warnx("acme_get: return code %d, json=", ret);
         if (a->json)
         {
+            warnx("acme_get: return code %d, json=", ret);
             json_dump(stderr, a->json);
         }
         else
         {
-            fprintf(stderr, "<null>\n");
+            warnx("acme_get: return code %d", ret);
         }
     }
     if (!a->headers) a->headers = strdup("");
@@ -177,107 +176,126 @@ int acme_post(acme_t *a, const char *url, const char *format, ...)
     char *payload = NULL;
     char *protected = NULL;
     char *jws = NULL;
-    curldata_t *c = NULL;
 
-    json_free(a->json);
-    a->json = NULL;
-    free(a->headers);
-    a->headers = NULL;
-    free(a->body);
-    a->body = NULL;
-    free(a->type);
-    a->type = NULL;
+    if (!url)
+    {
+        warnx("acme_post: invalid URL");
+        return 0;
+    }
 
     if (!a->nonce)
     {
         warnx("acme_post: need a nonce first");
-        goto out;
+        return 0;
     }
 
     va_list ap;
     va_start(ap, format);
     if (vasprintf(&payload, format, ap) < 0)
     {
-        warnx("acme_post: vasprintf failed");
         payload = NULL;
     }
     va_end(ap);
-    if (!payload) return 0;
+    if (!payload)
+    {
+        warnx("acme_post: vasprintf failed");
+        return 0;
+    }
 
-    if (!url)
+    for (int retry = 0; a->nonce && retry < 3; retry++)
     {
-        warnx("acme_post: invalid URL");
-        goto out;
+        if (retry > 0)
+        {
+            msg(1, "acme_post: server rejected nonce, retrying");
+        }
+
+        json_free(a->json);
+        a->json = NULL;
+        free(a->headers);
+        a->headers = NULL;
+        free(a->body);
+        a->body = NULL;
+        free(a->type);
+        a->type = NULL;
+
+        protected = (a->kid && *a->kid) ?
+            jws_protected_kid(a->nonce, url, a->kid, a->key) :
+            jws_protected_jwk(a->nonce, url, a->key);
+        if (!protected)
+        {
+            warnx("acme_post: jws_protected_xxx failed");
+            goto out;
+        }
+        jws = jws_encode(protected, payload, a->key);
+        if (!jws)
+        {
+            warnx("acme_post: jws_encode failed");
+            goto out;
+        }
+        if (g_loglevel > 2)
+        {
+            warnx("acme_post: url=%s payload=%s "
+                    "protected=%s nonce=%s request=%s",
+                    url, payload, protected, a->nonce, jws);
+        }
+        else if (g_loglevel > 1)
+        {
+            warnx("acme_post: url=%s payload=%s", url, payload);
+        }
+        curldata_t *c = curl_post(url, jws);
+        if (!c)
+        {
+            warnx("acme_post: curl_post failed");
+            goto out;
+        }
+        free(a->nonce);
+        a->nonce = find_header(c->headers, "Replay-Nonce");
+        a->type = find_header(c->headers, "Content-Type");
+        if (a->type && strstr(a->type, "json"))
+        {
+            a->json = json_parse(c->body, c->body_len);
+        }
+        a->headers = c->headers;
+        c->headers = NULL;
+        a->body = c->body;
+        c->body = NULL;
+        ret = c->code;
+        curldata_free(c);
+        if (g_loglevel > 2)
+        {
+            if (a->headers)
+            {
+                warnx("acme_post: HTTP headers:\n%s", a->headers);
+            }
+            if (a->body)
+            {
+                warnx("acme_post: HTTP body:\n%s", a->body);
+            }
+        }
+        if (g_loglevel > 1)
+        {
+            if (a->json)
+            {
+                warnx("acme_post: return code %d, json=", ret);
+                json_dump(stderr, a->json);
+            }
+            else
+            {
+                warnx("acme_post: return code %d", ret);
+            }
+        }
+        if (ret != 400 || !a->type || !a->nonce || !a->json ||
+                0 != strcasecmp(a->type, "application/problem+json") ||
+                0 != json_compare_string(a->json, "type",
+                    "urn:ietf:params:acme:error:badNonce"))
+        {
+            break;
+        }
     }
-    protected = (a->kid && *a->kid) ?
-        jws_protected_kid(a->nonce, url, a->kid, a->key) :
-        jws_protected_jwk(a->nonce, url, a->key);
-    if (!protected)
-    {
-        warnx("acme_post: jws_protected_xxx failed");
-        goto out;
-    }
-    jws = jws_encode(protected, payload, a->key);
-    if (!jws)
-    {
-        warnx("acme_post: jws_encode failed");
-        goto out;
-    }
-    if (g_loglevel > 2)
-    {
-        warnx("acme_post: url=%s payload=%s protected=%s nonce=%s request=%s",
-                url, payload, protected, a->nonce, jws);
-    }
-    else if (g_loglevel > 1)
-    {
-        warnx("acme_post: url=%s payload=%s", url, payload);
-    }
-    c = curl_post(url, jws);
-    if (!c)
-    {
-        warnx("acme_post: curl_post failed");
-        goto out;
-    }
-    free(a->nonce);
-    a->nonce = find_header(c->headers, "Replay-Nonce");
-    a->type = find_header(c->headers, "Content-Type");
-    if (a->type && strstr(a->type, "json"))
-    {
-        a->json = json_parse(c->body, c->body_len);
-    }
-    a->headers = c->headers;
-    c->headers = NULL;
-    a->body = c->body;
-    c->body = NULL;
-    ret = c->code;
 out:
     free(payload);
     free(protected);
     free(jws);
-    curldata_free(c);
-    if (g_loglevel > 2)
-    {
-        if (a->headers)
-        {
-            warnx("acme_post: HTTP headers:\n%s", a->headers);
-        }
-        if (a->body)
-        {
-            warnx("acme_post: HTTP body:\n%s", a->body);
-        }
-    }
-    if (g_loglevel > 1)
-    {
-        warnx("acme_post: return code %d, json=", ret);
-        if (a->json)
-        {
-            json_dump(stderr, a->json);
-        }
-        else
-        {
-            fprintf(stderr, "<null>\n");
-        }
-    }
     if (!a->headers) a->headers = strdup("");
     if (!a->body) a->body = strdup("");
     if (!a->type) a->type = strdup("");
