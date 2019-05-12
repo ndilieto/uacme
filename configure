@@ -5685,9 +5685,9 @@ $as_echo_n "checking for libtasn1 >= 4.2... " >&6; }
 $as_echo "no" >&6; }
                 as_fn_error $? "libtasn1 not found" "$LINENO" 5
             else
-                addlib+=`$PKGCONFIG --libs-only-l libtasn1`
-                addld+=`$PKGCONFIG --libs-only-L libtasn1`
-                addcflags+=`$PKGCONFIG --cflags-only-I libtasn1`
+                addlib+=" `$PKGCONFIG --libs-only-l libtasn1`"
+                addld+=" `$PKGCONFIG --libs-only-L libtasn1`"
+                addcflags+=" `$PKGCONFIG --cflags-only-I libtasn1`"
                 version=`$PKGCONFIG --modversion libtasn1`
                 tasn1lib=`echo $addld | $SED -e 's/-L//'`
                 { $as_echo "$as_me:${as_lineno-$LINENO}: result: found $version" >&5
@@ -6106,12 +6106,10 @@ fi
 
 
     if test "$A2X" = :; then :
-  { $as_echo "$as_me:${as_lineno-$LINENO}: WARNING: Could not find a2x." >&5
-$as_echo "$as_me: WARNING: Could not find a2x." >&2;}
+  as_fn_error $? "Could not find a2x." "$LINENO" 5
 fi
     if test "$ASCIIDOC" = :; then :
-  { $as_echo "$as_me:${as_lineno-$LINENO}: WARNING: Could not find asciidoc." >&5
-$as_echo "$as_me: WARNING: Could not find asciidoc." >&2;}
+  as_fn_error $? "Could not find asciidoc." "$LINENO" 5
 fi
 fi
 ac_config_files="$ac_config_files Makefile"

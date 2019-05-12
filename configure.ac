@@ -155,9 +155,9 @@ if test X"$OPT_GNUTLS" != Xno; then
                 AC_MSG_RESULT([no])
                 AC_MSG_ERROR([libtasn1 not found])
             else
-                addlib+=`$PKGCONFIG --libs-only-l libtasn1`
-                addld+=`$PKGCONFIG --libs-only-L libtasn1`
-                addcflags+=`$PKGCONFIG --cflags-only-I libtasn1`
+                addlib+=" `$PKGCONFIG --libs-only-l libtasn1`"
+                addld+=" `$PKGCONFIG --libs-only-L libtasn1`"
+                addcflags+=" `$PKGCONFIG --cflags-only-I libtasn1`"
                 version=`$PKGCONFIG --modversion libtasn1`
                 tasn1lib=`echo $addld | $SED -e 's/-L//'`
                 AC_MSG_RESULT([found $version])
@@ -303,8 +303,8 @@ AM_CONDITIONAL(ENABLE_DOCS, test X"$enable_docs" = Xyes)
 if test X"$enable_docs" = Xyes; then
     AC_PATH_PROG(A2X, a2x, :)
     AC_PATH_PROG(ASCIIDOC, asciidoc, :)
-    AS_IF([test "$A2X" = :], [AC_MSG_WARN([Could not find a2x.])])
-    AS_IF([test "$ASCIIDOC" = :], [AC_MSG_WARN([Could not find asciidoc.])])
+    AS_IF([test "$A2X" = :], [AC_MSG_ERROR([Could not find a2x.])])
+    AS_IF([test "$ASCIIDOC" = :], [AC_MSG_ERROR([Could not find asciidoc.])])
 fi
 AC_CONFIG_FILES([Makefile])
 AC_OUTPUT
