@@ -21,6 +21,7 @@
 #include <ctype.h>
 #include <err.h>
 #include <errno.h>
+#include <fcntl.h>
 #include <getopt.h>
 #include <locale.h>
 #include <regex.h>
@@ -72,6 +73,7 @@ char *find_header(const char *headers, const char *name)
     char *regex = NULL;
     if (asprintf(&regex, "^%s: (.*)\r\n", name) < 0)
     {
+        warnx("find_header: asprintf failed");
         return NULL;
     }
     char *ret = NULL;
@@ -100,7 +102,6 @@ char *find_header(const char *headers, const char *name)
 int acme_get(acme_t *a, const char *url)
 {
     int ret = 0;
-    curldata_t *c = NULL;
 
     json_free(a->json);
     a->json = NULL;
@@ -120,7 +121,7 @@ int acme_get(acme_t *a, const char *url)
     {
         warnx("acme_get: url=%s", url);
     }
-    c = curl_get(url);
+    curldata_t *c = curl_get(url);
     if (!c)
     {
         warnx("acme_get: curl_get failed");
@@ -138,8 +139,8 @@ int acme_get(acme_t *a, const char *url)
     a->body = c->body;
     c->body = NULL;
     ret = c->code;
-out:
     curldata_free(c);
+out:
     if (g_loglevel > 2)
     {
         if (a->headers)
@@ -149,6 +150,18 @@ out:
         if (a->body)
         {
             warnx("acme_get: HTTP body\n%s", a->body);
+        }
+    }
+    if (g_loglevel > 1)
+    {
+        if (a->json)
+        {
+            warnx("acme_get: return code %d, json=", ret);
+            json_dump(stderr, a->json);
+        }
+        else
+        {
+            warnx("acme_get: return code %d", ret);
         }
     }
     if (!a->headers) a->headers = strdup("");
@@ -163,107 +176,126 @@ int acme_post(acme_t *a, const char *url, const char *format, ...)
     char *payload = NULL;
     char *protected = NULL;
     char *jws = NULL;
-    curldata_t *c = NULL;
 
-    json_free(a->json);
-    a->json = NULL;
-    free(a->headers);
-    a->headers = NULL;
-    free(a->body);
-    a->body = NULL;
-    free(a->type);
-    a->type = NULL;
+    if (!url)
+    {
+        warnx("acme_post: invalid URL");
+        return 0;
+    }
 
     if (!a->nonce)
     {
         warnx("acme_post: need a nonce first");
-        goto out;
+        return 0;
     }
 
     va_list ap;
     va_start(ap, format);
     if (vasprintf(&payload, format, ap) < 0)
     {
-        warnx("acme_post: vasprintf failed");
         payload = NULL;
     }
     va_end(ap);
-    if (!payload) return 0;
+    if (!payload)
+    {
+        warnx("acme_post: vasprintf failed");
+        return 0;
+    }
 
-    if (!url)
+    for (int retry = 0; a->nonce && retry < 3; retry++)
     {
-        warnx("acme_post: invalid URL");
-        goto out;
+        if (retry > 0)
+        {
+            msg(1, "acme_post: server rejected nonce, retrying");
+        }
+
+        json_free(a->json);
+        a->json = NULL;
+        free(a->headers);
+        a->headers = NULL;
+        free(a->body);
+        a->body = NULL;
+        free(a->type);
+        a->type = NULL;
+
+        protected = (a->kid && *a->kid) ?
+            jws_protected_kid(a->nonce, url, a->kid, a->key) :
+            jws_protected_jwk(a->nonce, url, a->key);
+        if (!protected)
+        {
+            warnx("acme_post: jws_protected_xxx failed");
+            goto out;
+        }
+        jws = jws_encode(protected, payload, a->key);
+        if (!jws)
+        {
+            warnx("acme_post: jws_encode failed");
+            goto out;
+        }
+        if (g_loglevel > 2)
+        {
+            warnx("acme_post: url=%s payload=%s "
+                    "protected=%s nonce=%s request=%s",
+                    url, payload, protected, a->nonce, jws);
+        }
+        else if (g_loglevel > 1)
+        {
+            warnx("acme_post: url=%s payload=%s", url, payload);
+        }
+        curldata_t *c = curl_post(url, jws);
+        if (!c)
+        {
+            warnx("acme_post: curl_post failed");
+            goto out;
+        }
+        free(a->nonce);
+        a->nonce = find_header(c->headers, "Replay-Nonce");
+        a->type = find_header(c->headers, "Content-Type");
+        if (a->type && strstr(a->type, "json"))
+        {
+            a->json = json_parse(c->body, c->body_len);
+        }
+        a->headers = c->headers;
+        c->headers = NULL;
+        a->body = c->body;
+        c->body = NULL;
+        ret = c->code;
+        curldata_free(c);
+        if (g_loglevel > 2)
+        {
+            if (a->headers)
+            {
+                warnx("acme_post: HTTP headers:\n%s", a->headers);
+            }
+            if (a->body)
+            {
+                warnx("acme_post: HTTP body:\n%s", a->body);
+            }
+        }
+        if (g_loglevel > 1)
+        {
+            if (a->json)
+            {
+                warnx("acme_post: return code %d, json=", ret);
+                json_dump(stderr, a->json);
+            }
+            else
+            {
+                warnx("acme_post: return code %d", ret);
+            }
+        }
+        if (ret != 400 || !a->type || !a->nonce || !a->json ||
+                0 != strcasecmp(a->type, "application/problem+json") ||
+                0 != json_compare_string(a->json, "type",
+                    "urn:ietf:params:acme:error:badNonce"))
+        {
+            break;
+        }
     }
-    protected = (a->kid && *a->kid) ?
-        jws_protected_kid(a->nonce, url, a->kid, key_type(a->key)) :
-        jws_protected_jwk(a->nonce, url, a->key);
-    if (!protected)
-    {
-        warnx("acme_post: jws_protected_xxx failed");
-        goto out;
-    }
-    jws = jws_encode(protected, payload, a->key);
-    if (!jws)
-    {
-        warnx("acme_post: jws_encode failed");
-        goto out;
-    }
-    if (g_loglevel > 2)
-    {
-        warnx("acme_post: url=%s payload=%s nonce=%s request=%s",
-                url, payload, a->nonce, jws);
-    }
-    else if (g_loglevel > 1)
-    {
-        warnx("acme_post: url=%s payload=%s", url, payload);
-    }
-    c = curl_post(url, jws);
-    if (!c)
-    {
-        warnx("acme_post: curl_post failed");
-        goto out;
-    }
-    free(a->nonce);
-    a->nonce = find_header(c->headers, "Replay-Nonce");
-    a->type = find_header(c->headers, "Content-Type");
-    if (a->type && strstr(a->type, "json"))
-    {
-        a->json = json_parse(c->body, c->body_len);
-    }
-    a->headers = c->headers;
-    c->headers = NULL;
-    a->body = c->body;
-    c->body = NULL;
-    ret = c->code;
 out:
     free(payload);
     free(protected);
     free(jws);
-    curldata_free(c);
-    if (g_loglevel > 2)
-    {
-        if (a->headers)
-        {
-            warnx("acme_post: HTTP headers:\n%s", a->headers);
-        }
-        if (a->body)
-        {
-            warnx("acme_post: HTTP body:\n%s", a->body);
-        }
-    }
-    if (g_loglevel > 1)
-    {
-        warnx("acme_post: return code %d, json=", ret);
-        if (a->json)
-        {
-            json_dump(stderr, a->json);
-        }
-        else
-        {
-            fprintf(stderr, "<null>\n");
-        }
-    }
     if (!a->headers) a->headers = strdup("");
     if (!a->body) a->body = strdup("");
     if (!a->type) a->type = strdup("");
@@ -737,7 +769,7 @@ bool authorize(acme_t *a)
                 }
                 if (strcmp(type, "dns-01") == 0)
                 {
-                    key_auth = sha256_base64url("%s.%s", token, thumbprint);
+                    key_auth = sha2_base64url(256, "%s.%s", token, thumbprint);
                 }
                 else if (asprintf(&key_auth, "%s.%s", token, thumbprint) < 0)
                 {
@@ -852,6 +884,11 @@ bool cert_issue(acme_t *a)
     bool success = false;
     char *csr = NULL;
     char *orderurl = NULL;
+    char *certfile = NULL;
+    char *bakfile = NULL;
+    char *tmpfile = NULL;
+    time_t t = time(NULL);
+    int fd = -1;
     char *ids = identifiers(a->names);
     if (!ids)
     {
@@ -1006,15 +1043,70 @@ bool cert_issue(acme_t *a)
         goto out;
     }
 
-    if (!cert_save(a->body, a->certdir))
+    if (asprintf(&certfile, "%s/cert.pem", a->certdir) < 0)
     {
-        warnx("failed to save certificate");
+        certfile = NULL;
+        warnx("cert_issue: vasprintf failed");
         goto out;
     }
 
-    success = true;
+    if (asprintf(&tmpfile, "%s/cert.pem.tmp", a->certdir) < 0)
+    {
+        tmpfile = NULL;
+        warnx("cert_issue: vasprintf failed");
+        goto out;
+    }
 
+    if (asprintf(&bakfile, "%s/cert-%llu.pem", a->certdir,
+                (unsigned long long)t) < 0)
+    {
+        bakfile = NULL;
+        warnx("cert_issue: vasprintf failed");
+        goto out;
+    }
+
+    if (link(certfile, bakfile) < 0 && errno != ENOENT)
+    {
+        warn("failed to link %s to %s", bakfile, certfile);
+        goto out;
+    }
+
+    fd = open(tmpfile, O_WRONLY|O_CREAT|O_TRUNC, S_IRUSR|S_IRGRP|S_IROTH);
+    if (fd < 0)
+    {
+        warn("failed to create %s", tmpfile);
+        goto out;
+    }
+
+    if (write(fd, a->body, strlen(a->body)) != strlen(a->body))
+    {
+        warn("failed to write to %s", tmpfile);
+        goto out;
+    }
+
+    if (close(fd) < 0)
+    {
+        warn("failed to close %s", tmpfile);
+        goto out;
+    }
+    else
+    {
+        fd = -1;
+    }
+
+    if (rename(tmpfile, certfile) < 0)
+    {
+        warn("failed to rename %s to %s", tmpfile, certfile);
+        goto out;
+    }
+    msg(1, "certificate saved to %s", certfile);
+
+    success = true;
 out:
+    if (fd >= 0) close(fd);
+    free(bakfile);
+    free(tmpfile);
+    free(certfile);
     free(csr);
     free(ids);
     free(orderurl);
@@ -1137,7 +1229,7 @@ int main(int argc, char **argv)
     bool version = false;
     bool yes = false;
     int days = 30;
-    int bits = 2048;
+    int bits = 0;
     keytype_t type = PK_RSA;
     const char *revokefile = NULL;
 
@@ -1190,9 +1282,9 @@ int main(int argc, char **argv)
 
             case 'b':
                 bits = strtol(optarg, &endptr, 10);
-                if (*endptr != 0 || bits < 2048 || bits > 8192)
+                if (*endptr != 0 || bits <= 0)
                 {
-                    warnx("bits must be between 2048 and 8192");
+                    warnx("BITS must be a positive integer");
                     goto out;
                 }
                 break;
@@ -1205,7 +1297,7 @@ int main(int argc, char **argv)
                 days = strtol(optarg, &endptr, 10);
                 if (*endptr != 0 || days <= 0)
                 {
-                    warnx("days must be a positive integer");
+                    warnx("DAYS must be a positive integer");
                     goto out;
                 }
                 break;
@@ -1264,6 +1356,47 @@ int main(int argc, char **argv)
     {
         msg(0, "version " VERSION);
         goto out;
+    }
+
+    switch (type)
+    {
+        case PK_RSA:
+            if (bits == 0)
+            {
+                bits = 2048;
+            }
+            else if (bits < 2048 || bits > 8192)
+            {
+                warnx("BITS must be between 2048 and 8192 for RSA keys");
+                goto out;
+            }
+            else if (bits & 7)
+            {
+                warnx("BITS must be a multiple of 8 for RSA keys");
+                goto out;
+            }
+            break;
+
+        case PK_EC:
+            switch (bits)
+            {
+                case 0:
+                    bits = 256;
+                    break;
+
+                case 256:
+                case 384:
+                    break;
+
+                default:
+                    warnx("BITS must be either 256 or 384 for EC keys");
+                    goto out;
+            }
+            break;
+
+        default:
+            warnx("key type must be either RSA or EC");
+            goto out;
     }
 
     if (optind == argc)

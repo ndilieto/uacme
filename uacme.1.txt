@@ -26,7 +26,7 @@ DESCRIPTION
 *uacme* is a client for the ACMEv2 protocol described in RFC8555,
 written in plain C code with minimal dependencies (libcurl and 
 one of GnuTLS, OpenSSL or mbedTLS). The ACMEv2 protocol allows a
-Certificate Authority (<https://letsencrypt.org/> is a popular one)
+Certificate Authority (<https://letsencrypt.org> is a popular one)
 and an applicant to automate the process of verification and certificate
 issuance. The protocol also provides facilities for other certificate
 management functions, such as certificate revocation. For more
@@ -43,8 +43,10 @@ OPTIONS
     staging URL (see *-s, --staging* below)
 
 *-b, --bits*='BITS'::
-    RSA key bit length (default 2048). Only applies to newly generated
-    RSA keys.
+    key bit length (default 2048 for RSA, 256 for EC). Only applies
+    to newly generated keys. RSA key length must be a multiple of 8
+    between 2048 and 8192. EC key length must be either 256
+    (*NID_X9_62_prime256v1* curve) or 384 (*NID_secp384r1* curve).
 
 *-c, --confdir*='CONFDIR'::
     Use configuration directory 'CONFDIR' (default '/etc/ssl/uacme').
@@ -58,7 +60,7 @@ OPTIONS
     than 'DAYS' (default 30).
 
 *-f, --force*::
-    Force certificate reissuance regardless of expiration date
+    Force certificate reissuance regardless of expiration date.
 
 *-h, --hook*='PROGRAM'::
     Challenge hook program. If not specified *uacme* interacts with
@@ -83,7 +85,7 @@ OPTIONS
            provisioned as _acme-challenge DNS TXT record).
 
 *-?, --help*::
-    Print a brief usage text on stderr and exit
+    Print a brief usage text on stderr and exit.
 
 *-n, --never-create*::
     By default *uacme* creates directories/keys if they do not exist.
@@ -96,8 +98,7 @@ OPTIONS
 
 *-t, --type*=*RSA* | *EC*::
     Key type, either RSA or EC. Only applies to newly generated keys.
-    RSA bit length can be specified with *-b, --bits*. EC supports
-    the 'NID_X9_62_prime256v1' curve only.
+    The bit length can be specified with *-b, --bits*.
 
 *-v, --verbose*::
     By default *uacme* only produces output upon errors or when user
@@ -106,10 +107,10 @@ OPTIONS
     can be specified more than once to increase verbosity.
 
 *-V, --version*::
-    Print program version on stderr and exit
+    Print program version on stderr and exit.
 
 *-y, --yes*::
-    Autoaccept ACME server terms (if any) upon new account creation
+    Autoaccept ACME server terms (if any) upon new account creation.
 
 
 USAGE
