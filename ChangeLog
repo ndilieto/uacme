@@ -1,3 +1,12 @@
+2019-05-12 Nicola Di Lieto <nicola.dilieto@gmail.com>
+	* Release 1.0.9
+	- added secp384r1 EC key support
+	- -b, --bits option accepts 256 or 384 for EC keys
+	- enforce multiple of 8 RSA key size
+	- improved acme_get and acme_post verbose logging
+	- retry upon badNonce response according to RFC8555 6.5
+	- mbedtls: fixed incorrect size of EC signature
+
 2019-05-09 Nicola Di Lieto <nicola.dilieto@gmail.com>
 	* Release 1.0.9
 	- added EC key/cert support (-t, --type=EC, default RSA)

@@ -2,12 +2,12 @@
 .\"     Title: uacme
 .\"    Author: [see the "AUTHOR" section]
 .\" Generator: DocBook XSL Stylesheets v1.78.1 <http://docbook.sf.net/>
-.\"      Date: 05/09/2019
+.\"      Date: 05/12/2019
 .\"    Manual: User Commands
-.\"    Source: uacme 1.0.9
+.\"    Source: uacme 1.0.10
 .\"  Language: English
 .\"
-.TH "UACME" "1" "05/09/2019" "uacme 1\&.0\&.9" "User Commands"
+.TH "UACME" "1" "05/12/2019" "uacme 1\&.0\&.10" "User Commands"
 .\" -----------------------------------------------------------------
 .\" * Define some portability stuff
 .\" -----------------------------------------------------------------
@@ -34,7 +34,7 @@ uacme \- ACMEv2 client written in plain C code with minimal dependencies
 \fBuacme\fR [\fB\-a\fR|\fB\-\-acme\-url\fR \fIURL\fR] [\fB\-b\fR|\fB\-\-bits\fR \fIBITS\fR] [\fB\-c\fR|\fB\-\-confdir\fR \fIDIR\fR] [\fB\-d\fR|\fB\-\-days\fR \fIDAYS\fR] [\fB\-f\fR|\fB\-\-force\fR] [\fB\-h\fR|\fB\-\-hook\fR \fIPROGRAM\fR] [\fB\-n\fR|\fB\-\-never\fR] [\fB\-s\fR|\fB\-\-staging\fR] [\fB\-t\fR|\fB\-\-type\fR \fBRSA\fR|\fBEC\fR] [\fB\-v\fR|\fB\-\-verbose\fR \&...] [\fB\-V\fR|\fB\-\-version\fR] [\fB\-y\fR|\fB\-\-yes\fR] [\fB\-?\fR|\fB\-\-help\fR] \fBnew\fR [\fIEMAIL\fR] | \fBupdate\fR [\fIEMAIL\fR] | \fBdeactivate\fR | \fBissue\fR \fIDOMAIN\fR [\fIALTNAME\fR \&...]] | \fBrevoke\fR \fICERTFILE\fR
 .SH "DESCRIPTION"
 .sp
-\fBuacme\fR is a client for the ACMEv2 protocol described in RFC8555, written in plain C code with minimal dependencies (libcurl and one of GnuTLS, OpenSSL or mbedTLS)\&. The ACMEv2 protocol allows a Certificate Authority (https://letsencrypt\&.org/ is a popular one) and an applicant to automate the process of verification and certificate issuance\&. The protocol also provides facilities for other certificate management functions, such as certificate revocation\&. For more information see https://tools\&.ietf\&.org/html/rfc8555
+\fBuacme\fR is a client for the ACMEv2 protocol described in RFC8555, written in plain C code with minimal dependencies (libcurl and one of GnuTLS, OpenSSL or mbedTLS)\&. The ACMEv2 protocol allows a Certificate Authority (https://letsencrypt\&.org is a popular one) and an applicant to automate the process of verification and certificate issuance\&. The protocol also provides facilities for other certificate management functions, such as certificate revocation\&. For more information see https://tools\&.ietf\&.org/html/rfc8555
 .SH "OPTIONS"
 .PP
 \fB\-a, \-\-acme\-url\fR=\fIURL\fR
@@ -59,7 +59,9 @@ below)
 .PP
 \fB\-b, \-\-bits\fR=\fIBITS\fR
 .RS 4
-RSA key bit length (default 2048)\&. Only applies to newly generated RSA keys\&.
+key bit length (default 2048 for RSA, 256 for EC)\&. Only applies to newly generated keys\&. RSA key length must be a multiple of 8 between 2048 and 8192\&. EC key length must be either 256 (\fBNID_X9_62_prime256v1\fR
+curve) or 384 (\fBNID_secp384r1\fR
+curve)\&.
 .RE
 .PP
 \fB\-c, \-\-confdir\fR=\fICONFDIR\fR
@@ -98,7 +100,7 @@ Do not reissue certificates that are still valid for longer than
 .PP
 \fB\-f, \-\-force\fR
 .RS 4
-Force certificate reissuance regardless of expiration date
+Force certificate reissuance regardless of expiration date\&.
 .RE
 .PP
 \fB\-h, \-\-hook\fR=\fIPROGRAM\fR
@@ -169,7 +171,7 @@ already converted to the base64\-encoded SHA256 digest format to be provisioned 
 .PP
 \fB\-?, \-\-help\fR
 .RS 4
-Print a brief usage text on stderr and exit
+Print a brief usage text on stderr and exit\&.
 .RE
 .PP
 \fB\-n, \-\-never\-create\fR
@@ -192,10 +194,8 @@ specified\&.
 .PP
 \fB\-t, \-\-type\fR=\fBRSA\fR | \fBEC\fR
 .RS 4
-Key type, either RSA or EC\&. Only applies to newly generated keys\&. RSA bit length can be specified with
-\fB\-b, \-\-bits\fR\&. EC supports the
-\fINID_X9_62_prime256v1\fR
-curve only\&.
+Key type, either RSA or EC\&. Only applies to newly generated keys\&. The bit length can be specified with
+\fB\-b, \-\-bits\fR\&.
 .RE
 .PP
 \fB\-v, \-\-verbose\fR
@@ -209,12 +209,12 @@ prints information about what is going on on stderr\&. This option can be specif
 .PP
 \fB\-V, \-\-version\fR
 .RS 4
-Print program version on stderr and exit
+Print program version on stderr and exit\&.
 .RE
 .PP
 \fB\-y, \-\-yes\fR
 .RS 4
-Autoaccept ACME server terms (if any) upon new account creation
+Autoaccept ACME server terms (if any) upon new account creation\&.
 .RE
 .SH "USAGE"
 .PP
