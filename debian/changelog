@@ -1,3 +1,16 @@
+uacme (1.0.10-1) unstable; urgency=medium
+
+  * Added secp384r1 EC support
+    - -b, --bits option accepts 256 or 384 for EC keys
+  * enforce multiple of 8 RSA key size
+  * improved acme_get and acme_post verbose logging
+  * Implemented retry upon badNonce response according to RFC8555 6.5
+  * Fix configure.ac bug for gnutls variant
+  * mbedtls: fixed incorrect size of EC signature
+  * avoid depending on asciidoc for debian build
+
+ -- Nicola Di Lieto <nicola.dilieto@gmail.com>  Sun, 12 May 2019 18:30:38 +0200
+
 uacme (1.0.9-1) unstable; urgency=medium
 
   * added ECC support (-t, --type=EC)
