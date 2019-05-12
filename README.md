@@ -19,19 +19,19 @@ processes.  Particularly when using mbedTLS, it is small enough to run
 on embedded systems with severe RAM and program memory restrictions
 (such as OpenWRT routers, for example).  This is in contrast to
 solutions based on python or shell scripts, which may well be a few
-hundred lines but are not only ugly and brittle, but also require many
+hundred lines but are ugly, brittle and also require many
 other large applications such as python or openssl to work.
 * **Native ECC support** - Elliptic Curve keys and certificates can be
 generated with a commmand line option (-t EC)
 * **Easily extensible** - It optionally calls an external hook program
 with the tokens required for domain authorization by the server. The 
 hook program can be an executable, shell script, perl script, python 
-script, or any file that the operating system can execute. An example
-shell script to handle http-01 challenges is provided
+script, or any file that the operating system can execute.
 * **ACME challenge agnostic** - It provides the user or hook program
-with all tokens and information required to complete the challenge,
-but leaves the task of setting up/cleaning up the challenge environment
-to the user or hook.
+with all tokens and information required to complete any challenge type
+(including http-01, dns-01 and others) but leaves the task of setting up 
+and cleaning up the challenge environment to the user or hook. An example
+shell script to handle http-01 challenges is provided.
 * **Can run as a cron job** - to renew certificates automatically 
 when needed, even for remote machines
 * **Robust** - It checks every operation, retrying or failing gracefully
@@ -43,8 +43,8 @@ by specifying the **--verbose** flag once or more.
 
 ## Installation
 ```
-wget -O - https://github.com/ndilieto/uacme/archive/upstream/1.0.9.tar.gz | tar zx
-cd uacme-1.0.9
+wget -O - https://github.com/ndilieto/uacme/archive/upstream/1.0.10.tar.gz | tar zx
+cd uacme-1.0.10
 ./configure
 make install
 ```
@@ -54,9 +54,9 @@ git clone -b upstream/latest https://github.com/ndilieto/uacme
 ```
 and a precompiled debian jessie amd64 package
 ```
-wget https://github.com/ndilieto/uacme/releases/download/debian/1.0.9-1/uacme_1.0.9-1_amd64.deb
+wget https://github.com/ndilieto/uacme/releases/download/debian/1.0.10-1/uacme_1.0.10-1_amd64.deb
 sudo apt-get install libgnutls-deb0-28 libcurl3-gnutls 
-sudo dpkg -i uacme_1.0.9-1_amd64.deb
+sudo dpkg -i uacme_1.0.10-1_amd64.deb
 ```
 
 ## Getting started
@@ -96,9 +96,9 @@ will be created:
 /path/to/uacme.d/private/www.your.domain.com/key.pem
 ```
 Note other types of challenges are possible, if you type anything other than 'y',
-uacme will skip the challenge and propose a different one. The easiest is http-01.
-Note also that challenge types may be served in random order by the server.
-Do not make any assumptions and read uacme's output carefully.
+uacme will skip the challenge and propose a different one. The easiest is http-01 but
+any other type can be dealt with. Keep in mind that challenge types may be served in
+random order by the server. Do not make any assumptions and read uacme's output carefully.
 
 ## Automating updates
 Use the -h flag:
