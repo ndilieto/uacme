@@ -767,7 +767,8 @@ bool authorize(acme_t *a)
                     warnx("failed to parse challenge");
                     goto out;
                 }
-                if (strcmp(type, "dns-01") == 0)
+                if (strcmp(type, "dns-01") == 0 ||
+                        strcmp(type, "tls-alpn-01") == 0)
                 {
                     key_auth = sha2_base64url(256, "%s.%s", token, thumbprint);
                 }

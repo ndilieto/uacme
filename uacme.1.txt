@@ -80,9 +80,8 @@ OPTIONS
         'TYPE'::: challenge type (for example *dns-01* or *http-01*)
         'IDENT'::: The identifier the challenge refers to
         'TOKEN'::: The challenge token
-        'AUTH'::: The key authorization (for *dns-01* already converted
-           to the base64-encoded SHA256 digest format to be 
-           provisioned as _acme-challenge DNS TXT record).
+        'AUTH'::: The key authorization (for *dns-01* and *tls-alpn-01*
+           already converted to the base64-encoded SHA256 digest format)
 
 *-?, --help*::
     Print a brief usage text on stderr and exit.
