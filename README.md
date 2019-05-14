@@ -43,20 +43,15 @@ by specifying the **--verbose** flag once or more.
 
 ## Installation
 ```
-wget -O - https://github.com/ndilieto/uacme/archive/upstream/1.0.10.tar.gz | tar zx
-cd uacme-1.0.10
-./configure
+mkdir uacme
+wget -O - https://github.com/ndilieto/uacme/archive/upstream/latest.tar.gz | tar zx -C uacme --strip-components=1
+cd uacme
+./configure --disable-maintainer-mode
 make install
 ```
 You'll also find the latest release in the git repository:
 ```
 git clone -b upstream/latest https://github.com/ndilieto/uacme
-```
-and a precompiled debian jessie amd64 package
-```
-wget https://github.com/ndilieto/uacme/releases/download/debian/1.0.10-1/uacme_1.0.10-1_amd64.deb
-sudo apt-get install libgnutls-deb0-28 libcurl3-gnutls 
-sudo dpkg -i uacme_1.0.10-1_amd64.deb
 ```
 
 ## Getting started
