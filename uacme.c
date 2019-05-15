@@ -23,6 +23,7 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <getopt.h>
+#include <libgen.h>
 #include <locale.h>
 #include <regex.h>
 #include <stdarg.h>
@@ -235,8 +236,8 @@ int acme_post(acme_t *a, const char *url, const char *format, ...)
         if (g_loglevel > 2)
         {
             warnx("acme_post: url=%s payload=%s "
-                    "protected=%s nonce=%s request=%s",
-                    url, payload, protected, a->nonce, jws);
+                    "protected=%s jws=%s",
+                    url, payload, protected, jws);
         }
         else if (g_loglevel > 1)
         {
@@ -660,6 +661,139 @@ bool account_update(acme_t *a)
     return true;
 }
 
+bool account_keychange(acme_t *a, bool never, keytype_t type, int bits)
+{
+    bool success = false;
+    privkey_t newkey = NULL;
+    char *newkeyfile = NULL;
+    char *keyfile = NULL;
+    char *bakfile = NULL;
+    char *protected = NULL;
+    char *payload = NULL;
+    char *jwk = NULL;
+    char *jws = NULL;
+    const char *url = json_find_string(a->dir, "keyChange");
+    if (!url)
+    {
+        warnx("account_keychange: failed to find keyChange URL in directory");
+        goto out;
+    }
+
+    if (asprintf(&keyfile, "%s/key.pem", a->keydir) < 0)
+    {
+        warnx("account_keychange: asprintf failed");
+        keyfile = NULL;
+        goto out;
+    }
+
+    if (asprintf(&bakfile, "%s/key-%llu.pem", a->keydir,
+                (unsigned long long)time(NULL)) < 0)
+    {
+        warnx("account_keychange: asprintf failed");
+        bakfile = NULL;
+        goto out;
+    }
+
+    if (asprintf(&newkeyfile, "%s/newkey.pem", a->keydir) < 0)
+    {
+        warnx("account_keychange: asprintf failed");
+        newkeyfile = NULL;
+        goto out;
+    }
+
+    newkey = key_load(never ? PK_NONE : type, bits, newkeyfile);
+    if (!newkey)
+    {
+        goto out;
+    }
+
+    protected = jws_protected_jwk(NULL, url, newkey);
+    if (!protected)
+    {
+        warnx("account_keychange: jws_protected_jwk failed");
+        goto out;
+    }
+
+    jwk = jws_jwk(a->key, NULL, NULL);
+    if (!jwk)
+    {
+        warnx("account_keychange: jws_jwk failed");
+        goto out;
+    }
+
+    if (asprintf(&payload, "{\"account\":\"%s\",\"oldKey\":%s}",
+                a->kid, jwk) < 0)
+    {
+        warnx("account_keychange: jws_jwk failed");
+        goto out;
+    }
+
+    jws = jws_encode(protected, payload, newkey);
+    if (!jws)
+    {
+        warnx("account_keychange: jws_encode failed");
+        goto out;
+    }
+
+    if (g_loglevel > 2)
+    {
+        warnx("account_keychange: url=%s payload=%s protected=%s jws=%s",
+                url, payload, protected, jws);
+    }
+    else if (g_loglevel > 1)
+    {
+        warnx("account_keychange: url=%s payload=%s", url, payload);
+    }
+
+    msg(1, "changing account key at %s", url);
+    if (200 != acme_post(a, url, jws))
+    {
+        warnx("failed to change account key at %s", url);
+        acme_error(a);
+        goto out;
+    }
+    else if (acme_error(a))
+    {
+        goto out;
+    }
+
+    msg(1, "backing up %s as %s", keyfile, bakfile);
+    if (link(keyfile, bakfile) < 0)
+    {
+        warn("failed to link %s to %s", bakfile, keyfile);
+    }
+    else
+    {
+        msg(1, "renaming %s to %s", newkeyfile, keyfile);
+        if (rename(newkeyfile, keyfile) < 0)
+        {
+            warn("failed to rename %s to %s", newkeyfile, keyfile);
+            unlink(bakfile);
+        }
+        else
+        {
+            msg(1, "account key changed");
+            success = true;
+        }
+    }
+    if (!success)
+    {
+        warnx("WARNING: account key changed but %s NOT replaced by %s",
+                keyfile, newkeyfile);
+        goto out;
+    }
+out:
+    if (newkey) privkey_deinit(newkey);
+    free(newkeyfile);
+    free(keyfile);
+    free(bakfile);
+    free(protected);
+    free(payload);
+    free(jwk);
+    free(jws);
+    return success;
+}
+
 bool account_deactivate(acme_t *a)
 {
     msg(1, "deactivating account at %s", a->kid);
@@ -1066,12 +1200,7 @@ bool cert_issue(acme_t *a)
         goto out;
     }
 
-    if (link(certfile, bakfile) < 0 && errno != ENOENT)
-    {
-        warn("failed to link %s to %s", bakfile, certfile);
-        goto out;
-    }
-
+    msg(1, "saving certificate to %s", tmpfile);
     fd = open(tmpfile, O_WRONLY|O_CREAT|O_TRUNC, S_IRUSR|S_IRGRP|S_IROTH);
     if (fd < 0)
     {
@@ -1095,12 +1224,26 @@ bool cert_issue(acme_t *a)
         fd = -1;
     }
 
+    if (link(certfile, bakfile) < 0)
+    {
+        if (errno != ENOENT)
+        {
+            warn("failed to link %s to %s", bakfile, certfile);
+            goto out;
+        }
+    }
+    else
+    {
+        msg(1, "backed up %s as %s", certfile, bakfile);
+    }
+
+    msg(1, "renaming %s to %s", tmpfile, certfile);
     if (rename(tmpfile, certfile) < 0)
     {
         warn("failed to rename %s to %s", tmpfile, certfile);
+        unlink(bakfile);
         goto out;
     }
-    msg(1, "certificate saved to %s", certfile);
 
     success = true;
 out:
@@ -1117,6 +1260,8 @@ out:
 bool cert_revoke(acme_t *a, const char *certfile, int reason_code)
 {
     bool success = false;
+    char *certfiledup = NULL;
+    char *revokedfile = NULL;
     const char *url = NULL;
     char *crt = cert_der_base64url(certfile);
     if (!crt)
@@ -1145,10 +1290,30 @@ bool cert_revoke(acme_t *a, const char *certfile, int reason_code)
         goto out;
     }
     msg(1, "revoked %s", certfile);
+    certfiledup = strdup(certfile);
+    if (!certfiledup)
+    {
+        warnx("strdup failed");
+        certfiledup = NULL;
+        goto out;
+    }
+    if (asprintf(&revokedfile, "%s/revoked-%llu.pem", dirname(certfiledup),
+                (unsigned long long)time(NULL)) < 0)
+    {
+        warnx("asprintf failed");
+        revokedfile = NULL;
+        goto out;
+    }
+    msg(1, "renaming %s to %s", certfile, revokedfile);
+    if (rename(certfile, revokedfile) < 0)
+    {
+        warn("failed to rename %s to %s", certfile, revokedfile);
+    }
     success = true;
-
 out:
     free(crt);
+    free(revokedfile);
+    free(certfiledup);
     return success;
 }
 
@@ -1197,11 +1362,12 @@ bool validate_domain_str(const char *s)
 
 void usage(const char *progname)
 {
-    fprintf(stderr, "usage: %s [-a|--acme-url URL] [-b|--bits BITS] [-c|--confdir DIR]\n"
-            "\t[-d|--days DAYS] [-f|--force] [-h|--hook PROGRAM] [-n|--never-create]\n"
-            "\t[-s|--staging] [-t|--type RSA | EC] [-v|--verbose ...] [-V|--version]\n"
-            "\t[-y|--yes] [-?|--help] new [EMAIL] | update [EMAIL] | deactivate\n"
-            "\t| issue DOMAIN [ALTNAME ...]] | revoke CERTFILE\n", progname);
+    fprintf(stderr,
+        "usage: %s [-a|--acme-url URL] [-b|--bits BITS] [-c|--confdir DIR]\n"
+        "\t[-d|--days DAYS] [-f|--force] [-h|--hook PROGRAM] [-n|--never-create]\n"
+        "\t[-s|--staging] [-t|--type RSA | EC] [-v|--verbose ...] [-V|--version]\n"
+        "\t[-y|--yes] [-?|--help] new [EMAIL] | update [EMAIL] | deactivate\n"
+        "\t| newkey | issue DOMAIN [ALTNAME ...]] | revoke CERTFILE\n", progname);
 }
 
 int main(int argc, char **argv)
@@ -1232,8 +1398,7 @@ int main(int argc, char **argv)
     int days = 30;
     int bits = 0;
     keytype_t type = PK_RSA;
-    const char *revokefile = NULL;
-
+    const char *filename = NULL;
     acme_t a;
     memset(&a, 0, sizeof(a));
     a.directory = PRODUCTION_URL;
@@ -1419,7 +1584,8 @@ int main(int argc, char **argv)
             goto out;
         }
     }
-    else if (strcmp(action, "deactivate") == 0)
+    else if (strcmp(action, "newkey") == 0
+            || strcmp(action, "deactivate") == 0)
     {
         if (optind < argc)
         {
@@ -1456,15 +1622,15 @@ int main(int argc, char **argv)
             usage(basename(argv[0]));
             goto out;
         }
-        revokefile = argv[optind++];
+        filename = argv[optind++];
         if (optind < argc)
         {
             usage(basename(argv[0]));
             goto out;
         }
-        if (access(revokefile, R_OK))
+        if (access(filename, R_OK))
         {
-            warn("failed to read %s", revokefile);
+            warn("failed to read %s", filename);
             goto out;
         }
     }
@@ -1542,9 +1708,18 @@ int main(int argc, char **argv)
             ret = 0;
         }
     }
+    else if (strcmp(action, "newkey") == 0)
+    {
+        if (acme_bootstrap(&a) && account_retrieve(&a)
+                && account_keychange(&a, never, type, bits))
+        {
+            ret = 0;
+        }
+    }
     else if (strcmp(action, "deactivate") == 0)
     {
-        if (acme_bootstrap(&a) && account_retrieve(&a) && account_deactivate(&a))
+        if (acme_bootstrap(&a) && account_retrieve(&a)
+                && account_deactivate(&a))
         {
             ret = 0;
         }
@@ -1591,7 +1766,7 @@ int main(int argc, char **argv)
     else if (strcmp(action, "revoke") == 0)
     {
         if (acme_bootstrap(&a) && account_retrieve(&a) &&
-                cert_revoke(&a, revokefile, 0))
+                cert_revoke(&a, filename, 0))
         {
             ret = 0;
         }

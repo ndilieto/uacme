@@ -68,6 +68,7 @@ typedef enum
 bool crypto_init(void);
 void crypto_deinit(void);
 char *sha2_base64url(size_t, const char *, ...);
+char *jws_jwk(privkey_t key, const char **, const char **);
 char *jws_protected_jwk(const char *, const char *, privkey_t);
 char *jws_protected_kid(const char *, const char *, const char *, privkey_t);
 char *jws_thumbprint(privkey_t);

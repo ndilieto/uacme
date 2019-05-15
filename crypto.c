@@ -759,77 +759,105 @@ keytype_t key_type(privkey_t key)
     }
 }
 
-char *jws_protected_jwk(const char *nonce, const char *url,
-        privkey_t key)
+char *jws_jwk(privkey_t key, const char **crv, const char **alg)
 {
     char *ret = NULL;
-    char *jwk = NULL;
     char *p1 = NULL;
     char *p2 = NULL;
-    const char *crv = NULL;
-    const char *alg = NULL;
+    const char *_crv = NULL;
     switch (key_type(key))
     {
         case PK_RSA:
             if (!rsa_params(key, &p1, &p2))
             {
-                warnx("jws_protected_jwk: rsa_params failed");
+                warnx("jws_jwk: rsa_params failed");
                 goto out;
             }
-            if (asprintf(&jwk, "\"jwk\":{\"kty\":\"RSA\","
-                        "\"n\":\"%s\",\"e\":\"%s\"}", p1, p2) < 0)
+            if (asprintf(&ret, "{\"kty\":\"RSA\",\"n\":\"%s\",\"e\":\"%s\"}",
+                        p1, p2) < 0)
             {
-                warnx("jws_protected_jwk: asprintf failed");
-                jwk = NULL;
+                warnx("jws_jwk: asprintf failed");
+                ret = NULL;
                 goto out;
             }
-            alg = "RS256";
+            if (alg) *alg = "RS256";
             break;
 
         case PK_EC:
             switch (ec_params(key, &p1, &p2))
             {
                 case 0:
-                    warnx("jws_protected_jwk: ec_params failed");
+                    warnx("jws_jwk: ec_params failed");
                     goto out;
 
                 case 256:
-                    crv = "P-256";
-                    alg = "ES256";
+                    _crv = "P-256";
+                    if (crv) *crv = _crv;
+                    if (alg) *alg = "ES256";
                     break;
 
                 case 384:
-                    crv = "P-384";
-                    alg = "ES384";
+                    _crv = "P-384";
+                    if (crv) *crv = _crv;
+                    if (alg) *alg = "ES384";
                     break;
 
                 default:
-                    warnx("jws_protected_jwk: unsupported EC curve");
+                    warnx("jws_jwk: unsupported EC curve");
                     goto out;
             }
-            if (asprintf(&jwk, "\"jwk\":{\"kty\":\"EC\",\"crv\":\"%s\","
-                        "\"x\":\"%s\",\"y\":\"%s\"}", crv, p1, p2) < 0)
+            if (asprintf(&ret, "{\"kty\":\"EC\",\"crv\":\"%s\","
+                        "\"x\":\"%s\",\"y\":\"%s\"}", _crv, p1, p2) < 0)
             {
-                warnx("jws_protected_jwk: asprintf failed");
-                jwk = NULL;
+                warnx("jws_jwk: asprintf failed");
+                ret = NULL;
                 goto out;
             }
             break;
 
         default:
-            warnx("jws_protected_jwk: only RSA/EC keys are supported");
+            warnx("jws_jwk: only RSA/EC keys are supported");
             goto out;
     }
-    if (asprintf(&ret, "{\"alg\":\"%s\",\"nonce\":\"%s\","
-                "\"url\":\"%s\",%s}", alg, nonce, url, jwk) < 0)
+ out:
+    free(p1);
+    free(p2);
+    return ret;
+}
+
+char *jws_protected_jwk(const char *nonce, const char *url,
+        privkey_t key)
+{
+    char *ret = NULL;
+    const char *crv = NULL;
+    const char *alg = NULL;
+    char *jwk = jws_jwk(key, &crv, &alg);
+    if (!jwk)
     {
-        warnx("jws_protected_jwk: asprintf failed");
-        ret = NULL;
+        warnx("jws_protected_jwk: jws_jwk failed");
+        goto out;
+    }
+
+    if (nonce)
+    {
+        if (asprintf(&ret, "{\"alg\":\"%s\",\"nonce\":\"%s\","
+                    "\"url\":\"%s\",\"jwk\":%s}", alg, nonce, url, jwk) < 0)
+        {
+            warnx("jws_protected_jwk: asprintf failed");
+            ret = NULL;
+        }
+    }
+    else
+    {
+        if (asprintf(&ret, "{\"alg\":\"%s\",\"url\":\"%s\",\"jwk\":%s}",
+                    alg, url, jwk) < 0)
+        {
+            warnx("jws_protected_jwk: asprintf failed");
+            ret = NULL;
+        }
     }
  out:
     free(jwk);
-    free(p1);
-    free(p2);
     return ret;
 }
 
@@ -2394,7 +2422,11 @@ static mbedtls_x509_crt *cert_load(const char *format, ...)
     FILE *f = NULL;
     if (!(f = fopen(certfile, "r")))
     {
-        if (errno != ENOENT)
+        if (errno == ENOENT)
+        {
+            msg(1, "%s does not exist", certfile);
+        }
+        else
         {
             warn("cert_load: failed to open %s", certfile);
         }
@@ -2414,7 +2446,7 @@ static mbedtls_x509_crt *cert_load(const char *format, ...)
     {
         if (errno == ENOENT)
         {
-            msg(2, "%s does not exist", certfile);
+            msg(1, "%s does not exist", certfile);
         }
         else
         {
@@ -2484,7 +2516,6 @@ bool cert_valid(const char *certdir, const char * const *names, int validity)
     gnutls_x509_crt_t crt = cert_load("%s/cert.pem", certdir);
     if (!crt)
     {
-        warnx("cert_valid: cert_load failed");
         goto out;
     }
 
@@ -2524,7 +2555,6 @@ out:
     X509 *crt = cert_load("%s/cert.pem", certdir);
     if (!crt)
     {
-        warnx("cert_valid: cert_load failed");
         goto out;
     }
     int days_left, sec;
@@ -2692,6 +2722,7 @@ char *cert_der_base64url(const char *certfile)
     X509 *crt = cert_load(certfile);
     if (!crt)
     {
+        warnx("cert_der_base64url: cert_load failed");
         goto out;
     }
     r = i2d_X509(crt, NULL);
@@ -2721,7 +2752,7 @@ char *cert_der_base64url(const char *certfile)
     certdata = read_file(certfile, &certsize);
     if (!certdata)
     {
-        warnx("cert_der_base64url: error reading %s", certfile);
+        warn("cert_der_base64url: error reading %s", certfile);
         goto out;
     }
     mbedtls_pem_context ctx;
