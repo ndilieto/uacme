@@ -2,12 +2,12 @@
 .\"     Title: uacme
 .\"    Author: [see the "AUTHOR" section]
 .\" Generator: DocBook XSL Stylesheets v1.78.1 <http://docbook.sf.net/>
-.\"      Date: 05/12/2019
+.\"      Date: 05/17/2019
 .\"    Manual: User Commands
-.\"    Source: uacme 1.0.10
+.\"    Source: uacme 1.0.11
 .\"  Language: English
 .\"
-.TH "UACME" "1" "05/12/2019" "uacme 1\&.0\&.10" "User Commands"
+.TH "UACME" "1" "05/17/2019" "uacme 1\&.0\&.11" "User Commands"
 .\" -----------------------------------------------------------------
 .\" * Define some portability stuff
 .\" -----------------------------------------------------------------
@@ -31,7 +31,7 @@
 uacme \- ACMEv2 client written in plain C code with minimal dependencies
 .SH "SYNOPSIS"
 .sp
-\fBuacme\fR [\fB\-a\fR|\fB\-\-acme\-url\fR \fIURL\fR] [\fB\-b\fR|\fB\-\-bits\fR \fIBITS\fR] [\fB\-c\fR|\fB\-\-confdir\fR \fIDIR\fR] [\fB\-d\fR|\fB\-\-days\fR \fIDAYS\fR] [\fB\-f\fR|\fB\-\-force\fR] [\fB\-h\fR|\fB\-\-hook\fR \fIPROGRAM\fR] [\fB\-n\fR|\fB\-\-never\fR] [\fB\-s\fR|\fB\-\-staging\fR] [\fB\-t\fR|\fB\-\-type\fR \fBRSA\fR|\fBEC\fR] [\fB\-v\fR|\fB\-\-verbose\fR \&...] [\fB\-V\fR|\fB\-\-version\fR] [\fB\-y\fR|\fB\-\-yes\fR] [\fB\-?\fR|\fB\-\-help\fR] \fBnew\fR [\fIEMAIL\fR] | \fBupdate\fR [\fIEMAIL\fR] | \fBdeactivate\fR | \fBissue\fR \fIDOMAIN\fR [\fIALTNAME\fR \&...]] | \fBrevoke\fR \fICERTFILE\fR
+\fBuacme\fR [\fB\-a\fR|\fB\-\-acme\-url\fR \fIURL\fR] [\fB\-b\fR|\fB\-\-bits\fR \fIBITS\fR] [\fB\-c\fR|\fB\-\-confdir\fR \fIDIR\fR] [\fB\-d\fR|\fB\-\-days\fR \fIDAYS\fR] [\fB\-f\fR|\fB\-\-force\fR] [\fB\-h\fR|\fB\-\-hook\fR \fIPROGRAM\fR] [\fB\-n\fR|\fB\-\-never\fR] [\fB\-s\fR|\fB\-\-staging\fR] [\fB\-t\fR|\fB\-\-type\fR \fBRSA\fR|\fBEC\fR] [\fB\-v\fR|\fB\-\-verbose\fR \&...] [\fB\-V\fR|\fB\-\-version\fR] [\fB\-y\fR|\fB\-\-yes\fR] [\fB\-?\fR|\fB\-\-help\fR] \fBnew\fR [\fIEMAIL\fR] | \fBupdate\fR [\fIEMAIL\fR] | \fBdeactivate\fR | \fBnewkey\fR | \fBissue\fR \fIDOMAIN\fR [\fIALTNAME\fR \&...]] | \fBrevoke\fR \fICERTFILE\fR
 .SH "DESCRIPTION"
 .sp
 \fBuacme\fR is a client for the ACMEv2 protocol described in RFC8555, written in plain C code with minimal dependencies (libcurl and one of GnuTLS, OpenSSL or mbedTLS)\&. The ACMEv2 protocol allows a Certificate Authority (https://letsencrypt\&.org is a popular one) and an applicant to automate the process of verification and certificate issuance\&. The protocol also provides facilities for other certificate management functions, such as certificate revocation\&. For more information see https://tools\&.ietf\&.org/html/rfc8555
@@ -165,7 +165,9 @@ The challenge token
 .RS 4
 The key authorization (for
 \fBdns\-01\fR
-already converted to the base64\-encoded SHA256 digest format to be provisioned as _acme\-challenge DNS TXT record)\&.
+and
+\fBtls\-alpn\-01\fR
+already converted to the base64\-encoded SHA256 digest format)
 .RE
 .RE
 .PP
@@ -247,6 +249,20 @@ Deactivate the ACME account corresponding to the account private key\&.
 this action is irreversible\&. Users may wish to do this when the account key is compromised or decommissioned\&. A deactivated account can no longer request certificate issuances and revocations or access resources related to the account\&.
 .RE
 .PP
+\fBuacme\fR [\fIOPTIONS\fR \&...] \fBnewkey\fR
+.RS 4
+Change the ACME account private key\&. If the new account private key does not exist at
+\fICONFDIR/private/newkey\&.pem\fR
+it is generated unless
+\fB\-n, \-\-never\-create\fR
+is specified\&. The new key is then submitted to the server and if the operation succeeds the old key is hardlinked to
+\fICONFDIR/private/key\-TIMESTAMP\&.pem\fR
+before renaming
+\fICONFDIR/private/newkey\&.pem\fR
+to
+\fICONFDIR/private/key\&.pem\fR\&.
+.RE
+.PP
 \fBuacme\fR [\fIOPTIONS\fR \&...] \fBissue\fR \fIDOMAIN\fR [\fIALTNAME\fR \&...]
 .RS 4
 Issue a certificate for
@@ -272,7 +288,10 @@ is specified\&.
 \fBuacme\fR [\fIOPTIONS\fR \&...] \fBrevoke\fR \fICERTFILE\fR
 .RS 4
 Revoke the certificate stored in
-\fICERTFILE\fR\&. Only certificates associated with the account can be revoked\&.
+\fICERTFILE\fR\&. Only certificates associated with the account can be revoked\&. If successful
+\fICERTFILE\fR
+is renamed to
+\fIrevoked\-TIMESTAMP\&.pem\fR\&.
 .RE
 .SH "EXIT STATUS"
 .PP
