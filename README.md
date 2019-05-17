@@ -90,7 +90,7 @@ will be created:
 /path/to/uacme.d/www.your.domain.com/cert.pem
 /path/to/uacme.d/private/www.your.domain.com/key.pem
 ```
-Note other types of challenges are possible, if you type anything other than 'y',
+Note other types of challenges are possible. If you type anything other than 'y',
 uacme will skip the challenge and propose a different one. The easiest is http-01 but
 any other type can be dealt with. Keep in mind that challenge types may be served in
 random order by the server. Do not make any assumptions and read uacme's output carefully.

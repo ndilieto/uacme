@@ -19,7 +19,7 @@ A complete list of options available for configure can be found
 by running './configure --help'.
 
     cd uacme-<version>
-    ./configure
+    ./configure --disable-maintainer-mode
     make
     sudo make install
 
@@ -50,7 +50,7 @@ See the COPYING file for licensing information
 BUGS
 ----
 If you believe you have found a bug, please create a new issue
-at https://github.com/ndilieto/uacme/issue with any applicable
+at https://github.com/ndilieto/uacme/issues with any applicable
 information. 
 
 Applicable information would include why the issue is a uacme bug (if
