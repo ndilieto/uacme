@@ -1,7 +1,16 @@
 uacme NEWS
 Copyright (C) 2019 Nicola Di Lieto <nicola.dilieto@gmail.com>
 
-## [1.0.10] - 2019-05-09
+## [1.0.11] - 2019-05-17
+### Added
+- Key rollover (https://tools.ietf.org/html/rfc8555#section-7.3.5)
+
+### Changed
+- Revoked cert files now renamed to 'revoked-TIMESTAMP.pem'
+- Key auth contains SHA256 digest for tls-alpn-01 (like dns-01)
+- Minor logging improvements
+
+## [1.0.10] - 2019-05-12
 ### Added
 - secp384r1 EC key support
 

@@ -17,7 +17,7 @@ SYNOPSIS
     [*-d*|*--days* 'DAYS'] [*-f*|*--force*] [*-h*|*--hook* 'PROGRAM']
     [*-n*|*--never*] [*-s*|*--staging*] [*-t*|*--type* *RSA*|*EC*]
     [*-v*|*--verbose* ...] [*-V*|*--version*] [*-y*|*--yes*] [*-?*|*--help*]
-    *new* ['EMAIL'] | *update* ['EMAIL'] | *deactivate* |
+    *new* ['EMAIL'] | *update* ['EMAIL'] | *deactivate* | *newkey* |
     *issue* 'DOMAIN' ['ALTNAME' ...]] | *revoke* 'CERTFILE'
 
 
@@ -80,9 +80,8 @@ OPTIONS
         'TYPE'::: challenge type (for example *dns-01* or *http-01*)
         'IDENT'::: The identifier the challenge refers to
         'TOKEN'::: The challenge token
-        'AUTH'::: The key authorization (for *dns-01* already converted
-           to the base64-encoded SHA256 digest format to be 
-           provisioned as _acme-challenge DNS TXT record).
+        'AUTH'::: The key authorization (for *dns-01* and *tls-alpn-01*
+           already converted to the base64-encoded SHA256 digest format)
 
 *-?, --help*::
     Print a brief usage text on stderr and exit.
@@ -138,6 +137,14 @@ USAGE
     A deactivated account can no longer request certificate issuances
     and revocations or access resources related to the account.
 
+*uacme* ['OPTIONS' ...] *newkey*::
+    Change the ACME account private key. If the new account private
+    key does not exist at 'CONFDIR/private/newkey.pem' it is generated
+    unless *-n, --never-create* is specified. The new key is then
+    submitted to the server and if the operation succeeds the old key
+    is hardlinked to 'CONFDIR/private/key-TIMESTAMP.pem' before
+    renaming 'CONFDIR/private/newkey.pem' to 'CONFDIR/private/key.pem'.
+
 *uacme* ['OPTIONS' ...] *issue* 'DOMAIN' ['ALTNAME' ...]::
     Issue a certificate for 'DOMAIN' with zero or more 'ALTNAME'.
     If a certificate is already available at 'CONFDIR/DOMAIN/cert.pem'
@@ -152,7 +159,8 @@ USAGE
 
 *uacme* ['OPTIONS' ...] *revoke* 'CERTFILE'::
     Revoke the certificate stored in 'CERTFILE'. Only certificates
-    associated with the account can be revoked.
+    associated with the account can be revoked. If successful
+    'CERTFILE' is renamed to 'revoked-TIMESTAMP.pem'.
 
 
 EXIT STATUS
