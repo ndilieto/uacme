@@ -1,3 +1,13 @@
+uacme (1.0.11-1) unstable; urgency=medium
+
+  * Fix ChangeLog typo and update README.md links
+  * Changed download links to latest release
+  * key auth SHA256 for tls-alpn-01 (like dns-01)
+  * Add key rollover and renaming of revoked cert file
+  * minor logging improvements
+
+ -- Nicola Di Lieto <nicola.dilieto@gmail.com>  Fri, 17 May 2019 13:35:11 +0200
+
 uacme (1.0.10-1) unstable; urgency=medium
 
   * Added secp384r1 EC support
