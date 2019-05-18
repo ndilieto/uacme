@@ -203,7 +203,7 @@ char *sha2_base64url(size_t bits, const char *format, ...)
     char *input = NULL;
     size_t encoded_hash_len;
     char *encoded_hash = NULL;
-    const unsigned int hash_len = bits/8;
+    const unsigned int hash_len = (bits+7)/8;
     unsigned char *hash = NULL;
     va_list ap;
     va_start(ap, format);
@@ -301,15 +301,36 @@ out:
     return encoded_hash;
 }
 
-static char *bn2str(const unsigned char *data, size_t len)
+static char *bn2str(const unsigned char *data, size_t data_len, size_t pad_len)
 {
     char *ret = NULL;
-    while (len && !*data)
+    unsigned char *buf = NULL;
+
+    while (data_len && !*data)
     {
         data++;
-        len--;
+        data_len--;
     }
-    size_t encoded_len = base64_ENCODED_LEN(len,
+
+    if (pad_len == 0)
+    {
+        pad_len = data_len;
+    }
+    else if (pad_len < data_len)
+    {
+        warnx("bn2str: insufficient pad_len");
+        goto out;
+    }
+
+    buf = calloc(1, pad_len);
+    if (!buf)
+    {
+        warn("bn2str: calloc failed");
+        goto out;
+    }
+    memcpy(buf + pad_len - data_len, data, data_len);
+
+    size_t encoded_len = base64_ENCODED_LEN(pad_len,
             base64_VARIANT_URLSAFE_NO_PADDING);
     ret = calloc(1, encoded_len);
     if (!ret)
@@ -317,13 +338,14 @@ static char *bn2str(const unsigned char *data, size_t len)
         warn("bn2str: calloc failed");
         goto out;
     }
-    if (!bin2base64(ret, encoded_len, data, len,
+    if (!bin2base64(ret, encoded_len, buf, pad_len,
                 base64_VARIANT_URLSAFE_NO_PADDING))
     {
         free(ret);
         ret = NULL;
     }
 out:
+    free(buf);
     return ret;
 }
 
@@ -348,13 +370,13 @@ static bool rsa_params(privkey_t key, char **m, char **e)
                 gnutls_strerror(r));
         goto out;
     }
-    _m = bn2str(mod.data, mod.size);
+    _m = bn2str(mod.data, mod.size, 0);
     if (!_m)
     {
         warnx("rsa_params: bn2str failed");
         goto out;
     }
-    _e = bn2str(exp.data, exp.size);
+    _e = bn2str(exp.data, exp.size, 0);
     if (!_e)
     {
         warnx("rsa_params: bn2str failed");
@@ -380,7 +402,7 @@ static bool rsa_params(privkey_t key, char **m, char **e)
         openssl_error("rsa_params");
         goto out;
     }
-    _m = bn2str(data, r);
+    _m = bn2str(data, r, 0);
     if (!_m)
     {
         warnx("rsa_params: bn2str failed");
@@ -399,7 +421,7 @@ static bool rsa_params(privkey_t key, char **m, char **e)
         openssl_error("rsa_params");
         goto out;
     }
-    _e = bn2str(data, r);
+    _e = bn2str(data, r, 0);
     if (!_e)
     {
         warnx("rsa_params: bn2str failed");
@@ -428,7 +450,7 @@ static bool rsa_params(privkey_t key, char **m, char **e)
                 _mbedtls_strerror(r));
         goto out;
     }
-    _m = bn2str(data, len);
+    _m = bn2str(data, len, 0);
     if (!_m)
     {
         warnx("rsa_params: bn2str failed");
@@ -449,7 +471,7 @@ static bool rsa_params(privkey_t key, char **m, char **e)
                 _mbedtls_strerror(r));
         goto out;
     }
-    _e = bn2str(data, len);
+    _e = bn2str(data, len, 0);
     if (!_e)
     {
         warnx("rsa_params: bn2str failed");
@@ -530,13 +552,13 @@ static size_t ec_params(privkey_t key, char **x, char **y)
                     "Elliptic Curves supported");
             goto out;
     }
-    _x = bn2str(dx.data, dx.size);
+    _x = bn2str(dx.data, dx.size, (bits+7)/8);
     if (!_x)
     {
         warnx("ec_params: bn2str failed");
         goto out;
     }
-    _y = bn2str(dy.data, dy.size);
+    _y = bn2str(dy.data, dy.size, (bits+7)/8);
     if (!_y)
     {
         warnx("ec_params: bn2str failed");
@@ -600,7 +622,7 @@ static size_t ec_params(privkey_t key, char **x, char **y)
         openssl_error("ec_params");
         goto out;
     }
-    _x = bn2str(data, r);
+    _x = bn2str(data, r, (bits+7)/8);
     if (!_x)
     {
         warnx("ec_params: bn2str failed");
@@ -619,7 +641,7 @@ static size_t ec_params(privkey_t key, char **x, char **y)
         openssl_error("ec_params");
         goto out;
     }
-    _y = bn2str(data, r);
+    _y = bn2str(data, r, (bits+7)/8);
     if (!_y)
     {
         warnx("ec_params: bn2str failed");
@@ -663,7 +685,7 @@ static size_t ec_params(privkey_t key, char **x, char **y)
                 _mbedtls_strerror(r));
         goto out;
     }
-    _x = bn2str(data, len);
+    _x = bn2str(data, len, (bits+7)/8);
     if (!_x)
     {
         warnx("ec_params: bn2str failed");
@@ -684,7 +706,7 @@ static size_t ec_params(privkey_t key, char **x, char **y)
                 _mbedtls_strerror(r));
         goto out;
     }
-    _y = bn2str(data, len);
+    _y = bn2str(data, len, (bits+7)/8);
     if (!_y)
     {
         warnx("ec_params: bn2str failed");

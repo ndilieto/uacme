@@ -1,3 +1,8 @@
+2019-05-18 Nicola Di Lieto <nicola.dilieto@gmail.com>
+	* Release 1.0.12
+	- Ensure EC key params are always properly padded
+	- Improved hook_run error checking
+
 2019-05-17 Nicola Di Lieto <nicola.dilieto@gmail.com>
 	* Release 1.0.11
 	- Key rollover (https://tools.ietf.org/html/rfc8555#section-7.3.5)

@@ -315,10 +315,17 @@ int hook_run(const char *prog, const char *method, const char *type,
     else if (pid > 0) // parent
     {
         int status;
-        waitpid(pid, &status, 0);
-        if (WIFEXITED(status))
+        if (waitpid(pid, &status, 0) < 0)
+        {
+            warn("hook_run: waitpid failed");
+        }
+        else if (WIFEXITED(status))
         {
             ret = WEXITSTATUS(status);
+        }
+        else
+        {
+            warnx("hook_run: %s terminated abnormally", prog);
         }
     }
     else // child
