@@ -1,6 +1,11 @@
 uacme NEWS
 Copyright (C) 2019 Nicola Di Lieto <nicola.dilieto@gmail.com>
 
+## [1.0.12] - 2019-05-18
+### Changed
+- Ensure EC key params are always properly padded
+- Improved hook_run error checking
+
 ## [1.0.11] - 2019-05-17
 ### Added
 - Key rollover (https://tools.ietf.org/html/rfc8555#section-7.3.5)
