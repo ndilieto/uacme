@@ -1,3 +1,10 @@
+uacme (1.0.12-1) unstable; urgency=medium
+
+  * Ensure EC key params are always properly padded
+  * Improved hook_run error checking
+
+ -- Nicola Di Lieto <nicola.dilieto@gmail.com>  Sat, 18 May 2019 19:29:52 +0200
+
 uacme (1.0.11-1) unstable; urgency=medium
 
   * Fix ChangeLog typo and update README.md links
