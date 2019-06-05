@@ -1,6 +1,10 @@
 uacme NEWS
 Copyright (C) 2019 Nicola Di Lieto <nicola.dilieto@gmail.com>
 
+## [1.0.13] - 2019-06-05
+### Changed
+- Disable mbedTLS runtime version check if not available
+
 ## [1.0.12] - 2019-05-18
 ### Changed
 - Ensure EC key params are always properly padded
