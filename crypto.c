@@ -161,11 +161,13 @@ static const char *_mbedtls_strerror(int code)
 
 bool crypto_init(void)
 {
+#ifdef MBEDTLS_VERSION_C
     if (mbedtls_version_get_number() < 0x02100000)
     {
         warnx("crypto_init: mbedTLS version 2.16 or later is required");
         return false;
     }
+#endif
     mbedtls_entropy_init(&entropy);
     mbedtls_ctr_drbg_init(&ctr_drbg);
     int r = mbedtls_ctr_drbg_seed(&ctr_drbg, mbedtls_entropy_func,
