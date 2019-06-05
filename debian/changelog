@@ -1,3 +1,9 @@
+uacme (1.0.13-1) unstable; urgency=medium
+
+  * mbedtls: disable runtime version check if not available
+
+ -- Nicola Di Lieto <nicola.dilieto@gmail.com>  Wed, 05 Jun 2019 08:43:59 +0200
+
 uacme (1.0.12-1) unstable; urgency=medium
 
   * Ensure EC key params are always properly padded
