@@ -39,6 +39,7 @@
 #include <libtasn1.h>
 #elif defined(USE_OPENSSL)
 #include <openssl/asn1.h>
+#include <openssl/bn.h>
 #include <openssl/crypto.h>
 #include <openssl/engine.h>
 #include <openssl/err.h>
@@ -2582,7 +2583,7 @@ out:
         goto out;
     }
     int days_left, sec;
-    const ASN1_TIME *tm = X509_get_notAfter(crt);
+    const ASN1_TIME *tm = X509_get0_notAfter(crt);
     if (!tm || !ASN1_TIME_diff(&days_left, &sec, NULL, tm))
     {
         warnx("cert_valid: invalid expiration time format in %s/cert.pem", certdir);
