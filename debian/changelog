@@ -1,3 +1,9 @@
+uacme (1.0.14-1) unstable; urgency=medium
+
+  * Fix deprecated API when building with OpenSSL v1.1.1c
+
+ -- Nicola Di Lieto <nicola.dilieto@gmail.com>  Wed, 12 Jun 2019 23:42:47 +0200
+
 uacme (1.0.13-1) unstable; urgency=medium
 
   * mbedtls: disable runtime version check if not available
