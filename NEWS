@@ -1,6 +1,10 @@
 uacme NEWS
 Copyright (C) 2019 Nicola Di Lieto <nicola.dilieto@gmail.com>
 
+## [1.0.14] - 2019-06-12
+### Changed
+- Fix deprecated API when building with OpenSSL v1.1.1c
+
 ## [1.0.13] - 2019-06-05
 ### Changed
 - Disable mbedTLS runtime version check if not available
