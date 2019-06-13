@@ -36,7 +36,9 @@
 
 #if defined(USE_GNUTLS)
 #include <gnutls/crypto.h>
+#if !HAVE_GNUTLS_DECODE_RS_VALUE
 #include <libtasn1.h>
+#endif
 #elif defined(USE_OPENSSL)
 #include <openssl/asn1.h>
 #include <openssl/bn.h>
@@ -72,9 +74,15 @@
 
 bool crypto_init(void)
 {
+#if HAVE_GNUTLS_DECODE_RS_VALUE
+    if (!gnutls_check_version("3.6.0"))
+    {
+        warnx("crypto_init: GnuTLS version 3.6.0 or later is required");
+#else
     if (!gnutls_check_version("3.3.30"))
     {
         warnx("crypto_init: GnuTLS version 3.3.30 or later is required");
+#endif
         return false;
     }
     gnutls_global_init();
@@ -1015,6 +1023,43 @@ bool ec_decode(size_t hash_size, unsigned char **sig, size_t *sig_size)
 {
     int r;
 #if defined(USE_GNUTLS)
+#if HAVE_GNUTLS_DECODE_RS_VALUE
+    gnutls_datum_t dr = {NULL, 0};
+    gnutls_datum_t ds = {NULL, 0};
+    gnutls_datum_t dsig = {*sig, *sig_size};
+    r = gnutls_decode_rs_value(&dsig, &dr, &ds);
+    if (r < 0)
+    {
+        warnx("ec_decode: gnutls_decode_rs_value: %s", gnutls_strerror(r));
+        return false;
+    }
+    unsigned char *tmp = calloc(1, 2*hash_size);
+    if (!tmp)
+    {
+        warn("ec_decode: calloc failed");
+        gnutls_free(dr.data);
+        gnutls_free(ds.data);
+        return false;
+    }
+    if (dr.size >= hash_size)
+    {
+        memcpy(tmp, dr.data + dr.size - hash_size, hash_size);
+    }
+    else
+    {
+        memcpy(tmp + hash_size - dr.size, dr.data, dr.size);
+    }
+    if (ds.size >= hash_size)
+    {
+        memcpy(tmp + hash_size, ds.data + ds.size - hash_size, hash_size);
+    }
+    else
+    {
+        memcpy(tmp + 2*hash_size - ds.size, ds.data, ds.size);
+    }
+    gnutls_free(dr.data);
+    gnutls_free(ds.data);
+#else
     int len;
     const unsigned char *p = *sig;
     int ps = *sig_size;
@@ -1083,7 +1128,7 @@ bool ec_decode(size_t hash_size, unsigned char **sig, size_t *sig_size)
     p += len;
     ps -= len;
 
-    if (r >= hash_size)
+    if (r >= (int)hash_size)
     {
         memcpy(tmp, p + r - hash_size, hash_size);
     }
@@ -1120,7 +1165,7 @@ bool ec_decode(size_t hash_size, unsigned char **sig, size_t *sig_size)
     p += len;
     ps -= len;
 
-    if (r >= hash_size)
+    if (r >= (int)hash_size)
     {
         memcpy(tmp + hash_size, p + r - hash_size, hash_size);
     }
@@ -1137,6 +1182,7 @@ bool ec_decode(size_t hash_size, unsigned char **sig, size_t *sig_size)
         free(tmp);
         return false;
     }
+#endif
 #elif defined(USE_OPENSSL)
     const unsigned char *p = *sig;
     ECDSA_SIG *s = d2i_ECDSA_SIG(NULL, &p, *sig_size);
@@ -1766,7 +1812,7 @@ static bool key_gen(keytype_t type, int bits, const char *keyfile)
 #else
     r = fwrite(pem_data, 1, pem_size, f);
     fclose(f);
-    if (r != pem_size)
+    if (r != (int)pem_size)
     {
         warn("key_gen: failed to write to %s", keyfile);
         unlink(keyfile);

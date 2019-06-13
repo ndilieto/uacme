@@ -614,7 +614,7 @@ bool account_update(acme_t *a)
         {
             email_update = true;
         }
-        else for (int i=0; i<contacts->v.array.size; i++)
+        else for (size_t i=0; i<contacts->v.array.size; i++)
         {
             if (contacts->v.array.values[i].type != JSON_STRING ||
                     contacts->v.array.values[i].v.value !=
@@ -836,7 +836,7 @@ bool authorize(acme_t *a)
         goto out;
     }
 
-    for (int i=0; i<auths->v.array.size; i++)
+    for (size_t i=0; i<auths->v.array.size; i++)
     {
         if (auths->v.array.values[i].type != JSON_STRING)
         {
@@ -891,7 +891,7 @@ bool authorize(acme_t *a)
         a->json = NULL;
 
         bool chlg_done = false;
-        for (int j=0; j<chlgs->v.array.size && !chlg_done; j++)
+        for (size_t j=0; j<chlgs->v.array.size && !chlg_done; j++)
         {
             if (json_compare_string(chlgs->v.array.values+j,
                         "status", "pending") == 0)
@@ -1215,7 +1215,7 @@ bool cert_issue(acme_t *a)
         goto out;
     }
 
-    if (write(fd, a->body, strlen(a->body)) != strlen(a->body))
+    if (write(fd, a->body, strlen(a->body)) != (ssize_t)strlen(a->body))
     {
         warn("failed to write to %s", tmpfile);
         goto out;
@@ -1327,7 +1327,7 @@ out:
 bool validate_domain_str(const char *s)
 {
     bool len = 0;
-    for (int j = 0; j < strlen(s); j++)
+    for (size_t j = 0; j < strlen(s); j++)
     {
         switch (s[j])
         {

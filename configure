@@ -632,6 +632,7 @@ USE_MBEDTLS
 ENABLE_READFILE_FALSE
 ENABLE_READFILE_TRUE
 USE_OPENSSL
+USE_LIBTASN1
 USE_GNUTLS
 PKGCONFIG
 EGREP
@@ -5418,6 +5419,117 @@ else
 fi
 done
 
+as_CACHEVAR=`$as_echo "ax_cv_check_cflags__$CFLAGS -Wall" | $as_tr_sh`
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking whether C compiler accepts $CFLAGS -Wall" >&5
+$as_echo_n "checking whether C compiler accepts $CFLAGS -Wall... " >&6; }
+if eval \${$as_CACHEVAR+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+
+  ax_check_save_flags=$CFLAGS
+  CFLAGS="$CFLAGS  $CFLAGS -Wall"
+  cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+int
+main ()
+{
+
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_c_try_compile "$LINENO"; then :
+  eval "$as_CACHEVAR=yes"
+else
+  eval "$as_CACHEVAR=no"
+fi
+rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
+  CFLAGS=$ax_check_save_flags
+fi
+eval ac_res=\$$as_CACHEVAR
+	       { $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_res" >&5
+$as_echo "$ac_res" >&6; }
+if test x"`eval 'as_val=${'$as_CACHEVAR'};$as_echo "$as_val"'`" = xyes; then :
+  CFLAGS="$CFLAGS -Wall"
+else
+  :
+fi
+
+as_CACHEVAR=`$as_echo "ax_cv_check_cflags__$CFLAGS -Wextra" | $as_tr_sh`
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking whether C compiler accepts $CFLAGS -Wextra" >&5
+$as_echo_n "checking whether C compiler accepts $CFLAGS -Wextra... " >&6; }
+if eval \${$as_CACHEVAR+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+
+  ax_check_save_flags=$CFLAGS
+  CFLAGS="$CFLAGS  $CFLAGS -Wextra"
+  cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+int
+main ()
+{
+
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_c_try_compile "$LINENO"; then :
+  eval "$as_CACHEVAR=yes"
+else
+  eval "$as_CACHEVAR=no"
+fi
+rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
+  CFLAGS=$ax_check_save_flags
+fi
+eval ac_res=\$$as_CACHEVAR
+	       { $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_res" >&5
+$as_echo "$ac_res" >&6; }
+if test x"`eval 'as_val=${'$as_CACHEVAR'};$as_echo "$as_val"'`" = xyes; then :
+  CFLAGS="$CFLAGS -Wextra"
+else
+  :
+fi
+
+as_CACHEVAR=`$as_echo "ax_cv_check_cflags__$CFLAGS -pedantic" | $as_tr_sh`
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking whether C compiler accepts $CFLAGS -pedantic" >&5
+$as_echo_n "checking whether C compiler accepts $CFLAGS -pedantic... " >&6; }
+if eval \${$as_CACHEVAR+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+
+  ax_check_save_flags=$CFLAGS
+  CFLAGS="$CFLAGS  $CFLAGS -pedantic"
+  cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+int
+main ()
+{
+
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_c_try_compile "$LINENO"; then :
+  eval "$as_CACHEVAR=yes"
+else
+  eval "$as_CACHEVAR=no"
+fi
+rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
+  CFLAGS=$ax_check_save_flags
+fi
+eval ac_res=\$$as_CACHEVAR
+	       { $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_res" >&5
+$as_echo "$ac_res" >&6; }
+if test x"`eval 'as_val=${'$as_CACHEVAR'};$as_echo "$as_val"'`" = xyes; then :
+  CFLAGS="$CFLAGS -pedantic"
+else
+  :
+fi
+
 
 if test -n "$PKG_CONFIG"; then
     PKGCONFIG="$PKG_CONFIG"
@@ -5677,29 +5789,12 @@ $as_echo "no" >&6; }
                 { $as_echo "$as_me:${as_lineno-$LINENO}: result: found $version" >&5
 $as_echo "found $version" >&6; }
             fi
-            { $as_echo "$as_me:${as_lineno-$LINENO}: checking for libtasn1 >= 4.2" >&5
-$as_echo_n "checking for libtasn1 >= 4.2... " >&6; }
-            itexists=`$PKGCONFIG --exists 'libtasn1 >= 4.2' >/dev/null 2>&1 && echo 1`
-            if test -z "$itexists"; then
-                { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
-$as_echo "no" >&6; }
-                as_fn_error $? "libtasn1 not found" "$LINENO" 5
-            else
-                addlib+=" `$PKGCONFIG --libs-only-l libtasn1`"
-                addld+=" `$PKGCONFIG --libs-only-L libtasn1`"
-                addcflags+=" `$PKGCONFIG --cflags-only-I libtasn1`"
-                version=`$PKGCONFIG --modversion libtasn1`
-                tasn1lib=`echo $addld | $SED -e 's/-L//'`
-                { $as_echo "$as_me:${as_lineno-$LINENO}: result: found $version" >&5
-$as_echo "found $version" >&6; }
-            fi
          fi
     else
-        addlib=-lgnutls -ltasn1
+        addlib=-lgnutls
         addld=-L$OPT_GNUTLS/lib$libsuff
         addcflags=-I$OPT_GNUTLS/include
         gtlslib=$OPT_GNUTLS/lib$libsuff
-        tasn1lib=$OPT_GNUTLS/lib$libsuff
     fi
     if test -n "$addlib"; then
         LIBS="$addlib $LIBS"
@@ -5755,6 +5850,19 @@ else
   as_fn_error $? "gnutls check failed" "$LINENO" 5
 fi
 
+        for ac_func in gnutls_decode_rs_value
+do :
+  ac_fn_c_check_func "$LINENO" "gnutls_decode_rs_value" "ac_cv_func_gnutls_decode_rs_value"
+if test "x$ac_cv_func_gnutls_decode_rs_value" = xyes; then :
+  cat >>confdefs.h <<_ACEOF
+#define HAVE_GNUTLS_DECODE_RS_VALUE 1
+_ACEOF
+
+else
+  NEED_LIBTASN1="yes"
+fi
+done
+
         if test X"$USE_GNUTLS" = Xyes; then
             if test -n "$gtlslib"; then
                 if test X"$cross_compiling" != Xyes; then
@@ -5764,6 +5872,89 @@ fi
 $as_echo "$as_me: Added $gtlslib to UACME_LIBRARY_PATH" >&6;}
                 fi
             fi
+        fi
+    fi
+fi
+
+if test X"$NEED_LIBTASN1" = Xyes; then
+    addlib=""
+    if test X"$PKGCONFIG" != Xno; then
+        { $as_echo "$as_me:${as_lineno-$LINENO}: checking for libtasn1 >= 4.2" >&5
+$as_echo_n "checking for libtasn1 >= 4.2... " >&6; }
+        itexists=`$PKGCONFIG --exists 'libtasn1 >= 4.2' >/dev/null 2>&1 && echo 1`
+        if test -z "$itexists"; then
+            { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
+$as_echo "no" >&6; }
+            as_fn_error $? "libtasn1 not found" "$LINENO" 5
+        else
+            addlib=`$PKGCONFIG --libs-only-l libtasn1`
+            addld=`$PKGCONFIG --libs-only-L libtasn1`
+            addcflags=`$PKGCONFIG --cflags-only-I libtasn1`
+            version=`$PKGCONFIG --modversion libtasn1`
+            tasn1lib=`echo $addld | $SED -e 's/-L//'`
+            { $as_echo "$as_me:${as_lineno-$LINENO}: result: found $version" >&5
+$as_echo "found $version" >&6; }
+        fi
+    else
+        addlib=-ltasn1
+        addld=""
+        addcflags=""
+    fi
+    if test -n "$addlib"; then
+        LIBS="$addlib $LIBS"
+        LDFLAGS="$LDFLAGS $addld"
+        if test "$addcflags" != "-I/usr/include"; then
+            CPPFLAGS="$CPPFLAGS $addcflags"
+        fi
+        { $as_echo "$as_me:${as_lineno-$LINENO}: checking for asn1_get_tag_der in -ltasn1" >&5
+$as_echo_n "checking for asn1_get_tag_der in -ltasn1... " >&6; }
+if ${ac_cv_lib_tasn1_asn1_get_tag_der+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  ac_check_lib_save_LIBS=$LIBS
+LIBS="-ltasn1  $LIBS"
+cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+/* Override any GCC internal prototype to avoid an error.
+   Use char because int might match the return type of a GCC
+   builtin and then its argument prototype would still apply.  */
+#ifdef __cplusplus
+extern "C"
+#endif
+char asn1_get_tag_der ();
+int
+main ()
+{
+return asn1_get_tag_der ();
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_c_try_link "$LINENO"; then :
+  ac_cv_lib_tasn1_asn1_get_tag_der=yes
+else
+  ac_cv_lib_tasn1_asn1_get_tag_der=no
+fi
+rm -f core conftest.err conftest.$ac_objext \
+    conftest$ac_exeext conftest.$ac_ext
+LIBS=$ac_check_lib_save_LIBS
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_lib_tasn1_asn1_get_tag_der" >&5
+$as_echo "$ac_cv_lib_tasn1_asn1_get_tag_der" >&6; }
+if test "x$ac_cv_lib_tasn1_asn1_get_tag_der" = xyes; then :
+
+$as_echo "#define USE_LIBTASN1 1" >>confdefs.h
+
+                      USE_LIBTASN1=1
+
+                      LIBTASN1_ENABLED=1
+                      USE_LIBTASN1="yes"
+else
+  as_fn_error $? "libtasn1 check failed" "$LINENO" 5
+fi
+
+        if test X"$USE_LIBTASN1" = Xyes; then
             if test -n "$tasn1lib"; then
                 if test X"$cross_compiling" != Xyes; then
                     UACME_LIBRARY_PATH="$UACME_LIBRARY_PATH:$tasn1lib"
@@ -5772,7 +5963,7 @@ $as_echo "$as_me: Added $gtlslib to UACME_LIBRARY_PATH" >&6;}
 $as_echo "$as_me: Added $tasn1lib to UACME_LIBRARY_PATH" >&6;}
                 fi
             fi
-         fi
+        fi
     fi
 fi
 
