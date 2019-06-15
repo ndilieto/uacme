@@ -1,3 +1,8 @@
+2019-06-15 Nicola Di Lieto <nicola.dilieto@gmail.com>
+	* Release 1.0.15
+	- Exit with error if both -a and -s are specified
+	- Avoid depending on libtasn1 if gnutls_decode_rs_value is available
+
 2019-06-12 Nicola Di Lieto <nicola.dilieto@gmail.com>
 	* Release 1.0.14
 	- Fix deprecated API when building with OpenSSL v1.1.1c

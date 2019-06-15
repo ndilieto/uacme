@@ -54,7 +54,7 @@ fread_file (FILE *stream, size_t *length)
 
         if (pos >= 0 && pos < st.st_size)
           {
-            off_t alloc_off = st.st_size - pos;
+            size_t alloc_off = st.st_size - pos;
 
             /* '1' below, accounts for the trailing NUL.  */
             if (SIZE_MAX - 1 < alloc_off)
