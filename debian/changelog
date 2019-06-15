@@ -1,3 +1,10 @@
+uacme (1.0.15-1) unstable; urgency=medium
+
+  * Exit with error if both -a and -s are specified
+  * Avoid depending on libtasn1 if gnutls_decode_rs_value is available
+
+ -- Nicola Di Lieto <nicola.dilieto@gmail.com>  Sat, 15 Jun 2019 21:37:19 +0200
+
 uacme (1.0.14-1) unstable; urgency=medium
 
   * Fix deprecated API when building with OpenSSL v1.1.1c
