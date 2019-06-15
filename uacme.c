@@ -1402,6 +1402,8 @@ int main(int argc, char **argv)
     bool force = false;
     bool version = false;
     bool yes = false;
+    bool staging = false;
+    bool custom_directory = false;
     int days = 30;
     int bits = 0;
     keytype_t type = PK_RSA;
@@ -1450,6 +1452,12 @@ int main(int argc, char **argv)
         switch (c)
         {
             case 'a':
+                if (staging)
+                {
+                    warnx("-a,--acme-url is incompatible with -s,--staging");
+                    goto out;
+                }
+                custom_directory = true;
                 a.directory = optarg;
                 break;
 
@@ -1492,6 +1500,12 @@ int main(int argc, char **argv)
                 break;
 
             case 's':
+                if (custom_directory)
+                {
+                    warnx("-s,--staging is incompatible with -a,--acme-url");
+                    goto out;
+                }
+                staging = true;
                 a.directory = STAGING_URL;
                 break;
 
