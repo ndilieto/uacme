@@ -101,9 +101,9 @@ static int json_build(const char *js, jsmntok_t *t, size_t count,
     }
 }
 
-static void _json_dump(FILE *f, const json_value_t *value, int indent)
+static void _json_dump(FILE *f, const json_value_t *value, size_t indent)
 {
-    int i,j;
+    size_t i,j;
     if (!value) return;
     switch (value->type)
     {
@@ -163,7 +163,7 @@ void json_dump(FILE *f, const json_value_t *value)
 
 void json_free(json_value_t *value)
 {
-    int i;
+    size_t i;
     if (!value) return;
     switch (value->type)
     {
@@ -206,7 +206,7 @@ const json_value_t *json_find(const json_value_t *haystack,
     {
         return NULL;
     }
-    for (int i=0; i<haystack->v.object.size; i++)
+    for (size_t i=0; i<haystack->v.object.size; i++)
     {
         if (strcmp(haystack->v.object.names[i].v.value, needle) == 0)
         {
@@ -223,7 +223,7 @@ const char *json_find_string(const json_value_t *haystack,
     {
         return NULL;
     }
-    for (int i=0; i<haystack->v.object.size; i++)
+    for (size_t i=0; i<haystack->v.object.size; i++)
     {
         if (haystack->v.object.values[i].type == JSON_STRING &&
                 strcmp(haystack->v.object.names[i].v.value, needle) == 0)
