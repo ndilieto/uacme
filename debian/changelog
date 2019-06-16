@@ -1,3 +1,13 @@
+uacme (1.0.15-3) unstable; urgency=medium
+
+  * Suggestions from https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=930595#10
+  - Target unstable
+  - re-enable document rebuild (build-depends on asciidoc)
+  * build-depend on autoconf-archive
+  * patch AC_REVISION out of configure.ac
+
+ -- Nicola Di Lieto <nicola.dilieto@gmail.com>  Sun, 16 Jun 2019 14:45:44 +0200
+
 uacme (1.0.15-2) stretch; urgency=medium
 
   * Build for stretch

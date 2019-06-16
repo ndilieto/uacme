@@ -1,2 +1,2 @@
+remove-ac-revision.patch
 remove-gnumakefile.patch
-dont-depend-on-asciidoc.patch

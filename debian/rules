@@ -21,4 +21,4 @@ include /usr/share/dpkg/default.mk
 	dh $@
 
 override_dh_auto_configure:
-	dh_auto_configure -- --disable-maintainer-mode --disable-docs
+	dh_auto_configure -- --disable-maintainer-mode
