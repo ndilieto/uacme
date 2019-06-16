@@ -1,0 +1,6 @@
+# Debian and upstream are combined in the source repository
+# at https://github.com/ndilieto/uacme which uses the DEP-14
+# branch layout documented at http://dep.debian.net/deps/dep14
+#
+# The debian source package is maintained in the branch at
+# https://github.com/ndilieto/uacme/tree/debian/master

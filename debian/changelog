@@ -1,3 +1,10 @@
+uacme (1.0.15-2) stretch; urgency=medium
+
+  * Build for stretch
+    (Closes: #928469)
+
+ -- Nicola Di Lieto <nicola.dilieto@gmail.com>  Sun, 16 Jun 2019 07:56:24 +0200
+
 uacme (1.0.15-1) unstable; urgency=medium
 
   * Exit with error if both -a and -s are specified

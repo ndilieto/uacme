@@ -39,7 +39,7 @@ License: permissive
 Files: build-aux/m4/ax_is_release.m4
 Copyright: 2015 Philip Withnall <philip@tecnocode.co.uk>
            2016 Collabora Ltd.
-License: permissive
+License: permissive2
  Copying and distribution of this file, with or without modification,
  are permitted in any medium without royalty provided the copyright
  notice and this notice are preserved.
