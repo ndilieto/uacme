@@ -2,12 +2,12 @@
 .\"     Title: uacme
 .\"    Author: [see the "AUTHOR" section]
 .\" Generator: DocBook XSL Stylesheets v1.78.1 <http://docbook.sf.net/>
-.\"      Date: 06/15/2019
+.\"      Date: 06/17/2019
 .\"    Manual: User Commands
-.\"    Source: uacme 1.0.15
+.\"    Source: uacme 1.0.16
 .\"  Language: English
 .\"
-.TH "UACME" "1" "06/15/2019" "uacme 1\&.0\&.15" "User Commands"
+.TH "UACME" "1" "06/17/2019" "uacme 1\&.0\&.16" "User Commands"
 .\" -----------------------------------------------------------------
 .\" * Define some portability stuff
 .\" -----------------------------------------------------------------
@@ -70,7 +70,7 @@ Use configuration directory
 \fICONFDIR\fR
 (default
 \fI/etc/ssl/uacme\fR)\&. The structure is as follows (multiple
-\fIDOMAIN\fR
+\fIDOMAINs\fR
 allowed)
 .PP
 \fICONFDIR/private/key\&.pem\fR
@@ -268,12 +268,12 @@ to
 Issue a certificate for
 \fIDOMAIN\fR
 with zero or more
-\fIALTNAME\fR\&. If a certificate is already available at
+\fIALTNAMEs\fR\&. If a certificate is already available at
 \fICONFDIR/DOMAIN/cert\&.pem\fR
 for the specified
 \fIDOMAIN\fR
 and
-\fIALTNAME\fR, and is still valid for longer than
+\fIALTNAMEs\fR, and is still valid for longer than
 \fIDAYS\fR, no action is taken unless
 \fB\-f, \-\-force\fR
 is specified\&. The new certificate is saved to

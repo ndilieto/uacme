@@ -70,6 +70,11 @@ if test X"$OPT_LIBCURL" = Xyes; then
             AC_MSG_RESULT([no])
             AC_MSG_ERROR([libcurl not found])
         else
+            addlib=`$PKGCONFIG --libs-only-l libcurl`
+            addld=`$PKGCONFIG --libs-only-L libcurl`
+            addcflags=`$PKGCONFIG --cflags-only-I libcurl`
+            version=`$PKGCONFIG --modversion libcurl`
+            curllib=`echo $addld | $SED -e 's/-L//'`
             AC_MSG_RESULT([found $version])
             AC_MSG_CHECKING([for libcurl https support])
             https=`$PKGCONFIG --variable=supported_protocols libcurl 2>/dev/null | grep -q HTTPS && echo 1`
@@ -78,11 +83,6 @@ if test X"$OPT_LIBCURL" = Xyes; then
                 AC_MSG_ERROR([libcurl does not support https])
             fi
             AC_MSG_RESULT([yes])
-            addlib=`$PKGCONFIG --libs-only-l libcurl`
-            addld=`$PKGCONFIG --libs-only-L libcurl`
-            addcflags=`$PKGCONFIG --cflags-only-I libcurl`
-            version=`$PKGCONFIG --modversion libcurl`
-            curllib=`echo $addld | $SED -e 's/-L//'`
         fi
     fi
 else

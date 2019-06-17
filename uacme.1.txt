@@ -50,7 +50,7 @@ OPTIONS
 
 *-c, --confdir*='CONFDIR'::
     Use configuration directory 'CONFDIR' (default '/etc/ssl/uacme').
-    The structure is as follows (multiple 'DOMAIN' allowed)
+    The structure is as follows (multiple 'DOMAINs' allowed)
         'CONFDIR/private/key.pem'::: ACME account private key
         'CONFDIR/private/DOMAIN/key.pem'::: certificate key for 'DOMAIN'
         'CONFDIR/DOMAIN/cert.pem'::: certificate for 'DOMAIN'
@@ -146,9 +146,9 @@ USAGE
     renaming 'CONFDIR/private/newkey.pem' to 'CONFDIR/private/key.pem'.
 
 *uacme* ['OPTIONS' ...] *issue* 'DOMAIN' ['ALTNAME' ...]::
-    Issue a certificate for 'DOMAIN' with zero or more 'ALTNAME'.
+    Issue a certificate for 'DOMAIN' with zero or more 'ALTNAMEs'.
     If a certificate is already available at 'CONFDIR/DOMAIN/cert.pem'
-    for the specified 'DOMAIN' and 'ALTNAME', and is still valid for
+    for the specified 'DOMAIN' and 'ALTNAMEs', and is still valid for
     longer than 'DAYS', no action is taken unless *-f, --force* is
     specified. The new certificate is saved to 'CONFDIR/DOMAIN/cert.pem'.
     If the certificate file already exists, it is hardlinked to
