@@ -1,11 +1,16 @@
 uacme NEWS
 Copyright (C) 2019 Nicola Di Lieto <nicola.dilieto@gmail.com>
 
+## [1.0.16] - 2019-06-17
+### changed
+- configure script checks for libcurl HTTPS support
+- minor manpage corrections 
+
 ## [1.0.15] - 2019-06-15
-### Changed
-- Exit with error if both -a and -s are specified
-- Avoid depending on libtasn1 if gnutls_decode_rs_value is
-  available (requires GnuTLS 3.6.0 or later)
+### changed
+- exit with error if both -a and -s are specified
+- avoid depending on libtasn1 if gnutls_decode_rs_value is
+  available (requires gnutls 3.6.0 or later)
 
 ## [1.0.14] - 2019-06-12
 ### Changed
