@@ -25,7 +25,6 @@ AM_MAINTAINER_MODE([enable])
 AM_SILENT_RULES([yes])
 AX_IS_RELEASE([git-directory])
 AX_CHECK_ENABLE_DEBUG([yes])
-AC_REVISION([m4_esyscmd_s([git describe --always])])
 
 if test -z "$SED"; then
     AC_PATH_PROG([SED], [sed], [not_found],
@@ -77,6 +76,13 @@ if test X"$OPT_LIBCURL" = Xyes; then
             version=`$PKGCONFIG --modversion libcurl`
             curllib=`echo $addld | $SED -e 's/-L//'`
             AC_MSG_RESULT([found $version])
+            AC_MSG_CHECKING([for libcurl https support])
+            https=`$PKGCONFIG --variable=supported_protocols libcurl 2>/dev/null | grep -q HTTPS && echo 1`
+            if test -z "$https"; then
+                AC_MSG_RESULT([no])
+                AC_MSG_ERROR([libcurl does not support https])
+            fi
+            AC_MSG_RESULT([yes])
         fi
     fi
 else

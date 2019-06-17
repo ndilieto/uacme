@@ -815,7 +815,7 @@ production URL
 <dd>
 <p>
     Use configuration directory <em>CONFDIR</em> (default <em>/etc/ssl/uacme</em>).
-    The structure is as follows (multiple <em>DOMAIN</em> allowed)
+    The structure is as follows (multiple <em>DOMAINs</em> allowed)
 </p>
 <div class="dlist"><dl>
 <dt class="hdlist1">
@@ -1072,9 +1072,9 @@ The key authorization (for <strong>dns-01</strong> and <strong>tls-alpn-01</stro
 </dt>
 <dd>
 <p>
-    Issue a certificate for <em>DOMAIN</em> with zero or more <em>ALTNAME</em>.
+    Issue a certificate for <em>DOMAIN</em> with zero or more <em>ALTNAMEs</em>.
     If a certificate is already available at <em>CONFDIR/DOMAIN/cert.pem</em>
-    for the specified <em>DOMAIN</em> and <em>ALTNAME</em>, and is still valid for
+    for the specified <em>DOMAIN</em> and <em>ALTNAMEs</em>, and is still valid for
     longer than <em>DAYS</em>, no action is taken unless <strong>-f, --force</strong> is
     specified. The new certificate is saved to <em>CONFDIR/DOMAIN/cert.pem</em>.
     If the certificate file already exists, it is hardlinked to
@@ -1227,9 +1227,9 @@ along with this program.  If not, see <a href="http://www.gnu.org/licenses/">htt
 <div id="footnotes"><hr></div>
 <div id="footer">
 <div id="footer-text">
-Version 1.0.15<br>
+Version 1.0.16<br>
 Last updated
- 2019-06-15 21:26:17 CEST
+ 2019-06-17 22:47:32 CEST
 </div>
 </div>
 </body>
