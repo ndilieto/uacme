@@ -1,3 +1,9 @@
+uacme (1.0.16-2) unstable; urgency=medium
+
+  * build-depend on pkg-tool
+
+ -- Nicola Di Lieto <nicola.dilieto@gmail.com>  Wed, 19 Jun 2019 07:29:55 +0200
+
 uacme (1.0.16-1) unstable; urgency=medium
 
   * New upstream release

@@ -2,7 +2,7 @@ Source: uacme
 Section: net
 Priority: optional
 Maintainer: Nicola Di Lieto <nicola.dilieto@gmail.com>
-Build-Depends: debhelper (>= 10), autoconf-archive, asciidoc,
+Build-Depends: debhelper (>= 10), autoconf-archive, asciidoc, pkg-config,
                libgnutls28-dev (>= 3.3), libcurl4-gnutls-dev (>= 7.38)
 Standards-Version: 4.3.0
 Homepage: https://github.com/ndilieto/uacme
