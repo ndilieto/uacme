@@ -4,7 +4,7 @@ Priority: optional
 Maintainer: Nicola Di Lieto <nicola.dilieto@gmail.com>
 Build-Depends: debhelper (>= 10), autoconf-archive, pkg-config,
                libgnutls28-dev (>= 3.3), libcurl4-gnutls-dev (>= 7.38),
-               asciidoc, libxml2-utils
+               asciidoc, docbook-xml, docbook-xsl, libxml2-utils
 Standards-Version: 4.3.0
 Homepage: https://github.com/ndilieto/uacme
 Vcs-Git: https://github.com/ndilieto/uacme
