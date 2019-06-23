@@ -1,3 +1,11 @@
+uacme (1.0.16-7) unstable; urgency=medium
+
+  * build-depend on xsltproc
+  * remove verbose options from asciidoc/a2x
+  * also add debian/patches/fix-pedantic-warning.patch
+
+ -- Nicola Di Lieto <nicola.dilieto@gmail.com>  Sun, 23 Jun 2019 09:33:18 +0200
+
 uacme (1.0.16-6) unstable; urgency=medium
 
   * add verbose options to asciidoc/a2x

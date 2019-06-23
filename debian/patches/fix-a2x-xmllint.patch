@@ -1,30 +1,22 @@
 --- a/Makefile.am
 +++ b/Makefile.am
-@@ -38,10 +38,10 @@
+@@ -38,7 +38,7 @@
  dist_html_DATA = uacme.1.html
  
  uacme.1: uacme.1.txt $(top_srcdir)/.version
 -	$(A2X) -d manpage -f manpage -a revision=$(VERSION) $<
-+	$(A2X) -v -v -L -d manpage -f manpage -a revision=$(VERSION) $<
++	$(A2X) -L -d manpage -f manpage -a revision=$(VERSION) $<
  
  uacme.1.html: uacme.1.txt $(top_srcdir)/.version
--	$(ASCIIDOC) -d manpage -b html5 -a revision=$(VERSION) $<
-+	$(ASCIIDOC) -v -d manpage -b html5 -a revision=$(VERSION) $<
- 
- $(top_srcdir)/docs/index.html: uacme.1.html
- 	mkdir -p docs
+ 	$(ASCIIDOC) -d manpage -b html5 -a revision=$(VERSION) $<
 --- a/Makefile.in
 +++ b/Makefile.in
-@@ -927,10 +927,10 @@
+@@ -927,7 +927,7 @@
  	echo $(VERSION) > $(distdir)/.tarball-version
  
  @ENABLE_DOCS_TRUE@uacme.1: uacme.1.txt $(top_srcdir)/.version
 -@ENABLE_DOCS_TRUE@	$(A2X) -d manpage -f manpage -a revision=$(VERSION) $<
-+@ENABLE_DOCS_TRUE@	$(A2X) -v -v -L -d manpage -f manpage -a revision=$(VERSION) $<
++@ENABLE_DOCS_TRUE@	$(A2X) -L -d manpage -f manpage -a revision=$(VERSION) $<
  
  @ENABLE_DOCS_TRUE@uacme.1.html: uacme.1.txt $(top_srcdir)/.version
--@ENABLE_DOCS_TRUE@	$(ASCIIDOC) -d manpage -b html5 -a revision=$(VERSION) $<
-+@ENABLE_DOCS_TRUE@	$(ASCIIDOC) -v -d manpage -b html5 -a revision=$(VERSION) $<
- 
- @ENABLE_DOCS_TRUE@$(top_srcdir)/docs/index.html: uacme.1.html
- @ENABLE_DOCS_TRUE@	mkdir -p docs
+ @ENABLE_DOCS_TRUE@	$(ASCIIDOC) -d manpage -b html5 -a revision=$(VERSION) $<
