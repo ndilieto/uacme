@@ -5531,10 +5531,12 @@ fi
 
 if test -n "$PKG_CONFIG"; then
     PKGCONFIG="$PKG_CONFIG"
+    if test -n "`$PKGCONFIG --version`"; then
+        as_fn_error $? "PKG_CONFIG is invalid" "$LINENO" 5
+    fi
 else
-    if test -n "$ac_tool_prefix"; then
-  # Extract the first word of "${ac_tool_prefix}pkg-config", so it can be a program name with args.
-set dummy ${ac_tool_prefix}pkg-config; ac_word=$2
+    # Extract the first word of "pkg-config", so it can be a program name with args.
+set dummy pkg-config; ac_word=$2
 { $as_echo "$as_me:${as_lineno-$LINENO}: checking for $ac_word" >&5
 $as_echo_n "checking for $ac_word... " >&6; }
 if ${ac_cv_path_PKGCONFIG+:} false; then :
@@ -5561,6 +5563,7 @@ done
   done
 IFS=$as_save_IFS
 
+  test -z "$ac_cv_path_PKGCONFIG" && ac_cv_path_PKGCONFIG="no"
   ;;
 esac
 fi
@@ -5574,64 +5577,9 @@ $as_echo "no" >&6; }
 fi
 
 
-fi
-if test -z "$ac_cv_path_PKGCONFIG"; then
-  ac_pt_PKGCONFIG=$PKGCONFIG
-  # Extract the first word of "pkg-config", so it can be a program name with args.
-set dummy pkg-config; ac_word=$2
-{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for $ac_word" >&5
-$as_echo_n "checking for $ac_word... " >&6; }
-if ${ac_cv_path_ac_pt_PKGCONFIG+:} false; then :
-  $as_echo_n "(cached) " >&6
-else
-  case $ac_pt_PKGCONFIG in
-  [\\/]* | ?:[\\/]*)
-  ac_cv_path_ac_pt_PKGCONFIG="$ac_pt_PKGCONFIG" # Let the user override the test with a path.
-  ;;
-  *)
-  as_save_IFS=$IFS; IFS=$PATH_SEPARATOR
-as_dummy="$PATH:/usr/bin:/usr/local/bin"
-for as_dir in $as_dummy
-do
-  IFS=$as_save_IFS
-  test -z "$as_dir" && as_dir=.
-    for ac_exec_ext in '' $ac_executable_extensions; do
-  if as_fn_executable_p "$as_dir/$ac_word$ac_exec_ext"; then
-    ac_cv_path_ac_pt_PKGCONFIG="$as_dir/$ac_word$ac_exec_ext"
-    $as_echo "$as_me:${as_lineno-$LINENO}: found $as_dir/$ac_word$ac_exec_ext" >&5
-    break 2
-  fi
-done
-  done
-IFS=$as_save_IFS
-
-  ;;
-esac
-fi
-ac_pt_PKGCONFIG=$ac_cv_path_ac_pt_PKGCONFIG
-if test -n "$ac_pt_PKGCONFIG"; then
-  { $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_pt_PKGCONFIG" >&5
-$as_echo "$ac_pt_PKGCONFIG" >&6; }
-else
-  { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
-$as_echo "no" >&6; }
-fi
-
-  if test "x$ac_pt_PKGCONFIG" = x; then
-    PKGCONFIG="no"
-  else
-    case $cross_compiling:$ac_tool_warned in
-yes:)
-{ $as_echo "$as_me:${as_lineno-$LINENO}: WARNING: using cross tools not prefixed with host triplet" >&5
-$as_echo "$as_me: WARNING: using cross tools not prefixed with host triplet" >&2;}
-ac_tool_warned=yes ;;
-esac
-    PKGCONFIG=$ac_pt_PKGCONFIG
-  fi
-else
-  PKGCONFIG="$ac_cv_path_PKGCONFIG"
-fi
-
+    if test "x$PKGCONFIG" = "xno"; then
+        as_fn_error $? "Could not find pkg-config" "$LINENO" 5
+    fi
 fi
 
 OPT_LIBCURL=yes
@@ -5642,37 +5590,35 @@ if test "${with_libcurl+set}" = set; then :
 fi
 
 
-if test X"$OPT_LIBCURL" = Xno; then
+if test "x$OPT_LIBCURL" = "xno"; then
     as_fn_error $? "libcurl must be enabled" "$LINENO" 5
 fi
-if test X"$OPT_LIBCURL" = Xyes; then
-    if test X"$PKGCONFIG" != Xno; then
-        { $as_echo "$as_me:${as_lineno-$LINENO}: checking for libcurl >= 7.38.0" >&5
+if test "x$OPT_LIBCURL" = "xyes"; then
+    { $as_echo "$as_me:${as_lineno-$LINENO}: checking for libcurl >= 7.38.0" >&5
 $as_echo_n "checking for libcurl >= 7.38.0... " >&6; }
-        itexists=`$PKGCONFIG --exists 'libcurl >= 7.38.0' >/dev/null 2>&1 && echo 1`
-        if test -z "$itexists"; then
+    itexists=`$PKGCONFIG --exists 'libcurl >= 7.38.0' >/dev/null 2>&1 && echo 1`
+    if test -z "$itexists"; then
+        { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
+$as_echo "no" >&6; }
+        as_fn_error $? "libcurl not found" "$LINENO" 5
+    else
+        addlib=`$PKGCONFIG --libs-only-l libcurl`
+        addld=`$PKGCONFIG --libs-only-L libcurl`
+        addcflags=`$PKGCONFIG --cflags-only-I libcurl`
+        version=`$PKGCONFIG --modversion libcurl`
+        curllib=`echo $addld | $SED -e 's/-L//'`
+        { $as_echo "$as_me:${as_lineno-$LINENO}: result: found $version" >&5
+$as_echo "found $version" >&6; }
+        { $as_echo "$as_me:${as_lineno-$LINENO}: checking for libcurl https support" >&5
+$as_echo_n "checking for libcurl https support... " >&6; }
+        https=`$PKGCONFIG --variable=supported_protocols libcurl 2>/dev/null | grep -q HTTPS && echo 1`
+        if test -z "$https"; then
             { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
 $as_echo "no" >&6; }
-            as_fn_error $? "libcurl not found" "$LINENO" 5
-        else
-            addlib=`$PKGCONFIG --libs-only-l libcurl`
-            addld=`$PKGCONFIG --libs-only-L libcurl`
-            addcflags=`$PKGCONFIG --cflags-only-I libcurl`
-            version=`$PKGCONFIG --modversion libcurl`
-            curllib=`echo $addld | $SED -e 's/-L//'`
-            { $as_echo "$as_me:${as_lineno-$LINENO}: result: found $version" >&5
-$as_echo "found $version" >&6; }
-            { $as_echo "$as_me:${as_lineno-$LINENO}: checking for libcurl https support" >&5
-$as_echo_n "checking for libcurl https support... " >&6; }
-            https=`$PKGCONFIG --variable=supported_protocols libcurl 2>/dev/null | grep -q HTTPS && echo 1`
-            if test -z "$https"; then
-                { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
-$as_echo "no" >&6; }
-                as_fn_error $? "libcurl does not support https" "$LINENO" 5
-            fi
-            { $as_echo "$as_me:${as_lineno-$LINENO}: result: yes" >&5
-$as_echo "yes" >&6; }
+            as_fn_error $? "libcurl does not support https" "$LINENO" 5
         fi
+        { $as_echo "$as_me:${as_lineno-$LINENO}: result: yes" >&5
+$as_echo "yes" >&6; }
     fi
 else
     addlib=-lcurl
@@ -5728,7 +5674,7 @@ else
 fi
 
 if test -n "$curllib"; then
-    if test X"$cross_compiling" != Xyes; then
+    if test "x$cross_compiling" != "xyes"; then
         UACME_LIBRARY_PATH="$UACME_LIBRARY_PATH:$curllib"
         export UACME_LIBRARY_PATH
         { $as_echo "$as_me:${as_lineno-$LINENO}: Added $curllib to UACME_LIBRARY_PATH" >&5
@@ -5752,7 +5698,7 @@ if test "${with_openssl+set}" = set; then :
 fi
 
 
-if test X"$OPT_MBEDTLS" = Xno -a X"$OPT_OPENSSL" = Xno; then
+if test "x$OPT_MBEDTLS" = "xno" -a "x$OPT_OPENSSL" = "xno"; then
     OPT_GNUTLS=yes
 else
     OPT_GNUTLS=no
@@ -5764,40 +5710,38 @@ if test "${with_gnutls+set}" = set; then :
 fi
 
 
-if test X"$OPT_GNUTLS" = Xno -a X"$OPT_MBEDTLS" = Xno -a X"$OPT_OPENSSL" = Xno; then
+if test "x$OPT_GNUTLS" = "xno" -a "x$OPT_MBEDTLS" = "xno" -a "x$OPT_OPENSSL" = "xno"; then
     as_fn_error $? "One of GnuTLS, OpenSSL or mbedTLS must be enabled" "$LINENO" 5
 fi
-if test X"$OPT_GNUTLS" != Xno -a X"$OPT_MBEDTLS" != Xno; then
+if test "x$OPT_GNUTLS" != "xno" -a "x$OPT_MBEDTLS" != "xno"; then
     as_fn_error $? "GnuTLS and mbedTLS cannot be both enabled" "$LINENO" 5
 fi
-if test X"$OPT_GNUTLS" != Xno -a X"$OPT_OPENSSL" != Xno; then
+if test "x$OPT_GNUTLS" != "xno" -a "x$OPT_OPENSSL" != "xno"; then
     as_fn_error $? "GnuTLS and OpenSSL cannot be both enabled" "$LINENO" 5
 fi
-if test X"$OPT_OPENSSL" != Xno -a X"$OPT_MBEDTLS" != Xno; then
+if test "x$OPT_OPENSSL" != "xno" -a "x$OPT_MBEDTLS" != "xno"; then
     as_fn_error $? "OpenSSL and mbedTLS cannot be both enabled" "$LINENO" 5
 fi
 
-if test X"$OPT_GNUTLS" != Xno; then
+if test "x$OPT_GNUTLS" != "xno"; then
     addlib=""
-    if test X"$OPT_GNUTLS" = Xyes; then
-        if test X"$PKGCONFIG" != Xno; then
-            { $as_echo "$as_me:${as_lineno-$LINENO}: checking for GnuTLS >= 3.3.30" >&5
+    if test "x$OPT_GNUTLS" = "xyes"; then
+        { $as_echo "$as_me:${as_lineno-$LINENO}: checking for GnuTLS >= 3.3.30" >&5
 $as_echo_n "checking for GnuTLS >= 3.3.30... " >&6; }
-            itexists=`$PKGCONFIG --exists 'gnutls >= 3.3.30' >/dev/null 2>&1 && echo 1`
-            if test -z "$itexists"; then
-                { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
+        itexists=`$PKGCONFIG --exists 'gnutls >= 3.3.30' >/dev/null 2>&1 && echo 1`
+        if test -z "$itexists"; then
+            { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
 $as_echo "no" >&6; }
-                as_fn_error $? "gnutls not found" "$LINENO" 5
-            else
-                addlib=`$PKGCONFIG --libs-only-l gnutls`
-                addld=`$PKGCONFIG --libs-only-L gnutls`
-                addcflags=`$PKGCONFIG --cflags-only-I gnutls`
-                version=`$PKGCONFIG --modversion gnutls`
-                gtlslib=`echo $addld | $SED -e 's/-L//'`
-                { $as_echo "$as_me:${as_lineno-$LINENO}: result: found $version" >&5
+            as_fn_error $? "gnutls not found" "$LINENO" 5
+        else
+            addlib=`$PKGCONFIG --libs-only-l gnutls`
+            addld=`$PKGCONFIG --libs-only-L gnutls`
+            addcflags=`$PKGCONFIG --cflags-only-I gnutls`
+            version=`$PKGCONFIG --modversion gnutls`
+            gtlslib=`echo $addld | $SED -e 's/-L//'`
+            { $as_echo "$as_me:${as_lineno-$LINENO}: result: found $version" >&5
 $as_echo "found $version" >&6; }
-            fi
-         fi
+        fi
     else
         addlib=-lgnutls
         addld=-L$OPT_GNUTLS/lib$libsuff
@@ -5871,9 +5815,9 @@ else
 fi
 done
 
-        if test X"$USE_GNUTLS" = Xyes; then
+        if test "x$USE_GNUTLS" = "xyes"; then
             if test -n "$gtlslib"; then
-                if test X"$cross_compiling" != Xyes; then
+                if test "x$cross_compiling" != "xyes"; then
                     UACME_LIBRARY_PATH="$UACME_LIBRARY_PATH:$gtlslib"
                     export UACME_LIBRARY_PATH
                     { $as_echo "$as_me:${as_lineno-$LINENO}: Added $gtlslib to UACME_LIBRARY_PATH" >&5
@@ -5884,29 +5828,23 @@ $as_echo "$as_me: Added $gtlslib to UACME_LIBRARY_PATH" >&6;}
     fi
 fi
 
-if test X"$NEED_LIBTASN1" = Xyes; then
+if test "x$NEED_LIBTASN1" = "xyes"; then
     addlib=""
-    if test X"$PKGCONFIG" != Xno; then
-        { $as_echo "$as_me:${as_lineno-$LINENO}: checking for libtasn1 >= 4.2" >&5
+    { $as_echo "$as_me:${as_lineno-$LINENO}: checking for libtasn1 >= 4.2" >&5
 $as_echo_n "checking for libtasn1 >= 4.2... " >&6; }
-        itexists=`$PKGCONFIG --exists 'libtasn1 >= 4.2' >/dev/null 2>&1 && echo 1`
-        if test -z "$itexists"; then
-            { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
+    itexists=`$PKGCONFIG --exists 'libtasn1 >= 4.2' >/dev/null 2>&1 && echo 1`
+    if test -z "$itexists"; then
+        { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
 $as_echo "no" >&6; }
-            as_fn_error $? "libtasn1 not found" "$LINENO" 5
-        else
-            addlib=`$PKGCONFIG --libs-only-l libtasn1`
-            addld=`$PKGCONFIG --libs-only-L libtasn1`
-            addcflags=`$PKGCONFIG --cflags-only-I libtasn1`
-            version=`$PKGCONFIG --modversion libtasn1`
-            tasn1lib=`echo $addld | $SED -e 's/-L//'`
-            { $as_echo "$as_me:${as_lineno-$LINENO}: result: found $version" >&5
-$as_echo "found $version" >&6; }
-        fi
+        as_fn_error $? "libtasn1 not found" "$LINENO" 5
     else
-        addlib=-ltasn1
-        addld=""
-        addcflags=""
+        addlib=`$PKGCONFIG --libs-only-l libtasn1`
+        addld=`$PKGCONFIG --libs-only-L libtasn1`
+        addcflags=`$PKGCONFIG --cflags-only-I libtasn1`
+        version=`$PKGCONFIG --modversion libtasn1`
+        tasn1lib=`echo $addld | $SED -e 's/-L//'`
+        { $as_echo "$as_me:${as_lineno-$LINENO}: result: found $version" >&5
+$as_echo "found $version" >&6; }
     fi
     if test -n "$addlib"; then
         LIBS="$addlib $LIBS"
@@ -5962,9 +5900,9 @@ else
   as_fn_error $? "libtasn1 check failed" "$LINENO" 5
 fi
 
-        if test X"$USE_LIBTASN1" = Xyes; then
+        if test "x$USE_LIBTASN1" = "xyes"; then
             if test -n "$tasn1lib"; then
-                if test X"$cross_compiling" != Xyes; then
+                if test "x$cross_compiling" != "xyes"; then
                     UACME_LIBRARY_PATH="$UACME_LIBRARY_PATH:$tasn1lib"
                     export UACME_LIBRARY_PATH
                     { $as_echo "$as_me:${as_lineno-$LINENO}: Added $tasn1lib to UACME_LIBRARY_PATH" >&5
@@ -5975,26 +5913,24 @@ $as_echo "$as_me: Added $tasn1lib to UACME_LIBRARY_PATH" >&6;}
     fi
 fi
 
-if test X"$OPT_OPENSSL" != Xno; then
+if test "x$OPT_OPENSSL" != "xno"; then
     addlib=""
-    if test X"$OPT_OPENSSL" = Xyes; then
-        if test X"$PKGCONFIG" != Xno; then
-            { $as_echo "$as_me:${as_lineno-$LINENO}: checking for OpenSSL >= 1.1.1" >&5
+    if test "x$OPT_OPENSSL" = "xyes"; then
+        { $as_echo "$as_me:${as_lineno-$LINENO}: checking for OpenSSL >= 1.1.1" >&5
 $as_echo_n "checking for OpenSSL >= 1.1.1... " >&6; }
-            itexists=`$PKGCONFIG --exists 'openssl >= 1.1.1' >/dev/null 2>&1 && echo 1`
-            if test -z "$itexists"; then
-                { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
+        itexists=`$PKGCONFIG --exists 'openssl >= 1.1.1' >/dev/null 2>&1 && echo 1`
+        if test -z "$itexists"; then
+            { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
 $as_echo "no" >&6; }
-                as_fn_error $? "openssl not found" "$LINENO" 5
-            else
-                addlib=`$PKGCONFIG --libs-only-l openssl`
-                addld=`$PKGCONFIG --libs-only-L openssl`
-                addcflags=`$PKGCONFIG --cflags-only-I openssl`
-                version=`$PKGCONFIG --modversion openssl`
-                openssllib=`echo $addld | $SED -e 's/-L//'`
-                { $as_echo "$as_me:${as_lineno-$LINENO}: result: found $version" >&5
+            as_fn_error $? "openssl not found" "$LINENO" 5
+        else
+            addlib=`$PKGCONFIG --libs-only-l openssl`
+            addld=`$PKGCONFIG --libs-only-L openssl`
+            addcflags=`$PKGCONFIG --cflags-only-I openssl`
+            version=`$PKGCONFIG --modversion openssl`
+            openssllib=`echo $addld | $SED -e 's/-L//'`
+            { $as_echo "$as_me:${as_lineno-$LINENO}: result: found $version" >&5
 $as_echo "found $version" >&6; }
-            fi
         fi
     else
         addlib="-lssl -lcrypto"
@@ -6056,9 +5992,9 @@ else
   as_fn_error $? "openssl check failed" "$LINENO" 5
 fi
 
-        if test X"$USE_OPENSSL" = Xyes; then
+        if test "x$USE_OPENSSL" = "xyes"; then
             if test -n "$openssllib"; then
-                if test X"$cross_compiling" != Xyes; then
+                if test "x$cross_compiling" != "xyes"; then
                     UACME_LIBRARY_PATH="$UACME_LIBRARY_PATH:$openssllib"
                     export UACME_LIBRARY_PATH
                     { $as_echo "$as_me:${as_lineno-$LINENO}: Added $openssllib to UACME_LIBRARY_PATH" >&5
@@ -6068,7 +6004,7 @@ $as_echo "$as_me: Added $openssllib to UACME_LIBRARY_PATH" >&6;}
         fi
     fi
 fi
- if test X"$USE_OPENSSL" != Xyes; then
+ if test "x$USE_OPENSSL" != "xyes"; then
   ENABLE_READFILE_TRUE=
   ENABLE_READFILE_FALSE='#'
 else
@@ -6077,8 +6013,8 @@ else
 fi
 
 
-if test X"$OPT_MBEDTLS" != Xno; then
-    if test X"$OPT_MBEDTLS" = Xyes; then
+if test "x$OPT_MBEDTLS" != "xno"; then
+    if test "x$OPT_MBEDTLS" = "xyes"; then
         OPT_MBEDTLS=""
     fi
     if test -z "$OPT_MBEDTLS" ; then
@@ -6133,7 +6069,7 @@ fi
     addlib=""
     addcflags=""
     mbedtlslib=""
-    if test X"$USE_MBEDTLS" != Xyes; then
+    if test "x$USE_MBEDTLS" != "xyes"; then
         addld=-L$OPT_MBEDTLS/lib$libsuff
         addcflags=-I$OPT_MBEDTLS/include
         mbedtlslib=$OPT_MBEDTLS/lib$libsuff
@@ -6190,12 +6126,12 @@ else
 fi
 
     fi
-    if test X"$USE_MBEDTLS" = Xyes; then
+    if test "x$USE_MBEDTLS" = "xyes"; then
         { $as_echo "$as_me:${as_lineno-$LINENO}: detected mbedTLS" >&5
 $as_echo "$as_me: detected mbedTLS" >&6;}
         LIBS="-lmbedtls -lmbedx509 -lmbedcrypto $LIBS"
         if test -n "$mbedtlslib"; then
-            if test X"$cross_compiling" != Xyes; then
+            if test "x$cross_compiling" != "xyes"; then
                 UACME_LIBRARY_PATH="$UACME_LIBRARY_PATH:$mbedtlslib"
                 export UACME_LIBRARY_PATH
                 { $as_echo "$as_me:${as_lineno-$LINENO}: Added $mbedtlslib to UACME_LIBRARY_PATH" >&5
@@ -6213,7 +6149,7 @@ else
   enable_docs=$default_docs
 fi
 
- if test X"$enable_docs" = Xyes; then
+ if test "x$enable_docs" = "xyes"; then
   ENABLE_DOCS_TRUE=
   ENABLE_DOCS_FALSE='#'
 else
@@ -6221,7 +6157,7 @@ else
   ENABLE_DOCS_FALSE=
 fi
 
-if test X"$enable_docs" = Xyes; then
+if test "x$enable_docs" = "xyes"; then
     # Extract the first word of "a2x", so it can be a program name with args.
 set dummy a2x; ac_word=$2
 { $as_echo "$as_me:${as_lineno-$LINENO}: checking for $ac_word" >&5
@@ -6249,7 +6185,7 @@ done
   done
 IFS=$as_save_IFS
 
-  test -z "$ac_cv_path_A2X" && ac_cv_path_A2X=":"
+  test -z "$ac_cv_path_A2X" && ac_cv_path_A2X="no"
   ;;
 esac
 fi
@@ -6290,7 +6226,7 @@ done
   done
 IFS=$as_save_IFS
 
-  test -z "$ac_cv_path_ASCIIDOC" && ac_cv_path_ASCIIDOC=":"
+  test -z "$ac_cv_path_ASCIIDOC" && ac_cv_path_ASCIIDOC="no"
   ;;
 esac
 fi
@@ -6304,10 +6240,10 @@ $as_echo "no" >&6; }
 fi
 
 
-    if test "$A2X" = :; then :
+    if test "x$A2X" = "xno"; then :
   as_fn_error $? "Could not find a2x." "$LINENO" 5
 fi
-    if test "$ASCIIDOC" = :; then :
+    if test "x$ASCIIDOC" = "xno"; then :
   as_fn_error $? "Could not find asciidoc." "$LINENO" 5
 fi
 fi
