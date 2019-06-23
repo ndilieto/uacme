@@ -1,3 +1,9 @@
+uacme (1.0.16-6) unstable; urgency=medium
+
+  * add verbose options to asciidoc/a2x
+
+ -- Nicola Di Lieto <nicola.dilieto@gmail.com>  Sun, 23 Jun 2019 07:31:51 +0200
+
 uacme (1.0.16-5) unstable; urgency=medium
 
   * build-depend on docbook-xml, docbook-xsl
