@@ -1,3 +1,8 @@
+2019-07-03 Nicola Di Lieto <nicola.dilieto@gmail.com>
+	* Release 1.0.17
+	- fix pedantic compilation warning
+        - configure fails if pkg-config isn't found
+
 2019-06-17 Nicola Di Lieto <nicola.dilieto@gmail.com>
 	* Release 1.0.16
 	- Configure script checks for libcurl HTTPS support
