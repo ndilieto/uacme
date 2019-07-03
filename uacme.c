@@ -1326,7 +1326,7 @@ out:
 
 bool validate_domain_str(const char *s)
 {
-    bool len = 0;
+    size_t len = 0;
     for (size_t j = 0; j < strlen(s); j++)
     {
         switch (s[j])
