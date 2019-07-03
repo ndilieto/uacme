@@ -1,3 +1,4 @@
+pass -L flag to a2x in order to avoid depending on xmllint
 --- a/Makefile.am
 +++ b/Makefile.am
 @@ -38,7 +38,7 @@

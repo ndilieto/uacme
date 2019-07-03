@@ -1,3 +1,2 @@
 fix-a2x-xmllint.patch
 remove-gnumakefile.patch
-fix-pedantic-warning.patch

@@ -4,3 +4,8 @@
 #
 # The debian source package is maintained in the branch at
 # https://github.com/ndilieto/uacme/tree/debian/master
+#
+version=3
+opts="filenamemangle=s/(?:.*\/)?upstream\/(\d[\d\.]*)\.tar\.gz/uacme_$1.orig.tar.gz/" \
+      https://github.com/ndilieto/uacme/tags (?:.*/)?upstream/(\d[\d\.]*)\.tar\.gz \
+      debian debian/pristine-tar.sh
