@@ -53,10 +53,11 @@ if test -n "$PKG_CONFIG"; then
         AC_MSG_ERROR([PKG_CONFIG is invalid])
     fi
 else
-    AC_PATH_PROG([PKGCONFIG], [pkg-config], [no],
-                 [$PATH:/usr/bin:/usr/local/bin])
-    if test "x$PKGCONFIG" = "xno"; then
+    PKG_PROG_PKG_CONFIG([0.28])
+    if test "x$PKG_CONFIG" = "x"; then
         AC_MSG_ERROR([Could not find pkg-config])
+    else
+        PKGCONFIG="$PKG_CONFIG"
     fi
 fi
 
