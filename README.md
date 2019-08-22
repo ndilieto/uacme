@@ -55,6 +55,11 @@ You'll also find the latest release in the git repository:
 ```
 git clone -b upstream/latest https://github.com/ndilieto/uacme
 ```
+Debian/Ubuntu packages are available in the official repositories:
+```
+https://packages.debian.org/bullseye/uacme
+https://packages.ubuntu.com/eoan/uacme
+```
 
 ## Getting started
 
