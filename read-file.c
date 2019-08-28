@@ -57,7 +57,7 @@ fread_file (FILE *stream, size_t *length)
             size_t alloc_off = st.st_size - pos;
 
             /* '1' below, accounts for the trailing NUL.  */
-            if (SIZE_MAX - 1 < alloc_off)
+            if (SIZE_MAX/2 - 1 < alloc_off)
               {
                 errno = ENOMEM;
                 return NULL;
@@ -105,16 +105,16 @@ fread_file (FILE *stream, size_t *length)
         {
           char *new_buf;
 
-          if (alloc == SIZE_MAX)
+          if (alloc >= SIZE_MAX/2)
             {
               save_errno = ENOMEM;
               break;
             }
 
-          if (alloc < SIZE_MAX - alloc / 2)
+          if (alloc < SIZE_MAX/2 - alloc / 2)
             alloc = alloc + alloc / 2;
           else
-            alloc = SIZE_MAX;
+            alloc = SIZE_MAX/2;
 
           if (!(new_buf = realloc (buf, alloc)))
             {
