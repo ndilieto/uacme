@@ -2268,6 +2268,16 @@ char *csr_gen(const char * const *names, privkey_t key)
         goto out;
     }
 
+    r = mbedtls_x509write_csr_set_key_usage(&csr,
+            MBEDTLS_X509_KU_DIGITAL_SIGNATURE |
+            MBEDTLS_X509_KU_KEY_ENCIPHERMENT);
+    if (r)
+    {
+        warnx("csr_gen: mbedtls_x509write_csr_set_key_usage failed: %s",
+                _mbedtls_strerror(r));
+        goto out;
+    }
+
     r = mbedtls_x509write_csr_set_subject_name(&csr, cn);
     if (r)
     {

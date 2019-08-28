@@ -1,3 +1,6 @@
+2019-08-28 Nicola Di Lieto <nicola.dilieto@gmail.com>
+	- explicitly set key usage constraints with mbedTLS
+
 2019-07-03 Nicola Di Lieto <nicola.dilieto@gmail.com>
 	* Release 1.0.17
 	- fix pedantic compilation warning
