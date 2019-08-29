@@ -1,3 +1,10 @@
+uacme (1.0.18-1) unstable; urgency=medium
+
+  * New upstream release (1.0.18)
+  - also added execute permissions to debian/pristine-tar.sh
+
+ -- Nicola Di Lieto <nicola.dilieto@gmail.com>  Thu, 29 Aug 2019 23:37:37 +0200
+
 uacme (1.0.17-1) unstable; urgency=medium
 
   * Initial debian release (Closes: #928469)
