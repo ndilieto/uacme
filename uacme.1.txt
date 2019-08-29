@@ -13,10 +13,11 @@ uacme - ACMEv2 client written in plain C code with minimal dependencies
 
 SYNOPSIS
 --------
-*uacme* [*-a*|*--acme-url* 'URL'] [*-b*|*--bits* 'BITS'] [*-c*|*--confdir* 'DIR']
-    [*-d*|*--days* 'DAYS'] [*-f*|*--force*] [*-h*|*--hook* 'PROGRAM']
-    [*-n*|*--never*] [*-s*|*--staging*] [*-t*|*--type* *RSA*|*EC*]
-    [*-v*|*--verbose* ...] [*-V*|*--version*] [*-y*|*--yes*] [*-?*|*--help*]
+*uacme* [*-a*|*--acme-url* 'URL'] [*-b*|*--bits* 'BITS']
+    [*-c*|*--confdir* 'DIR'] [*-d*|*--days* 'DAYS'] [*-f*|*--force*]
+    [*-h*|*--hook* 'PROGRAM'] [*-m*|*--must-staple*] [*-n*|*--never*]
+    [*-s*|*--staging*] [*-t*|*--type* *RSA*|*EC*] [*-v*|*--verbose* ...]
+    [*-V*|*--version*] [*-y*|*--yes*] [*-?*|*--help*]
     *new* ['EMAIL'] | *update* ['EMAIL'] | *deactivate* | *newkey* |
     *issue* 'DOMAIN' ['ALTNAME' ...]] | *revoke* 'CERTFILE'
 
@@ -83,8 +84,9 @@ OPTIONS
         'AUTH'::: The key authorization (for *dns-01* and *tls-alpn-01*
            already converted to the base64-encoded SHA256 digest format)
 
-*-?, --help*::
-    Print a brief usage text on stderr and exit.
+*-m, --must-staple*::
+    Request certificates with the RFC7633 Certificate Status Request
+    TLS Feature Extension, informally also known as "OCSP Must-Staple".
 
 *-n, --never-create*::
     By default *uacme* creates directories/keys if they do not exist.
@@ -110,6 +112,9 @@ OPTIONS
 
 *-y, --yes*::
     Autoaccept ACME server terms (if any) upon new account creation.
+
+*-?, --help*::
+    Print a brief usage text on stderr and exit.
 
 
 USAGE

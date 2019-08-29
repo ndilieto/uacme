@@ -1,18 +1,26 @@
 uacme NEWS
 Copyright (C) 2019 Nicola Di Lieto <nicola.dilieto@gmail.com>
 
+## [1.0.18] - 2019-08-29
+### Added
+- support for OCSP Must-Staple (-m, --must-staple)
+
+### Changed
+- explicitly set key usage constraints with mbedTLS
+- fix compilation warning with gcc7 on solaris
+
 ## [1.0.17] - 2019-07-03
-### changed
+### Changed
 - fix pedantic compilation warning
 - configure fails if pkg-config isn't found
 
 ## [1.0.16] - 2019-06-17
-### changed
+### Changed
 - configure script checks for libcurl HTTPS support
 - minor manpage corrections 
 
 ## [1.0.15] - 2019-06-15
-### changed
+### Changed
 - exit with error if both -a and -s are specified
 - avoid depending on libtasn1 if gnutls_decode_rs_value is
   available (requires gnutls 3.6.0 or later)

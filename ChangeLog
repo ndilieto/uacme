@@ -1,3 +1,9 @@
+2019-08-29 Nicola Di Lieto <nicola.dilieto@gmail.com>
+	* Release 1.0.18
+	- support for OCSP Must-Staple (-m, --must-staple)
+	- explicitly set key usage constraints with mbedTLS
+	- fix compilation warning with gcc7 on solaris
+
 2019-07-03 Nicola Di Lieto <nicola.dilieto@gmail.com>
 	* Release 1.0.17
 	- fix pedantic compilation warning
