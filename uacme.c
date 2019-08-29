@@ -1021,7 +1021,7 @@ out:
     return success;
 }
 
-bool cert_issue(acme_t *a)
+bool cert_issue(acme_t *a, bool status_req)
 {
     bool success = false;
     char *csr = NULL;
@@ -1109,7 +1109,7 @@ bool cert_issue(acme_t *a)
     }
 
     msg(1, "generating certificate request");
-    csr = csr_gen(a->names, a->dkey);
+    csr = csr_gen(a->names, status_req, a->dkey);
     if (!csr)
     {
         warnx("failed to generate certificate signing request");
@@ -1371,10 +1371,11 @@ void usage(const char *progname)
 {
     fprintf(stderr,
         "usage: %s [-a|--acme-url URL] [-b|--bits BITS] [-c|--confdir DIR]\n"
-        "\t[-d|--days DAYS] [-f|--force] [-h|--hook PROGRAM] [-n|--never-create]\n"
-        "\t[-s|--staging] [-t|--type RSA | EC] [-v|--verbose ...] [-V|--version]\n"
-        "\t[-y|--yes] [-?|--help] new [EMAIL] | update [EMAIL] | deactivate\n"
-        "\t| newkey | issue DOMAIN [ALTNAME ...]] | revoke CERTFILE\n", progname);
+        "\t[-d|--days DAYS] [-f|--force] [-h|--hook PROGRAM] [-m|--must-staple]\n"
+        "\t[-n|--never-create] [-s|--staging] [-t|--type RSA | EC]\n"
+        "\t[-v|--verbose ...] [-V|--version] [-y|--yes] [-?|--help]\n"
+        "\tnew [EMAIL] | update [EMAIL] | deactivate | newkey |\n"
+        "\tissue DOMAIN [ALTNAME ...]] | revoke CERTFILE\n", progname);
 }
 
 int main(int argc, char **argv)
@@ -1388,6 +1389,7 @@ int main(int argc, char **argv)
         {"force",        no_argument,       NULL, 'f'},
         {"help",         no_argument,       NULL, '?'},
         {"hook",         required_argument, NULL, 'h'},
+        {"must-staple",  no_argument,       NULL, 'm'},
         {"never-create", no_argument,       NULL, 'n'},
         {"staging",      no_argument,       NULL, 's'},
         {"type",         required_argument, NULL, 't'},
@@ -1404,6 +1406,7 @@ int main(int argc, char **argv)
     bool yes = false;
     bool staging = false;
     bool custom_directory = false;
+    bool status_req = false;
     int days = 30;
     int bits = 0;
     keytype_t type = PK_RSA;
@@ -1446,7 +1449,7 @@ int main(int argc, char **argv)
     {
         char *endptr;
         int option_index;
-        int c = getopt_long(argc, argv, "a:b:c:d:f?h:nst:vVy",
+        int c = getopt_long(argc, argv, "a:b:c:d:f?h:mnst:vVy",
                 options, &option_index);
         if (c == -1) break;
         switch (c)
@@ -1489,6 +1492,10 @@ int main(int argc, char **argv)
 
             case 'h':
                 a.hook = optarg;
+                break;
+
+            case 'm':
+                status_req = true;
                 break;
 
             case 'n':
@@ -1779,7 +1786,8 @@ int main(int argc, char **argv)
             }
         }
 
-        if (acme_bootstrap(&a) && account_retrieve(&a) && cert_issue(&a))
+        if (acme_bootstrap(&a) && account_retrieve(&a)
+                && cert_issue(&a, status_req))
         {
             ret = 0;
         }

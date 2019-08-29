@@ -36,6 +36,9 @@
 
 #if defined(USE_GNUTLS)
 #include <gnutls/crypto.h>
+#if HAVE_GNUTLS_X509_CRQ_SET_TLSFEATURES
+#include <gnutls/x509-ext.h>
+#endif
 #if !HAVE_GNUTLS_DECODE_RS_VALUE
 #include <libtasn1.h>
 #endif
@@ -78,6 +81,10 @@ bool crypto_init(void)
     if (!gnutls_check_version("3.6.0"))
     {
         warnx("crypto_init: GnuTLS version 3.6.0 or later is required");
+#elif HAVE_GNUTLS_X509_CRQ_SET_TLSFEATURES
+    if (!gnutls_check_version("3.5.1"))
+    {
+        warnx("crypto_init: GnuTLS version 3.5.1 or later is required");
 #else
     if (!gnutls_check_version("3.3.30"))
     {
@@ -1215,7 +1222,7 @@ bool ec_decode(size_t hash_size, unsigned char **sig, size_t *sig_size)
         free(tmp);
         return false;
     }
-    if (r >= hash_size)
+    if (r >= (int)hash_size)
     {
         memcpy(tmp, data + r - hash_size, hash_size);
     }
@@ -1242,7 +1249,7 @@ bool ec_decode(size_t hash_size, unsigned char **sig, size_t *sig_size)
         free(tmp);
         return false;
     }
-    if (r >= hash_size)
+    if (r >= (int)hash_size)
     {
         memcpy(tmp + hash_size, data + r - hash_size, hash_size);
     }
@@ -2002,20 +2009,24 @@ out:
     return key;
 }
 
-char *csr_gen(const char * const *names, privkey_t key)
+char *csr_gen(const char * const *names, bool status_req, privkey_t key)
 {
     char *req = NULL;
-    void *csrdata = NULL;
+    unsigned char *csrdata = NULL;
     size_t csrsize = 0;
     int r;
 #if defined(USE_GNUTLS)
     gnutls_digest_algorithm_t hash_type;
     gnutls_pubkey_t pubkey = NULL;
     gnutls_x509_crq_t crq = NULL;
+#if HAVE_GNUTLS_X509_CRQ_SET_TLSFEATURES
+    gnutls_x509_tlsfeatures_t tls_features = NULL;
+#endif
 #elif defined(USE_OPENSSL)
     const EVP_MD *hash_type;
     X509_REQ *crq = NULL;
     X509_NAME *name = NULL;
+    STACK_OF(X509_EXTENSION) *exts = NULL;
     char *san = NULL;
 #elif defined(USE_MBEDTLS)
     mbedtls_md_type_t hash_type;
@@ -2103,6 +2114,40 @@ char *csr_gen(const char * const *names, privkey_t key)
             goto out;
         }
         names++;
+    }
+
+    if (status_req)
+    {
+#if HAVE_GNUTLS_X509_CRQ_SET_TLSFEATURES
+        r = gnutls_x509_tlsfeatures_init(&tls_features);
+        if (r != GNUTLS_E_SUCCESS)
+        {
+            warnx("csr_gen: gnutls_x509_tlsfeatures_init: %s",
+                    gnutls_strerror(r));
+            goto out;
+        }
+
+        // status_request TLS feature (OCSP Must-Staple)
+        r = gnutls_x509_tlsfeatures_add(tls_features, 5);
+        if (r != GNUTLS_E_SUCCESS)
+        {
+            warnx("csr_gen: gnutls_x509_tlsfeatures_add: %s",
+                    gnutls_strerror(r));
+            goto out;
+        }
+
+        r = gnutls_x509_crq_set_tlsfeatures(crq, tls_features);
+        if (r != GNUTLS_E_SUCCESS)
+        {
+            warnx("csr_gen: gnutls_x509_set_tlsfeatures: %s",
+                    gnutls_strerror(r));
+            goto out;
+        }
+#else
+        warnx("csr_gen: -m, --must-staple disabled at compile time "
+                "- consider recompiling with GnuTLS 3.5.1 or later");
+        goto out;
+#endif
     }
 
     r = gnutls_pubkey_init(&pubkey);
@@ -2211,7 +2256,7 @@ char *csr_gen(const char * const *names, privkey_t key)
         san = tmp;
         names++;
     }
-    STACK_OF(X509_EXTENSION) *exts = sk_X509_EXTENSION_new_null();
+    exts = sk_X509_EXTENSION_new_null();
     if (!exts)
     {
         openssl_error("csr_gen");
@@ -2221,18 +2266,26 @@ char *csr_gen(const char * const *names, privkey_t key)
             NID_subject_alt_name, san);
     if (!ext)
     {
-        sk_X509_EXTENSION_free(exts);
         openssl_error("csr_gen");
         goto out;
     }
     sk_X509_EXTENSION_push(exts, ext);
+    if (status_req)
+    {
+        ext = X509V3_EXT_conf_nid(NULL, NULL, NID_tlsfeature,
+                "status_request");
+        if (!ext)
+        {
+            openssl_error("csr_gen");
+            goto out;
+        }
+        sk_X509_EXTENSION_push(exts, ext);
+    }
     if (!X509_REQ_add_extensions(crq, exts))
     {
-        sk_X509_EXTENSION_pop_free(exts, X509_EXTENSION_free);
         openssl_error("csr_gen");
         goto out;
     }
-    sk_X509_EXTENSION_pop_free(exts, X509_EXTENSION_free);
     if (!X509_REQ_sign(crq, key, hash_type))
     {
         openssl_error("csr_gen");
@@ -2252,7 +2305,7 @@ char *csr_gen(const char * const *names, privkey_t key)
         goto out;
     }
     unsigned char *tmp = csrdata;
-    if (i2d_X509_REQ(crq, &tmp) != csrsize)
+    if (i2d_X509_REQ(crq, &tmp) != (int)csrsize)
     {
         openssl_error("csr_gen");
         goto out;
@@ -2397,6 +2450,71 @@ char *csr_gen(const char * const *names, privkey_t key)
                     _mbedtls_strerror(r));
             goto out;
         }
+        if (!status_req)
+        {
+            break;
+        }
+        p = buf + buflen;
+        len = 0;
+        // status_request TLS feature (OCSP Must-Staple)
+        r = mbedtls_asn1_write_int(&p, buf, 5);
+        if (r >= 0)
+        {
+            len += r;
+        }
+        else if (r == MBEDTLS_ERR_ASN1_BUF_TOO_SMALL)
+        {
+            continue;
+        }
+        else
+        {
+            warnx("csr_gen: mbedtls_asn1_write_int failed: %s",
+                    _mbedtls_strerror(r));
+            goto out;
+        }
+        r = mbedtls_asn1_write_len(&p, buf, len);
+        if (r >= 0)
+        {
+            len += r;
+        }
+        else if (r == MBEDTLS_ERR_ASN1_BUF_TOO_SMALL)
+        {
+            continue;
+        }
+        else
+        {
+            warnx("csr_gen: mbedtls_asn1_write_len failed: %s",
+                    _mbedtls_strerror(r));
+            goto out;
+        }
+        r = mbedtls_asn1_write_tag(&p, buf,
+                MBEDTLS_ASN1_CONSTRUCTED | MBEDTLS_ASN1_SEQUENCE);
+        if (r >= 0)
+        {
+            len += r;
+        }
+        else if (r == MBEDTLS_ERR_ASN1_BUF_TOO_SMALL)
+        {
+            continue;
+        }
+        else
+        {
+            warnx("csr_gen: mbedtls_asn1_write_tag failed: %s",
+                    _mbedtls_strerror(r));
+            goto out;
+        }
+        r = mbedtls_x509write_csr_set_extension(&csr,
+                // http://oid-info.com/get/1.3.6.1.5.5.7.1.24
+                // pe(1) id-pe-tlsfeature(24)
+                MBEDTLS_OID_PKIX "\x01\x18",
+                MBEDTLS_OID_SIZE(MBEDTLS_OID_PKIX "\x01\x18"),
+                buf + buflen - len, len);
+        if (r)
+        {
+            warnx("csr_gen: mbedtls_x509write_csr_set_extension failed: %s",
+                    _mbedtls_strerror(r));
+            goto out;
+        }
         break;
     }
 
@@ -2452,10 +2570,17 @@ char *csr_gen(const char * const *names, privkey_t key)
 out:
 #if defined(USE_GNUTLS)
     gnutls_pubkey_deinit(pubkey);
+#if HAVE_GNUTLS_X509_CRQ_SET_TLSFEATURES
+    if (tls_features)
+    {
+        gnutls_x509_tlsfeatures_deinit(tls_features);
+    }
+#endif
     gnutls_x509_crq_deinit(crq);
 #elif defined(USE_OPENSSL)
     if (name) X509_NAME_free(name);
     if (req) X509_REQ_free(crq);
+    if (exts) sk_X509_EXTENSION_pop_free(exts, X509_EXTENSION_free);
     free(san);
 #elif defined(USE_MBEDTLS)
     mbedtls_x509write_csr_free(&csr);
@@ -2673,7 +2798,7 @@ out:
                 if (s)
                 {
                     char *ss = (char *)s;
-                    if (strlen(ss) == len && strcasecmp(ss, *names) == 0)
+                    if ((int)strlen(ss) == len && strcasecmp(ss, *names) == 0)
                     {
                         found = true;
                     }
@@ -2824,7 +2949,7 @@ char *cert_der_base64url(const char *certfile)
     unsigned char *tmp = certdata;
     r = i2d_X509(crt, &tmp);
     X509_free(crt);
-    if (r != certsize)
+    if (r != (int)certsize)
     {
         openssl_error("cert_der_base64url");
         goto out;

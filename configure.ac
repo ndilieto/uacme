@@ -181,6 +181,8 @@ if test "x$OPT_GNUTLS" != "xno"; then
                       USE_GNUTLS="yes"],
                      [AC_MSG_ERROR([gnutls check failed])])
         AC_CHECK_FUNCS([gnutls_decode_rs_value], [], [NEED_LIBTASN1="yes"])
+        AC_CHECK_FUNCS([gnutls_x509_crq_set_tlsfeatures], [],
+                       [AC_MSG_NOTICE([--must-staple requires GnuTLS 3.5.1 or later])])
         if test "x$USE_GNUTLS" = "xyes"; then
             if test -n "$gtlslib"; then
                 if test "x$cross_compiling" != "xyes"; then
