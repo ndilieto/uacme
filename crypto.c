@@ -2016,6 +2016,7 @@ char *csr_gen(const char * const *names, bool status_req, privkey_t key)
     size_t csrsize = 0;
     int r;
 #if defined(USE_GNUTLS)
+    unsigned int key_usage = 0;
     gnutls_digest_algorithm_t hash_type;
     gnutls_pubkey_t pubkey = NULL;
     gnutls_x509_crq_t crq = NULL;
@@ -2023,12 +2024,14 @@ char *csr_gen(const char * const *names, bool status_req, privkey_t key)
     gnutls_x509_tlsfeatures_t tls_features = NULL;
 #endif
 #elif defined(USE_OPENSSL)
+    const char *key_usage = NULL;
     const EVP_MD *hash_type;
     X509_REQ *crq = NULL;
     X509_NAME *name = NULL;
     STACK_OF(X509_EXTENSION) *exts = NULL;
     char *san = NULL;
 #elif defined(USE_MBEDTLS)
+    unsigned int key_usage = 0;
     mbedtls_md_type_t hash_type;
     size_t buflen = 1024;
     unsigned char *buf = NULL;
@@ -2041,15 +2044,27 @@ char *csr_gen(const char * const *names, bool status_req, privkey_t key)
     {
         case PK_RSA:
 #if defined(USE_GNUTLS)
+            key_usage = GNUTLS_KEY_DIGITAL_SIGNATURE |
+                GNUTLS_KEY_KEY_ENCIPHERMENT;
             hash_type = GNUTLS_DIG_SHA256;
 #elif defined(USE_OPENSSL)
+            key_usage = "critical, digitalSignature, keyEncipherment";
             hash_type = EVP_sha256();
 #elif defined(USE_MBEDTLS)
+            key_usage = MBEDTLS_X509_KU_DIGITAL_SIGNATURE |
+                MBEDTLS_X509_KU_KEY_ENCIPHERMENT;
             hash_type = MBEDTLS_MD_SHA256;
 #endif
             break;
 
         case PK_EC:
+#if defined(USE_GNUTLS)
+            key_usage = GNUTLS_KEY_DIGITAL_SIGNATURE;
+#elif defined(USE_OPENSSL)
+            key_usage = "critical, digitalSignature";
+#elif defined(USE_MBEDTLS)
+            key_usage = MBEDTLS_X509_KU_DIGITAL_SIGNATURE;
+#endif
             switch (ec_params(key, NULL, NULL))
             {
                 case 0:
@@ -2114,6 +2129,14 @@ char *csr_gen(const char * const *names, bool status_req, privkey_t key)
             goto out;
         }
         names++;
+    }
+
+    r = gnutls_x509_crq_set_key_usage(crq, key_usage);
+    if (r != GNUTLS_E_SUCCESS)
+    {
+        warnx("csr_gen: gnutls_x509_crq_set_key_usage: %s",
+                gnutls_strerror(r));
+        goto out;
     }
 
     if (status_req)
@@ -2270,6 +2293,13 @@ char *csr_gen(const char * const *names, bool status_req, privkey_t key)
         goto out;
     }
     sk_X509_EXTENSION_push(exts, ext);
+    ext = X509V3_EXT_conf_nid(NULL, NULL, NID_key_usage, key_usage);
+    if (!ext)
+    {
+        openssl_error("csr_gen");
+        goto out;
+    }
+    sk_X509_EXTENSION_push(exts, ext);
     if (status_req)
     {
         ext = X509V3_EXT_conf_nid(NULL, NULL, NID_tlsfeature,
@@ -2321,9 +2351,7 @@ char *csr_gen(const char * const *names, bool status_req, privkey_t key)
         goto out;
     }
 
-    r = mbedtls_x509write_csr_set_key_usage(&csr,
-            MBEDTLS_X509_KU_DIGITAL_SIGNATURE |
-            MBEDTLS_X509_KU_KEY_ENCIPHERMENT);
+    r = mbedtls_x509write_csr_set_key_usage(&csr, key_usage);
     if (r)
     {
         warnx("csr_gen: mbedtls_x509write_csr_set_key_usage failed: %s",
