@@ -49,7 +49,7 @@ AX_CHECK_COMPILE_FLAG([$CFLAGS -pedantic], [CFLAGS="$CFLAGS -pedantic"])
 
 if test -n "$PKG_CONFIG"; then
     PKGCONFIG="$PKG_CONFIG"
-    if test -n "`$PKGCONFIG --version`"; then
+    if test -z "`$PKGCONFIG --version`"; then
         AC_MSG_ERROR([PKG_CONFIG is invalid])
     fi
 else
