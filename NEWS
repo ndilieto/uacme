@@ -1,6 +1,12 @@
 uacme NEWS
 Copyright (C) 2019 Nicola Di Lieto <nicola.dilieto@gmail.com>
 
+## [1.0.19] - 2019-09-30
+### Changed
+- fix configure script bug when using explicit
+  PKG_CONFIG environment variable
+- explicitly set key usage in certificate request
+
 ## [1.0.18] - 2019-08-29
 ### Added
 - support for OCSP Must-Staple (-m, --must-staple)
