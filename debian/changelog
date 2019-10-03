@@ -1,3 +1,10 @@
+uacme (1.0.19-1) unstable; urgency=medium
+
+  * New upstream release (1.0.19)
+  - updated Standards-Version to 4.4.0
+
+ -- Nicola Di Lieto <nicola.dilieto@gmail.com>  Mon, 30 Sep 2019 08:21:56 +0200
+
 uacme (1.0.18-1) unstable; urgency=medium
 
   * New upstream release (1.0.18)
