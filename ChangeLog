@@ -1,3 +1,8 @@
+2019-10-03 Nicola Di Lieto <nicola.dilieto@gmail.com>
+	* Release 1.0.20
+	- improved HTTP header parsing to fix problem that
+	  can happen when retrieving directory over HTTP/2
+
 2019-09-30 Nicola Di Lieto <nicola.dilieto@gmail.com>
 	* Release 1.0.19
 	- Fix configure script bug when using explicit
