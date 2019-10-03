@@ -1,6 +1,11 @@
 uacme NEWS
 Copyright (C) 2019 Nicola Di Lieto <nicola.dilieto@gmail.com>
 
+## [1.0.20] - 2019-10-03
+### Changed
+- improved HTTP header parsing to fix problem that
+  can happen when retrieving directory over HTTP/2
+
 ## [1.0.19] - 2019-09-30
 ### Changed
 - fix configure script bug when using explicit
