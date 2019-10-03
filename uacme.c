@@ -72,14 +72,14 @@ typedef struct acme
 char *find_header(const char *headers, const char *name)
 {
     char *regex = NULL;
-    if (asprintf(&regex, "^%s: (.*)\r\n", name) < 0)
+    if (asprintf(&regex, "^%s:[ \t]*(.*)\r\n", name) < 0)
     {
         warnx("find_header: asprintf failed");
         return NULL;
     }
     char *ret = NULL;
     regex_t reg;
-    if (regcomp(&reg, regex, REG_EXTENDED | REG_NEWLINE))
+    if (regcomp(&reg, regex, REG_EXTENDED | REG_ICASE | REG_NEWLINE))
     {
         warnx("find_header: regcomp failed");
     }
