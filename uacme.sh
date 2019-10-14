@@ -22,7 +22,7 @@ E_BADARGS=85
 
 if test $# -ne "$ARGS"
 then
-    echo "Usage: `basename $0` method type ident token auth" 1>&2
+    echo "Usage: $(basename "$0") method type ident token auth" 1>&2
     exit $E_BADARGS
 fi
 
@@ -36,7 +36,7 @@ case "$METHOD" in
     "begin")
         case "$TYPE" in
             http-01)
-                echo -n "${AUTH}" > ${CHALLENGE_PATH}/${TOKEN}
+                echo -n "${AUTH}" > "${CHALLENGE_PATH}/${TOKEN}"
                 exit $?
                 ;;
             *)
@@ -48,7 +48,7 @@ case "$METHOD" in
     "done"|"failed")
         case "$TYPE" in
             http-01)
-                rm ${CHALLENGE_PATH}/${TOKEN}
+                rm "${CHALLENGE_PATH}/${TOKEN}"
                 exit $?
                 ;;
             *)
