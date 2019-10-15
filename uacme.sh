@@ -16,7 +16,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-CHALLENGE_PATH="${UACME_CHALLENGE_PATH:-'/var/www/.well-known/acme-challenge'}"
+CHALLENGE_PATH="${UACME_CHALLENGE_PATH:-/var/www/.well-known/acme-challenge}"
 ARGS=5
 E_BADARGS=85
 
