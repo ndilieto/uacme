@@ -1,3 +1,11 @@
+uacme (1.0.21-1) unstable; urgency=medium
+
+  * New upstream release (1.0.21)
+  - updated Standards-Version to 4.4.1
+  - updated debian/compat to 11
+
+ -- Nicola Di Lieto <nicola.dilieto@gmail.com>  Sun, 12 Jan 2020 13:58:24 +0100
+
 uacme (1.0.20-1) unstable; urgency=medium
 
   * New upstream release (1.0.20)
