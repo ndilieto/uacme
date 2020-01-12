@@ -1,5 +1,5 @@
 #!/bin/sh
-# Copyright (C) 2019 Nicola Di Lieto <nicola.dilieto@gmail.com>
+# Copyright (C) 2019,2020 Nicola Di Lieto <nicola.dilieto@gmail.com>
 #
 # This file is part of uacme.
 #
@@ -16,13 +16,13 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-CHALLENGE_PATH="${UACME_CHALLENGE_PATH:-'/var/www/.well-known/acme-challenge'}"
+CHALLENGE_PATH="${UACME_CHALLENGE_PATH:-/var/www/.well-known/acme-challenge}"
 ARGS=5
 E_BADARGS=85
 
 if test $# -ne "$ARGS"
 then
-    echo "Usage: `basename $0` method type ident token auth" 1>&2
+    echo "Usage: $(basename "$0") method type ident token auth" 1>&2
     exit $E_BADARGS
 fi
 
@@ -36,7 +36,7 @@ case "$METHOD" in
     "begin")
         case "$TYPE" in
             http-01)
-                echo -n "${AUTH}" > ${CHALLENGE_PATH}/${TOKEN}
+                echo -n "${AUTH}" > "${CHALLENGE_PATH}/${TOKEN}"
                 exit $?
                 ;;
             *)
@@ -48,7 +48,7 @@ case "$METHOD" in
     "done"|"failed")
         case "$TYPE" in
             http-01)
-                rm ${CHALLENGE_PATH}/${TOKEN}
+                rm "${CHALLENGE_PATH}/${TOKEN}"
                 exit $?
                 ;;
             *)

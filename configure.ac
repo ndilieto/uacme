@@ -1,4 +1,4 @@
-# Copyright (C) 2019 Nicola Di Lieto <nicola.dilieto@gmail.com>
+# Copyright (C) 2019,2020 Nicola Di Lieto <nicola.dilieto@gmail.com>
 #
 # This file is part of uacme.
 #
@@ -46,6 +46,7 @@ AC_CHECK_FUNCS([asprintf vasprintf], [],
 AX_CHECK_COMPILE_FLAG([$CFLAGS -Wall], [CFLAGS="$CFLAGS -Wall"])
 AX_CHECK_COMPILE_FLAG([$CFLAGS -Wextra], [CFLAGS="$CFLAGS -Wextra"])
 AX_CHECK_COMPILE_FLAG([$CFLAGS -pedantic], [CFLAGS="$CFLAGS -pedantic"])
+AC_SYS_LARGEFILE
 
 if test -n "$PKG_CONFIG"; then
     PKGCONFIG="$PKG_CONFIG"
