@@ -46,6 +46,7 @@ AC_CHECK_FUNCS([asprintf vasprintf], [],
 AX_CHECK_COMPILE_FLAG([$CFLAGS -Wall], [CFLAGS="$CFLAGS -Wall"])
 AX_CHECK_COMPILE_FLAG([$CFLAGS -Wextra], [CFLAGS="$CFLAGS -Wextra"])
 AX_CHECK_COMPILE_FLAG([$CFLAGS -pedantic], [CFLAGS="$CFLAGS -pedantic"])
+AC_SYS_LARGEFILE
 
 if test -n "$PKG_CONFIG"; then
     PKGCONFIG="$PKG_CONFIG"
