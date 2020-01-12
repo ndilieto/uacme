@@ -44,6 +44,9 @@ when something goes wrong. Optionally it can also print debug information
 by specifying the **--verbose** flag once or more.
 
 ## Installation
+**Please do not use the master branch. Pristine releases are in the upstream/latest
+branch, tagged as upstream/x.x.x**
+
 ```
 mkdir uacme
 wget -O - https://github.com/ndilieto/uacme/archive/upstream/latest.tar.gz | tar zx -C uacme --strip-components=1
