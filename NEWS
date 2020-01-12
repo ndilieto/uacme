@@ -1,5 +1,10 @@
 uacme NEWS
-Copyright (C) 2019 Nicola Di Lieto <nicola.dilieto@gmail.com>
+Copyright (C) 2019,2020 Nicola Di Lieto <nicola.dilieto@gmail.com>
+
+## [1.0.21] - 2020-01-12
+### Changed
+- Quote variables in uacme.sh
+- Added LFS support (AC_SYS_LARGEFILE)
 
 ## [1.0.20] - 2019-10-03
 ### Changed
