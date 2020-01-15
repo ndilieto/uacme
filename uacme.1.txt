@@ -113,6 +113,10 @@ OPTIONS
     Key type, either RSA or EC. Only applies to newly generated keys.
     The bit length can be specified with *-b, --bits*.
 
+*-u, --custom-cert-subdir='SUBDIR'::
+    Replace IDENTIFIER with SUBDIR when determining storage location
+    for certificates and keys (see -c, --confdir)
+
 *-v, --verbose*::
     By default *uacme* only produces output upon errors or when user
     interaction is required. When this option is specified *uacme*

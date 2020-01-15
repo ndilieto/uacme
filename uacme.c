@@ -1166,6 +1166,7 @@ void usage(const char *progname)
         "usage: %s [-a|--acme-url URL] [-b|--bits BITS] [-c|--confdir DIR]\n"
         "\t[-d|--days DAYS] [-f|--force] [-h|--hook PROGRAM] [-m|--must-staple]\n"
         "\t[-n|--never-create] [-o|--no-ocsp] [-s|--staging] [-t|--type RSA | EC]\n"
+        "\t[-u|--custom-cert-subdir subdir]\n"
         "\t[-v|--verbose ...] [-V|--version] [-y|--yes] [-?|--help]\n"
         "\tnew [EMAIL] | update [EMAIL] | deactivate | newkey |\n"
         "\tissue IDENTIFIER [ALTNAME ...]] | issue CSRFILE |\n"
@@ -1176,22 +1177,23 @@ int main(int argc, char **argv)
 {
     static struct option options[] =
     {
-        {"acme-url",     required_argument, NULL, 'a'},
-        {"bits",         required_argument, NULL, 'b'},
-        {"confdir",      required_argument, NULL, 'c'},
-        {"days",         required_argument, NULL, 'd'},
-        {"force",        no_argument,       NULL, 'f'},
-        {"help",         no_argument,       NULL, '?'},
-        {"hook",         required_argument, NULL, 'h'},
-        {"must-staple",  no_argument,       NULL, 'm'},
-        {"never-create", no_argument,       NULL, 'n'},
-        {"no-ocsp",      no_argument,       NULL, 'o'},
-        {"staging",      no_argument,       NULL, 's'},
-        {"type",         required_argument, NULL, 't'},
-        {"verbose",      no_argument,       NULL, 'v'},
-        {"version",      no_argument,       NULL, 'V'},
-        {"yes",          no_argument,       NULL, 'y'},
-        {NULL,           0,                 NULL, 0}
+        {"acme-url",           required_argument, NULL, 'a'},
+        {"bits",               required_argument, NULL, 'b'},
+        {"confdir",            required_argument, NULL, 'c'},
+        {"days",               required_argument, NULL, 'd'},
+        {"force",              no_argument,       NULL, 'f'},
+        {"help",               no_argument,       NULL, '?'},
+        {"hook",               required_argument, NULL, 'h'},
+        {"must-staple",        no_argument,       NULL, 'm'},
+        {"never-create",       no_argument,       NULL, 'n'},
+        {"no-ocsp",            no_argument,       NULL, 'o'},
+        {"staging",            no_argument,       NULL, 's'},
+        {"type",               required_argument, NULL, 't'},
+        {"custom-cert-subdir", required_argument, NULL, 'u'},
+        {"verbose",            no_argument,       NULL, 'v'},
+        {"version",            no_argument,       NULL, 'V'},
+        {"yes",                no_argument,       NULL, 'y'},
+        {NULL,                 0,                 NULL, 0}
     };
 
     int ret = 2;
@@ -1213,6 +1215,7 @@ int main(int argc, char **argv)
     const char *confdir = DEFAULT_CONFDIR;
     char *keyprefix = NULL;
     privkey_t key = NULL;
+    const char *custom_cert_subdir = NULL;
     acme_t a;
     memset(&a, 0, sizeof(a));
     a.directory = PRODUCTION_URL;
@@ -1245,7 +1248,7 @@ int main(int argc, char **argv)
     while (1) {
         char *endptr;
         int option_index;
-        int c = getopt_long(argc, argv, "a:b:c:d:f?h:mnost:vVy",
+        int c = getopt_long(argc, argv, "a:b:c:d:f?h:mnost:u:vVy",
                 options, &option_index);
         if (c == -1) break;
         switch (c) {
@@ -1320,6 +1323,15 @@ int main(int argc, char **argv)
                     warnx("type must be either RSA or EC");
                     goto out;
                 }
+                break;
+
+             case 'u':
+                if (NULL == optarg || strlen(optarg) <= 0)
+                {
+                    warnx("-u,--custom-cert-subdir requires non-empty argument");
+                    goto out;
+                }
+                custom_cert_subdir = optarg;
                 break;
 
              case 'V':
@@ -1491,13 +1503,14 @@ int main(int argc, char **argv)
         }
 
         if (ident) {
-            if (asprintf(&keyprefix, "%s/private/%s", confdir, ident) < 0) {
+            const char *certsubdir = custom_cert_subdir ? custom_cert_subdir : ident;
+            if (asprintf(&keyprefix, "%s/private/%s", confdir, certsubdir) < 0) {
                 keyprefix = NULL;
                 warnx("asprintf failed");
                 goto out;
             }
 
-            if (asprintf(&a.certprefix, "%s/%s/", confdir, ident) < 0) {
+            if (asprintf(&a.certprefix, "%s/%s/", confdir, certsubdir) < 0) {
                 a.certprefix = NULL;
                 warnx("asprintf failed");
                 goto out;
