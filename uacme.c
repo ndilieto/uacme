@@ -893,8 +893,10 @@ bool authorize(acme_t *a)
         bool chlg_done = false;
         for (size_t j=0; j<chlgs->v.array.size && !chlg_done; j++)
         {
-            if (json_compare_string(chlgs->v.array.values+j,
-                        "status", "pending") == 0)
+            const char *status = json_find_string(
+                    chlgs->v.array.values+j, "status");
+            if (status && (strcmp(status, "pending") == 0
+                        || strcmp(status, "processing") == 0))
             {
                 const char *url = json_find_string(
                         chlgs->v.array.values+j, "url");
