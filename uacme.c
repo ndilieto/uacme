@@ -582,10 +582,10 @@ bool account_retrieve(acme_t *a)
             acme_error(a);
             return false;
     }
-    if (json_compare_string(a->json, "status", "valid"))
+    const char* status = json_find_string(a->json, "status");
+    if (status && strcmp(status, "valid"))
     {
-        const char* status = json_find_string(a->json, "status");
-        warnx("invalid account status (%s)", status ? status : "unknown");
+        warnx("invalid account status (%s)", status);
         return false;
     }
     if (!(a->kid = find_header(a->headers, "Location")))
