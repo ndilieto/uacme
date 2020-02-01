@@ -929,7 +929,7 @@ dist-hook:
 	echo $(VERSION) > $(distdir)/.tarball-version
 
 @ENABLE_DOCS_TRUE@uacme.1: uacme.1.txt $(top_srcdir)/.version
-@ENABLE_DOCS_TRUE@	$(A2X) -d manpage -f manpage -a revision=$(VERSION) $<
+@ENABLE_DOCS_TRUE@	$(A2X) -L -d manpage -f manpage -a revision=$(VERSION) $<
 
 @ENABLE_DOCS_TRUE@uacme.1.html: uacme.1.txt $(top_srcdir)/.version
 @ENABLE_DOCS_TRUE@	$(ASCIIDOC) -d manpage -b html5 -a revision=$(VERSION) $<

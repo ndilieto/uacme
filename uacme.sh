@@ -55,7 +55,6 @@ case "$METHOD" in
                 exit 1
                 ;;
         esac
-        exit 0
         ;;
 
     *)
