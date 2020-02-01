@@ -66,7 +66,7 @@ OPTIONS
 *-h, --hook*='PROGRAM'::
     Challenge hook program. If not specified *uacme* interacts with
     the user for every ACME challenge, printing information about the
-    challenge type, token and authorization on stderr.  If specified,
+    challenge type, token and authorization on stderr.  If specified
     *uacme* executes 'PROGRAM' (a binary, a shell script or any file that
     can be executed by the operating system) for every challenge with
     the following 5 string arguments:
@@ -90,7 +90,7 @@ OPTIONS
 
 *-n, --never-create*::
     By default *uacme* creates directories/keys if they do not exist.
-    When this option is specified, *uacme* never does so and instead
+    When this option is specified *uacme* never does so and instead
     exits with an error if anything required is missing.
 
 *-s, --staging*::
@@ -132,8 +132,8 @@ USAGE
 
 *uacme* ['OPTIONS' ...] *update* ['EMAIL']::
     Update the 'EMAIL' associated with the ACME account corresponding to
-    the account private key. If 'EMAIL' is not specified, the account
-    contact email will be dropped.
+    the account private key. If 'EMAIL' is not specified the account
+    contact email is removed.
 
 *uacme* ['OPTIONS' ...] *deactivate*::
     Deactivate the ACME account corresponding to the account private
@@ -151,16 +151,21 @@ USAGE
     renaming 'CONFDIR/private/newkey.pem' to 'CONFDIR/private/key.pem'.
 
 *uacme* ['OPTIONS' ...] *issue* 'DOMAIN' ['ALTNAME' ...]::
-    Issue a certificate for 'DOMAIN' with zero or more 'ALTNAMEs'.
+    Issue a certificate for 'DOMAIN' with zero or more 'ALTNAMEs'. 
     If a certificate is already available at 'CONFDIR/DOMAIN/cert.pem'
-    for the specified 'DOMAIN' and 'ALTNAMEs', and is still valid for
-    longer than 'DAYS', no action is taken unless *-f, --force* is
+    for the specified 'DOMAIN' and 'ALTNAMEs' and is still valid for
+    longer than 'DAYS' no action is taken unless *-f, --force* is
     specified. The new certificate is saved to 'CONFDIR/DOMAIN/cert.pem'.
-    If the certificate file already exists, it is hardlinked to
+    If the certificate file already exists it is hardlinked to
     'CONFDIR/DOMAIN/cert-TIMESTAMP.pem' before overwriting.
     The private key for the certificate is loaded from
     'CONFDIR/private/DOMAIN/key.pem'. If no such file exists,
     a new key is generated unless *-n, --never-create* is specified.
+    Wildcard DOMAINs or ALTNAMEs are dealt with correctly, as long as
+    the ACME server supports them; note that any such wildcards are 
+    automatically removed from the configuration subdirectory name:
+    for example a certificate for '*.test.com' is saved to
+    'CONFDIR/test.com/cert.pem'.
 
 *uacme* ['OPTIONS' ...] *revoke* 'CERTFILE'::
     Revoke the certificate stored in 'CERTFILE'. Only certificates
@@ -189,6 +194,7 @@ to automate the certificate issuance with 'http-01' challenges,
 provided a web server for the domain being validated runs on the 
 same machine, with webroot at /var/www
 
+
     #!/bin/sh
     CHALLENGE_PATH=/var/www/.well-known/acme-challenge
     ARGS=5
@@ -196,7 +202,7 @@ same machine, with webroot at /var/www
     
     if test $# -ne "$ARGS"
     then
-        echo "Usage: `basename $0` method type ident token auth" 1>&2
+        echo "Usage: $(basename "$0") method type ident token auth" 1>&2
         exit $E_BADARGS
     fi
     
@@ -210,7 +216,7 @@ same machine, with webroot at /var/www
         "begin")
             case "$TYPE" in
                 http-01)
-                    echo -n "${AUTH}" > ${CHALLENGE_PATH}/${TOKEN}
+                    echo -n "${AUTH}" > "${CHALLENGE_PATH}/${TOKEN}"
                     exit $?
                     ;;
                 *)
@@ -218,18 +224,19 @@ same machine, with webroot at /var/www
                     ;;
             esac
             ;;
+    
         "done"|"failed")
             case "$TYPE" in
                 http-01)
-                    rm ${CHALLENGE_PATH}/${TOKEN}
+                    rm "${CHALLENGE_PATH}/${TOKEN}"
                     exit $?
                     ;;
                 *)
                     exit 1
                     ;;
             esac
-            exit 0
             ;;
+    
         *)
             echo "$0: invalid method" 1>&2 
             exit 1

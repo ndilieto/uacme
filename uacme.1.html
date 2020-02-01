@@ -869,7 +869,7 @@ certificate for <em>DOMAIN</em>
 <p>
     Challenge hook program. If not specified <strong>uacme</strong> interacts with
     the user for every ACME challenge, printing information about the
-    challenge type, token and authorization on stderr.  If specified,
+    challenge type, token and authorization on stderr.  If specified
     <strong>uacme</strong> executes <em>PROGRAM</em> (a binary, a shell script or any file that
     can be executed by the operating system) for every challenge with
     the following 5 string arguments:
@@ -963,7 +963,7 @@ The key authorization (for <strong>dns-01</strong> and <strong>tls-alpn-01</stro
 <dd>
 <p>
     By default <strong>uacme</strong> creates directories/keys if they do not exist.
-    When this option is specified, <strong>uacme</strong> never does so and instead
+    When this option is specified <strong>uacme</strong> never does so and instead
     exits with an error if anything required is missing.
 </p>
 </dd>
@@ -1048,8 +1048,8 @@ The key authorization (for <strong>dns-01</strong> and <strong>tls-alpn-01</stro
 <dd>
 <p>
     Update the <em>EMAIL</em> associated with the ACME account corresponding to
-    the account private key. If <em>EMAIL</em> is not specified, the account
-    contact email will be dropped.
+    the account private key. If <em>EMAIL</em> is not specified the account
+    contact email is removed.
 </p>
 </dd>
 <dt class="hdlist1">
@@ -1084,14 +1084,19 @@ The key authorization (for <strong>dns-01</strong> and <strong>tls-alpn-01</stro
 <p>
     Issue a certificate for <em>DOMAIN</em> with zero or more <em>ALTNAMEs</em>.
     If a certificate is already available at <em>CONFDIR/DOMAIN/cert.pem</em>
-    for the specified <em>DOMAIN</em> and <em>ALTNAMEs</em>, and is still valid for
-    longer than <em>DAYS</em>, no action is taken unless <strong>-f, --force</strong> is
+    for the specified <em>DOMAIN</em> and <em>ALTNAMEs</em> and is still valid for
+    longer than <em>DAYS</em> no action is taken unless <strong>-f, --force</strong> is
     specified. The new certificate is saved to <em>CONFDIR/DOMAIN/cert.pem</em>.
-    If the certificate file already exists, it is hardlinked to
+    If the certificate file already exists it is hardlinked to
     <em>CONFDIR/DOMAIN/cert-TIMESTAMP.pem</em> before overwriting.
     The private key for the certificate is loaded from
     <em>CONFDIR/private/DOMAIN/key.pem</em>. If no such file exists,
     a new key is generated unless <strong>-n, --never-create</strong> is specified.
+    Wildcard DOMAINs or ALTNAMEs are dealt with correctly, as long as
+    the ACME server supports them; note that any such wildcards are
+    automatically removed from the configuration subdirectory name:
+    for example a certificate for <em>*.test.com</em> is saved to
+    <em>CONFDIR/test.com/cert.pem</em>.
 </p>
 </dd>
 <dt class="hdlist1">
@@ -1157,7 +1162,7 @@ E_BADARGS=85</pre>
 <div class="content monospaced">
 <pre>if test $# -ne "$ARGS"
 then
-    echo "Usage: `basename $0` method type ident token auth" 1&gt;&amp;2
+    echo "Usage: $(basename "$0") method type ident token auth" 1&gt;&amp;2
     exit $E_BADARGS
 fi</pre>
 </div></div>
@@ -1175,27 +1180,32 @@ AUTH=$5</pre>
     "begin")
         case "$TYPE" in
             http-01)
-                echo -n "${AUTH}" &gt; ${CHALLENGE_PATH}/${TOKEN}
+                echo -n "${AUTH}" &gt; "${CHALLENGE_PATH}/${TOKEN}"
                 exit $?
                 ;;
             *)
                 exit 1
                 ;;
         esac
-        ;;
-    "done"|"failed")
-        case "$TYPE" in
-            http-01)
-                rm ${CHALLENGE_PATH}/${TOKEN}
-                exit $?
-                ;;
-            *)
-                exit 1
-                ;;
-        esac
-        exit 0
-        ;;
-    *)
+        ;;</pre>
+</div></div>
+<div class="literalblock">
+<div class="content monospaced">
+<pre>"done"|"failed")
+    case "$TYPE" in
+        http-01)
+            rm "${CHALLENGE_PATH}/${TOKEN}"
+            exit $?
+            ;;
+        *)
+            exit 1
+            ;;
+    esac
+    ;;</pre>
+</div></div>
+<div class="literalblock">
+<div class="content monospaced">
+<pre>    *)
         echo "$0: invalid method" 1&gt;&amp;2
         exit 1
 esac</pre>
@@ -1237,9 +1247,9 @@ along with this program.  If not, see <a href="http://www.gnu.org/licenses/">htt
 <div id="footnotes"><hr></div>
 <div id="footer">
 <div id="footer-text">
-Version 1.0.21<br>
+Version 1.0.22<br>
 Last updated
- 2020-01-12 13:03:50 CET
+ 2020-02-01 10:53:00 CET
 </div>
 </div>
 </body>

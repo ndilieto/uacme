@@ -2,12 +2,12 @@
 .\"     Title: uacme
 .\"    Author: [see the "AUTHOR" section]
 .\" Generator: DocBook XSL Stylesheets v1.79.1 <http://docbook.sf.net/>
-.\"      Date: 01/12/2020
+.\"      Date: 02/01/2020
 .\"    Manual: User Commands
-.\"    Source: uacme 1.0.21
+.\"    Source: uacme 1.0.22
 .\"  Language: English
 .\"
-.TH "UACME" "1" "01/12/2020" "uacme 1\&.0\&.21" "User Commands"
+.TH "UACME" "1" "02/01/2020" "uacme 1\&.0\&.22" "User Commands"
 .\" -----------------------------------------------------------------
 .\" * Define some portability stuff
 .\" -----------------------------------------------------------------
@@ -107,7 +107,7 @@ Force certificate reissuance regardless of expiration date\&.
 .RS 4
 Challenge hook program\&. If not specified
 \fBuacme\fR
-interacts with the user for every ACME challenge, printing information about the challenge type, token and authorization on stderr\&. If specified,
+interacts with the user for every ACME challenge, printing information about the challenge type, token and authorization on stderr\&. If specified
 \fBuacme\fR
 executes
 \fIPROGRAM\fR
@@ -180,7 +180,7 @@ Request certificates with the RFC7633 Certificate Status Request TLS Feature Ext
 .RS 4
 By default
 \fBuacme\fR
-creates directories/keys if they do not exist\&. When this option is specified,
+creates directories/keys if they do not exist\&. When this option is specified
 \fBuacme\fR
 never does so and instead exits with an error if anything required is missing\&.
 .RE
@@ -244,7 +244,7 @@ Update the
 \fIEMAIL\fR
 associated with the ACME account corresponding to the account private key\&. If
 \fIEMAIL\fR
-is not specified, the account contact email will be dropped\&.
+is not specified the account contact email is removed\&.
 .RE
 .PP
 \fBuacme\fR [\fIOPTIONS\fR \&...] \fBdeactivate\fR
@@ -278,16 +278,21 @@ with zero or more
 for the specified
 \fIDOMAIN\fR
 and
-\fIALTNAMEs\fR, and is still valid for longer than
-\fIDAYS\fR, no action is taken unless
+\fIALTNAMEs\fR
+and is still valid for longer than
+\fIDAYS\fR
+no action is taken unless
 \fB\-f, \-\-force\fR
 is specified\&. The new certificate is saved to
-\fICONFDIR/DOMAIN/cert\&.pem\fR\&. If the certificate file already exists, it is hardlinked to
+\fICONFDIR/DOMAIN/cert\&.pem\fR\&. If the certificate file already exists it is hardlinked to
 \fICONFDIR/DOMAIN/cert\-TIMESTAMP\&.pem\fR
 before overwriting\&. The private key for the certificate is loaded from
 \fICONFDIR/private/DOMAIN/key\&.pem\fR\&. If no such file exists, a new key is generated unless
 \fB\-n, \-\-never\-create\fR
-is specified\&.
+is specified\&. Wildcard DOMAINs or ALTNAMEs are dealt with correctly, as long as the ACME server supports them; note that any such wildcards are automatically removed from the configuration subdirectory name: for example a certificate for
+\fI*\&.test\&.com\fR
+is saved to
+\fICONFDIR/test\&.com/cert\&.pem\fR\&.
 .RE
 .PP
 \fBuacme\fR [\fIOPTIONS\fR \&...] \fBrevoke\fR \fICERTFILE\fR
@@ -337,7 +342,7 @@ E_BADARGS=85
 .nf
 if test $# \-ne "$ARGS"
 then
-    echo "Usage: `basename $0` method type ident token auth" 1>&2
+    echo "Usage: $(basename "$0") method type ident token auth" 1>&2
     exit $E_BADARGS
 fi
 .fi
@@ -367,7 +372,7 @@ case "$METHOD" in
     "begin")
         case "$TYPE" in
             http\-01)
-                echo \-n "${AUTH}" > ${CHALLENGE_PATH}/${TOKEN}
+                echo \-n "${AUTH}" > "${CHALLENGE_PATH}/${TOKEN}"
                 exit $?
                 ;;
             *)
@@ -375,18 +380,35 @@ case "$METHOD" in
                 ;;
         esac
         ;;
-    "done"|"failed")
-        case "$TYPE" in
-            http\-01)
-                rm ${CHALLENGE_PATH}/${TOKEN}
-                exit $?
-                ;;
-            *)
-                exit 1
-                ;;
-        esac
-        exit 0
-        ;;
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+"done"|"failed")
+    case "$TYPE" in
+        http\-01)
+            rm "${CHALLENGE_PATH}/${TOKEN}"
+            exit $?
+            ;;
+        *)
+            exit 1
+            ;;
+    esac
+    ;;
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
     *)
         echo "$0: invalid method" 1>&2
         exit 1
