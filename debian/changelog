@@ -1,3 +1,11 @@
+uacme (1.0.22-1) unstable; urgency=medium
+
+  * New upstream release (1.0.22)
+  - remove fix-a2x-xmllint.patch (now included upstream)
+  - update debian/copyright
+
+ -- Nicola Di Lieto <nicola.dilieto@gmail.com>  Sat, 01 Feb 2020 11:09:19 +0100
+
 uacme (1.0.21-1) unstable; urgency=medium
 
   * New upstream release (1.0.21)
