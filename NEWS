@@ -1,6 +1,12 @@
 uacme NEWS
 Copyright (C) 2019,2020 Nicola Di Lieto <nicola.dilieto@gmail.com>
 
+## [1.0.22] - 2020-02-01
+### Changed
+- relax account status check (compatibility with buypass.no)
+- allow client challenge retry requests (RFC8555 section 7.1.6)
+- add wildcard clarification in manpage
+
 ## [1.0.21] - 2020-01-12
 ### Changed
 - Quote variables in uacme.sh

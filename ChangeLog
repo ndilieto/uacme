@@ -1,3 +1,10 @@
+2020-02-01 Nicola Di Lieto <nicola.dilieto@gmail.com>
+	* Release 1.0.22
+	- relax account status check (compatibility with buypass.no)
+	- allow client challenge retry requests (RFC8555 sec. 7.1.6)
+	- pass -L flag to a2x in order to avoid depending on xmllint
+	- add wildcard clarification in manpage
+
 2020-01-12 Nicola Di Lieto <nicola.dilieto@gmail.com>
 	* Release 1.0.21
 	- Fixed uacme.sh: https://github.com/ndilieto/uacme/pull/12

@@ -582,10 +582,10 @@ bool account_retrieve(acme_t *a)
             acme_error(a);
             return false;
     }
-    if (json_compare_string(a->json, "status", "valid"))
+    const char* status = json_find_string(a->json, "status");
+    if (status && strcmp(status, "valid"))
     {
-        const char* status = json_find_string(a->json, "status");
-        warnx("invalid account status (%s)", status ? status : "unknown");
+        warnx("invalid account status (%s)", status);
         return false;
     }
     if (!(a->kid = find_header(a->headers, "Location")))
@@ -893,8 +893,10 @@ bool authorize(acme_t *a)
         bool chlg_done = false;
         for (size_t j=0; j<chlgs->v.array.size && !chlg_done; j++)
         {
-            if (json_compare_string(chlgs->v.array.values+j,
-                        "status", "pending") == 0)
+            const char *status = json_find_string(
+                    chlgs->v.array.values+j, "status");
+            if (status && (strcmp(status, "pending") == 0
+                        || strcmp(status, "processing") == 0))
             {
                 const char *url = json_find_string(
                         chlgs->v.array.values+j, "url");
