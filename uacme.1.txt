@@ -194,7 +194,6 @@ to automate the certificate issuance with 'http-01' challenges,
 provided a web server for the domain being validated runs on the 
 same machine, with webroot at /var/www
 
-
     #!/bin/sh
     CHALLENGE_PATH=/var/www/.well-known/acme-challenge
     ARGS=5
@@ -224,7 +223,6 @@ same machine, with webroot at /var/www
                     ;;
             esac
             ;;
-    
         "done"|"failed")
             case "$TYPE" in
                 http-01)
@@ -236,7 +234,6 @@ same machine, with webroot at /var/www
                     ;;
             esac
             ;;
-    
         *)
             echo "$0: invalid method" 1>&2 
             exit 1

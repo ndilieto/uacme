@@ -1187,25 +1187,19 @@ AUTH=$5</pre>
                 exit 1
                 ;;
         esac
-        ;;</pre>
-</div></div>
-<div class="literalblock">
-<div class="content monospaced">
-<pre>"done"|"failed")
-    case "$TYPE" in
-        http-01)
-            rm "${CHALLENGE_PATH}/${TOKEN}"
-            exit $?
-            ;;
-        *)
-            exit 1
-            ;;
-    esac
-    ;;</pre>
-</div></div>
-<div class="literalblock">
-<div class="content monospaced">
-<pre>    *)
+        ;;
+    "done"|"failed")
+        case "$TYPE" in
+            http-01)
+                rm "${CHALLENGE_PATH}/${TOKEN}"
+                exit $?
+                ;;
+            *)
+                exit 1
+                ;;
+        esac
+        ;;
+    *)
         echo "$0: invalid method" 1&gt;&amp;2
         exit 1
 esac</pre>
@@ -1249,7 +1243,7 @@ along with this program.  If not, see <a href="http://www.gnu.org/licenses/">htt
 <div id="footer-text">
 Version 1.0.22<br>
 Last updated
- 2020-02-01 10:53:00 CET
+ 2020-02-01 12:07:47 CET
 </div>
 </div>
 </body>

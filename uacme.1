@@ -380,35 +380,17 @@ case "$METHOD" in
                 ;;
         esac
         ;;
-.fi
-.if n \{\
-.RE
-.\}
-.sp
-.if n \{\
-.RS 4
-.\}
-.nf
-"done"|"failed")
-    case "$TYPE" in
-        http\-01)
-            rm "${CHALLENGE_PATH}/${TOKEN}"
-            exit $?
-            ;;
-        *)
-            exit 1
-            ;;
-    esac
-    ;;
-.fi
-.if n \{\
-.RE
-.\}
-.sp
-.if n \{\
-.RS 4
-.\}
-.nf
+    "done"|"failed")
+        case "$TYPE" in
+            http\-01)
+                rm "${CHALLENGE_PATH}/${TOKEN}"
+                exit $?
+                ;;
+            *)
+                exit 1
+                ;;
+        esac
+        ;;
     *)
         echo "$0: invalid method" 1>&2
         exit 1
