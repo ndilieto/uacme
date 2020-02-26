@@ -46,7 +46,6 @@ by specifying the **--verbose** flag once or more.
 ## Installation
 **Please do not use the master branch. Pristine releases are in the upstream/latest
 branch, tagged as upstream/x.x.x**
-
 ```
 mkdir uacme
 wget -O - https://github.com/ndilieto/uacme/archive/upstream/latest.tar.gz | tar zx -C uacme --strip-components=1
@@ -54,19 +53,20 @@ cd uacme
 ./configure --disable-maintainer-mode
 make install
 ```
-You'll also find the latest release in the git repository:
+If you just want to check out the latest pristine release from github:
 ```
 git clone -b upstream/latest https://github.com/ndilieto/uacme
 ```
-Debian/Ubuntu packages are available in the official repositories:
-```
-https://packages.debian.org/bullseye/uacme
-https://packages.ubuntu.com/eoan/uacme
-```
+Pre-built packages are available for several distributions:
+
+* https://packages.debian.org/bullseye/uacme
+* https://packages.ubuntu.com/eoan/uacme
+* https://pkgs.alpinelinux.org/packages?name=uacme
+* https://github.com/openwrt/packages/tree/master/net/uacme
 
 ## Getting started
 
-Once you have obtained uacme (see Installation above), the next step is to use
+Once you have obtained uacme (see Installation above) the next step is to use
 ```
 uacme -v -c /path/to/uacme.d new
 ```
@@ -79,7 +79,7 @@ You can then issue a certificate for your domain by doing
 ```
 uacme -v -c /path/to/uacme.d issue www.your.domain.com
 ```
-If everything goes well, uacme will ask you to set up a challenge, for example
+If everything goes well uacme will ask you to set up a challenge, for example
 ```
 uacme: challenge=http-01 ident=www.your.domain.com token=kZjqYgAss_sl4XXDfFq-jeQV1_lqsE76v2BoCGegFk4
 key_auth=kZjqYgAss_sl4XXDfFq-jeQV1_lqsE76v2BoCGegFk4.2evcXalKLhAybRuxxE-HkSUihdzQ7ZDAKA9EZYrTXwU
@@ -93,9 +93,9 @@ The URL must return a text file containing a single line with the key authorizat
 ```
 kZjqYgAss_sl4XXDfFq-jeQV1_lqsE76v2BoCGegFk4.2evcXalKLhAybRuxxE-HkSUihdzQ7ZDAKA9EZYrTXwU
 ```
-once you set up the above, you can then type 'y' followed by a newline on uacme's
-input and it will proceed with the challenge. If everything goes well, the following
-will be created:
+After setting up the web server you can then type 'y' followed by a newline on uacme's
+input. This will notify the ACME server that it can proceed with challenge verification.
+If the procedure was successful uacme will save the certificate and the key at:
 ```
 /path/to/uacme.d/www.your.domain.com/cert.pem
 /path/to/uacme.d/private/www.your.domain.com/key.pem
@@ -134,6 +134,11 @@ been reissued).
 ```
 6 15 * * * /usr/bin/uacme -c /path/to/uacme.d -h /usr/share/uacme/uacme.sh issue www.your.domain.com && /usr/share/uacme/reload.sh
 ```
+
+Check https://github.com/jirutka/muacme for a complete, ready-to-go solution
+and https://gitlab.alpinelinux.org/alpine/infra/docker/uacme-nsd-wildcard
+for an advanced example with dns-01 challenge management.
+
 ## Documentation
 
 There is a regular unix man page in the distribution, also available
