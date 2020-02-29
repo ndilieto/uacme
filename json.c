@@ -18,6 +18,8 @@
  * <http://www.gnu.org/licenses/>.
  */
 
+#include "config.h"
+
 #include <err.h>
 #include <limits.h>
 #include <stdio.h>

@@ -18,7 +18,7 @@
 AC_PREREQ(2.53)
 AC_INIT([uacme], [m4_esyscmd([build-aux/git-version-gen .tarball-version])])
 AC_CONFIG_SRCDIR([uacme.c])
-AC_CONFIG_MACRO_DIRS([build-aux/m4])
+AC_CONFIG_MACRO_DIR([build-aux/m4])
 AC_CONFIG_AUX_DIR([build-aux])
 AM_INIT_AUTOMAKE([subdir-objects])
 AM_MAINTAINER_MODE([enable])
@@ -26,27 +26,27 @@ AM_SILENT_RULES([yes])
 AX_IS_RELEASE([git-directory])
 AX_CHECK_ENABLE_DEBUG([yes])
 
-if test -z "$SED"; then
-    AC_PATH_PROG([SED], [sed], [not_found],
-                 [$PATH:/usr/bin:/usr/local/bin])
-    if test -z "$SED" || test "$SED" = "not_found"; then
-        AC_MSG_ERROR([sed not found in PATH. Cannot continue without sed.])
-    fi
-fi
-AC_SUBST([SED])
-
 AC_USE_SYSTEM_EXTENSIONS
+AC_PROG_SED
+AC_PROG_GREP
+AC_PROG_RANLIB
+AC_PROG_INSTALL
 AC_PROG_CC
 AC_PROG_CC_C99
 if test "x$ac_cv_prog_cc_c99" = "xno"; then
     AC_MSG_ERROR([Could not find a C99 compatible compiler])
 fi
+
+AX_CHECK_COMPILE_FLAG([$CFLAGS -Wall], [WCFLAGS="-Wall"])
+AX_CHECK_COMPILE_FLAG([$CFLAGS -Wextra], [WCFLAGS="$WCFLAGS -Wextra"])
+AX_CHECK_COMPILE_FLAG([$CFLAGS -pedantic], [WCFLAGS="$WCFLAGS -pedantic"])
+AX_CHECK_COMPILE_FLAG([$CFLAGS -fno-strict-aliasing], [WCFLAGS="$WCFLAGS -fno-strict-aliasing"])
+AC_SUBST([WCFLAGS])
+
+AC_SYS_LARGEFILE
 AC_CHECK_FUNCS([asprintf vasprintf], [],
                AC_MSG_ERROR([(v)asprintf not found]))
-AX_CHECK_COMPILE_FLAG([$CFLAGS -Wall], [CFLAGS="$CFLAGS -Wall"])
-AX_CHECK_COMPILE_FLAG([$CFLAGS -Wextra], [CFLAGS="$CFLAGS -Wextra"])
-AX_CHECK_COMPILE_FLAG([$CFLAGS -pedantic], [CFLAGS="$CFLAGS -pedantic"])
-AC_SYS_LARGEFILE
+AC_CHECK_FUNCS([setproctitle])
 
 if test -n "$PKG_CONFIG"; then
     PKGCONFIG="$PKG_CONFIG"
@@ -63,9 +63,9 @@ else
 fi
 
 OPT_LIBCURL=yes
-AC_ARG_WITH([libcurl],
-[AS_HELP_STRING([--with-libcurl=PATH],[PATH is libcurl installation root])],
-    OPT_LIBCURL=$withval)
+AC_ARG_WITH(libcurl,
+[AS_HELP_STRING([--with-libcurl[[=PATH]]], [PATH is libcurl installation root])],
+OPT_LIBCURL=$withval)
 
 if test "x$OPT_LIBCURL" = "xno"; then
     AC_MSG_ERROR([libcurl must be enabled])
@@ -77,11 +77,12 @@ if test "x$OPT_LIBCURL" = "xyes"; then
         AC_MSG_RESULT([no])
         AC_MSG_ERROR([libcurl not found])
     else
-        addlib=`$PKGCONFIG --libs-only-l libcurl`
-        addld=`$PKGCONFIG --libs-only-L libcurl`
-        addcflags=`$PKGCONFIG --cflags-only-I libcurl`
+        CURL_ADDLIB=`$PKGCONFIG --libs-only-l libcurl`
+        CURL_ADDLDFLAGS=`$PKGCONFIG --libs-only-L libcurl`
+        CURL_ADDCPPFLAGS=`$PKGCONFIG --cflags-only-I libcurl`
+        CURL_LDFLAGS=`$PKGCONFIG --libs libcurl`
+        CURL_CFLAGS=`$PKGCONFIG --cflags libcurl`
         version=`$PKGCONFIG --modversion libcurl`
-        curllib=`echo $addld | $SED -e 's/-L//'`
         AC_MSG_RESULT([found $version])
         AC_MSG_CHECKING([for libcurl https support])
         https=`$PKGCONFIG --variable=supported_protocols libcurl 2>/dev/null | grep -q HTTPS && echo 1`
@@ -92,37 +93,38 @@ if test "x$OPT_LIBCURL" = "xyes"; then
         AC_MSG_RESULT([yes])
     fi
 else
-    addlib=-lcurl
-    addld=-L$OPT_LIBCURL/lib$libsuff
-    addcflags=-I$OPT_LIBCURL/include
-    curllib=$OPT_LIBCURL/lib$libsuff
+    CURL_ADDLIB=-lcurl
+    CURL_ADDLDFLAGS=-L$OPT_LIBCURL/lib$libsuff
+    CURL_ADDCPPFLAGS=-I$OPT_LIBCURL/include
+    CURL_LDFLAGS=$CURL_ADDLDFLAGS $CURL_ADDLIB
+    CURL_CFLAGS=$CURL_ADDCPPFLAGS
 fi
-LIBS="$addlib $LIBS"
-LDFLAGS="$LDFLAGS $addld"
-if test "$addcflags" != "-I/usr/include"; then
-    CPPFLAGS="$CPPFLAGS $addcflags"
-fi
+AC_SUBST(CURL_LDFLAGS)
+AC_SUBST(CURL_CFLAGS)
+
+LIBS_ORIG=$LIBS
+LDFLAGS_ORIG=$LDFLAGS
+CPPFLAGS_ORIG=$CPPFLAGS
+LIBS="$CURL_ADDLIB $LIBS"
+LDFLAGS="$LDFLAGS $CURL_ADDLDFLAGS"
+CPPFLAGS="$CPPFLAGS $CURL_ADDCPPFLAGS"
 AC_CHECK_LIB(curl, curl_global_init, [CURL_ENABLED=1],
              [AC_MSG_ERROR([libcurl check failed])])
-if test -n "$curllib"; then
-    if test "x$cross_compiling" != "xyes"; then
-        UACME_LIBRARY_PATH="$UACME_LIBRARY_PATH:$curllib"
-        export UACME_LIBRARY_PATH
-        AC_MSG_NOTICE([Added $curllib to UACME_LIBRARY_PATH])
-    fi
-fi
+LIBS=$LIBS_ORIG
+LDFLAGS=$FLAGS_ORIG
+CPPFLAGS=$CPPFLAGS_ORIG
 
 OPT_MBEDTLS=no
-AC_ARG_WITH([mbedtls],
-[AS_HELP_STRING([--with-mbedtls=PATH],[enable mbedTLS, PATH is installation root])
-AS_HELP_STRING([--without-mbedtls], [disable mbedTLS detection])],
-    OPT_MBEDTLS=$withval)
+AC_ARG_WITH(mbedtls,
+[AS_HELP_STRING([--with-mbedtls[[=PATH]]], [build with mbedTLS, PATH is installation root])
+AS_HELP_STRING([--without-mbedtls], [build without mbedTLS])],
+OPT_MBEDTLS=$withval)
 
 OPT_OPENSSL=no
-AC_ARG_WITH([openssl],
-[AS_HELP_STRING([--with-openssl=PATH],[enable OpenSSL, PATH is installation root])
-AS_HELP_STRING([--without-openssl], [disable OpenSSL detection])],
-    OPT_OPENSSL=$withval)
+AC_ARG_WITH(openssl,
+[AS_HELP_STRING([--with-openssl[[=PATH]]], [build with OpenSSL, PATH is installation root])
+AS_HELP_STRING([--without-openssl], [build without OpenSSL])],
+OPT_OPENSSL=$withval)
 
 if test "x$OPT_MBEDTLS" = "xno" -a "x$OPT_OPENSSL" = "xno"; then
     OPT_GNUTLS=yes
@@ -130,9 +132,9 @@ else
     OPT_GNUTLS=no
 fi
 AC_ARG_WITH([gnutls],
-[AS_HELP_STRING([--with-gnutls=PATH], [enable GnuTLS, PATH is installation root])
-AS_HELP_STRING([--without-gnutls], [disable GnuTLS detection])],
-    OPT_GNUTLS=$withval)
+[AS_HELP_STRING([--with-gnutls[[=PATH]]], [build with GnuTLS, PATH is installation root])
+AS_HELP_STRING([--without-gnutls], [build without GnuTLS])],
+OPT_GNUTLS=$withval)
 
 if test "x$OPT_GNUTLS" = "xno" -a "x$OPT_MBEDTLS" = "xno" -a "x$OPT_OPENSSL" = "xno"; then
     AC_MSG_ERROR([One of GnuTLS, OpenSSL or mbedTLS must be enabled])
@@ -160,7 +162,7 @@ if test "x$OPT_GNUTLS" != "xno"; then
             addld=`$PKGCONFIG --libs-only-L gnutls`
             addcflags=`$PKGCONFIG --cflags-only-I gnutls`
             version=`$PKGCONFIG --modversion gnutls`
-            gtlslib=`echo $addld | $SED -e 's/-L//'`
+            gtlslib=`echo $addld | sed -e 's/-L//'`
             AC_MSG_RESULT([found $version])
         fi
     else
@@ -184,15 +186,6 @@ if test "x$OPT_GNUTLS" != "xno"; then
         AC_CHECK_FUNCS([gnutls_decode_rs_value], [], [NEED_LIBTASN1="yes"])
         AC_CHECK_FUNCS([gnutls_x509_crq_set_tlsfeatures], [],
                        [AC_MSG_NOTICE([--must-staple requires GnuTLS 3.5.1 or later])])
-        if test "x$USE_GNUTLS" = "xyes"; then
-            if test -n "$gtlslib"; then
-                if test "x$cross_compiling" != "xyes"; then
-                    UACME_LIBRARY_PATH="$UACME_LIBRARY_PATH:$gtlslib"
-                    export UACME_LIBRARY_PATH
-                    AC_MSG_NOTICE([Added $gtlslib to UACME_LIBRARY_PATH])
-                fi
-            fi
-        fi
     fi
 fi
 
@@ -208,7 +201,7 @@ if test "x$NEED_LIBTASN1" = "xyes"; then
         addld=`$PKGCONFIG --libs-only-L libtasn1`
         addcflags=`$PKGCONFIG --cflags-only-I libtasn1`
         version=`$PKGCONFIG --modversion libtasn1`
-        tasn1lib=`echo $addld | $SED -e 's/-L//'`
+        tasn1lib=`echo $addld | sed -e 's/-L//'`
         AC_MSG_RESULT([found $version])
     fi
     if test -n "$addlib"; then
@@ -223,15 +216,6 @@ if test "x$NEED_LIBTASN1" = "xyes"; then
                       LIBTASN1_ENABLED=1
                       USE_LIBTASN1="yes"],
                      [AC_MSG_ERROR([libtasn1 check failed])])
-        if test "x$USE_LIBTASN1" = "xyes"; then
-            if test -n "$tasn1lib"; then
-                if test "x$cross_compiling" != "xyes"; then
-                    UACME_LIBRARY_PATH="$UACME_LIBRARY_PATH:$tasn1lib"
-                    export UACME_LIBRARY_PATH
-                    AC_MSG_NOTICE([Added $tasn1lib to UACME_LIBRARY_PATH])
-                fi
-            fi
-        fi
     fi
 fi
 
@@ -248,7 +232,7 @@ if test "x$OPT_OPENSSL" != "xno"; then
             addld=`$PKGCONFIG --libs-only-L openssl`
             addcflags=`$PKGCONFIG --cflags-only-I openssl`
             version=`$PKGCONFIG --modversion openssl`
-            openssllib=`echo $addld | $SED -e 's/-L//'`
+            openssllib=`echo $addld | sed -e 's/-L//'`
             AC_MSG_RESULT([found $version])
         fi
     else
@@ -269,15 +253,6 @@ if test "x$OPT_OPENSSL" != "xno"; then
                       OPENSSL_ENABLED=1
                       USE_OPENSSL="yes"],
                      [AC_MSG_ERROR([openssl check failed])])
-        if test "x$USE_OPENSSL" = "xyes"; then
-            if test -n "$openssllib"; then
-                if test "x$cross_compiling" != "xyes"; then
-                    UACME_LIBRARY_PATH="$UACME_LIBRARY_PATH:$openssllib"
-                    export UACME_LIBRARY_PATH
-                    AC_MSG_NOTICE([Added $openssllib to UACME_LIBRARY_PATH])
-                fi
-            fi
-        fi
     fi
 fi
 AM_CONDITIONAL(ENABLE_READFILE, test "x$USE_OPENSSL" != "xyes")
@@ -317,15 +292,39 @@ if test "x$OPT_MBEDTLS" != "xno"; then
     if test "x$USE_MBEDTLS" = "xyes"; then
         AC_MSG_NOTICE([detected mbedTLS])
         LIBS="-lmbedtls -lmbedx509 -lmbedcrypto $LIBS"
-        if test -n "$mbedtlslib"; then
-            if test "x$cross_compiling" != "xyes"; then
-                UACME_LIBRARY_PATH="$UACME_LIBRARY_PATH:$mbedtlslib"
-                export UACME_LIBRARY_PATH
-                AC_MSG_NOTICE([Added $mbedtlslib to UACME_LIBRARY_PATH])
-            fi
-        fi
     fi
 fi
+
+if test "x$OPT_GNUTLS" != "xno"; then
+    OPT_UALPN=yes
+else
+    OPT_UALPN=no
+fi
+AC_ARG_WITH(ualpn,
+[AS_HELP_STRING([--with-ualpn], [enable ualpn]),
+AS_HELP_STRING([--without-ualpn], [disable ualpn])],
+OPT_UALPN=$withval)
+
+if test "x$OPT_UALPN" != "xno" -a "x$OPT_GNUTLS" = "xno"; then
+    AC_MSG_ERROR([ualpn requires GnuTLS])
+fi
+
+if test "x$OPT_UALPN" != "xno"; then
+    AC_ARG_ENABLE(splice, AS_HELP_STRING([--disable-splice], [disable splice]))
+    if test "x$enable_splice" != "xno"; then
+        AC_CHECK_FUNCS([splice])
+    fi
+    AX_PTHREAD([], AC_MSG_ERROR([pthread not found]))
+    AC_CHECK_FUNCS([open_memstream], [],
+                   AC_MSG_ERROR([open_memstream not found]))
+    AC_CHECK_LIB(ev, ev_version_major, [], with_included_libev=yes)
+    if test "x$with_included_libev" = "xyes"; then
+        AC_MSG_NOTICE([libev not found, using included copy])
+        m4_include([libev/libev.m4])
+    fi
+fi
+AM_CONDITIONAL(ENABLE_UALPN, test "x$OPT_UALPN" = "xyes")
+AM_CONDITIONAL(ENABLE_LIBEV, test "x$with_included_libev" = "xyes")
 
 default_docs="yes"
 AC_ARG_ENABLE(docs,
@@ -338,6 +337,7 @@ if test "x$enable_docs" = "xyes"; then
     AS_IF([test "x$A2X" = "xno"], [AC_MSG_ERROR([Could not find a2x.])])
     AS_IF([test "x$ASCIIDOC" = "xno"], [AC_MSG_ERROR([Could not find asciidoc.])])
 fi
+AC_CONFIG_HEADERS([config.h])
 AC_CONFIG_FILES([Makefile])
 AC_OUTPUT
 

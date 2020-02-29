@@ -3,7 +3,7 @@
 <head>
 <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
 <meta name="generator" content="AsciiDoc 8.6.9">
-<title>UACME(1)</title>
+<title>UALPN(1)</title>
 <style type="text/css">
 /* Shared CSS for AsciiDoc xhtml11 and html5 backends */
 
@@ -733,12 +733,12 @@ asciidoc.install();
 <body class="manpage">
 <div id="header">
 <h1>
-UACME(1) Manual Page
+UALPN(1) Manual Page
 </h1>
 <h2>NAME</h2>
 <div class="sectionbody">
-<p>uacme -
-   ACMEv2 client written in plain C code with minimal dependencies
+<p>ualpn -
+   lightweight transparent proxy with built-in ACMEv2 tls-alpn-01 responder
 </p>
 </div>
 </div>
@@ -746,26 +746,51 @@ UACME(1) Manual Page
 <div class="sect1">
 <h2 id="_synopsis">SYNOPSIS</h2>
 <div class="sectionbody">
-<div class="paragraph"><p><strong>uacme</strong> [<strong>-a</strong>|<strong>--acme-url</strong> <em>URL</em>] [<strong>-b</strong>|<strong>--bits</strong> <em>BITS</em>]
-    [<strong>-c</strong>|<strong>--confdir</strong> <em>DIR</em>] [<strong>-d</strong>|<strong>--days</strong> <em>DAYS</em>] [<strong>-f</strong>|<strong>--force</strong>]
-    [<strong>-h</strong>|<strong>--hook</strong> <em>PROGRAM</em>] [<strong>-m</strong>|<strong>--must-staple</strong>] [<strong>-n</strong>|<strong>--never</strong>]
-    [<strong>-s</strong>|<strong>--staging</strong>] [<strong>-t</strong>|<strong>--type</strong> <strong>RSA</strong>|<strong>EC</strong>] [<strong>-v</strong>|<strong>--verbose</strong> &#8230;]
-    [<strong>-V</strong>|<strong>--version</strong>] [<strong>-y</strong>|<strong>--yes</strong>] [<strong>-?</strong>|<strong>--help</strong>]
-    <strong>new</strong> [<em>EMAIL</em>] | <strong>update</strong> [<em>EMAIL</em>] | <strong>deactivate</strong> | <strong>newkey</strong> |
-    <strong>issue</strong> <em>DOMAIN</em> [<em>ALTNAME</em> &#8230;]] | <strong>revoke</strong> <em>CERTFILE</em></p></div>
+<div class="paragraph"><p><strong>ualpn</strong> [<strong>-?</strong>|<strong>--help</strong>] [<strong>-4</strong>|<strong>--ipv4</strong>] [<strong>-6</strong>|<strong>--ipv6</strong>]
+    [<strong>-b</strong>|<strong>--bind</strong> <em>address</em>[@<em>port</em>]] [<strong>-c</strong>|<strong>--connect</strong> <em>address</em>[@<em>port</em>]]
+    [<strong>-d</strong>|<strong>--daemon</strong>] [<strong>-l</strong>|<strong>--logfile</strong> <em>file</em>] [<strong>-m</strong>|<strong>--max-auths</strong> <em>N</em>]
+    [<strong>-n</strong>|<strong>--num-workers</strong> <em>N</em>] [<strong>-p</strong>|<strong>--proxy</strong> <em>N</em>] [<strong>-P</strong>|<strong>--pidfile</strong> <em>file</em>]
+    [<strong>-s</strong>|<strong>--sock path</strong>] [<strong>-S</strong>|<strong>--sock-mode</strong> <em>mode</em>] [<strong>-t</strong>|<strong>--terminate</strong>]
+    [<strong>-u</strong>|<strong>--user</strong> <em>user</em><span class="monospaced">[:</span><em>group</em>]] [<strong>-v</strong>|<strong>--verbose</strong> &#8230;] [<strong>-V</strong>|<strong>--version</strong>]</p></div>
 </div>
 </div>
 <div class="sect1">
 <h2 id="_description">DESCRIPTION</h2>
 <div class="sectionbody">
-<div class="paragraph"><p><strong>uacme</strong> is a client for the ACMEv2 protocol described in RFC8555,
-written in plain C code with minimal dependencies (libcurl and
-one of GnuTLS, OpenSSL or mbedTLS). The ACMEv2 protocol allows a
-Certificate Authority (<a href="https://letsencrypt.org">https://letsencrypt.org</a> is a popular one)
-and an applicant to automate the process of verification and certificate
-issuance. The protocol also provides facilities for other certificate
-management functions, such as certificate revocation. For more
-information see <a href="https://tools.ietf.org/html/rfc8555">https://tools.ietf.org/html/rfc8555</a></p></div>
+<div class="paragraph"><p><strong>ualpn</strong> is a lightweight transparent proxy with built-in ACMEv2 tls-alpn-01
+challenge responder (<a href="https://tools.ietf.org/html/draft-ietf-acme-tls-alpn-01">https://tools.ietf.org/html/draft-ietf-acme-tls-alpn-01</a>).</p></div>
+<div class="paragraph"><p>In client mode <strong>ualpn</strong> connects to a running server mode instance of itself
+through a unix domain socket, in order to add or remove ACMEv2 authorizations.
+See CLIENT MODE below.</p></div>
+<div class="paragraph"><p>In server mode <strong>ualpn</strong> listens for incoming connections (by default on port 443,
+which is mandatory for tls-alpn-01 challenges). It then handles any such
+connection in one of two different ways:</p></div>
+<div class="ulist"><ul>
+<li>
+<p>
+If the connection begins with a "ClientHello" TLS handshake packet including a
+"acme-tls/1" RFC7301 Application Level Protocol Negotiation extension <strong>and</strong> a
+RFC6066 Server Name Indication extension matching a domain for which it has
+an authorization, <strong>ualpn</strong> performs the tls-alpn-01 handshake and closes the
+connection;
+</p>
+</li>
+<li>
+<p>
+otherwise <strong>ualpn</strong> transparently proxies the connection to one of the backend
+servers it is configured with. By default <strong>ualpn</strong> adds PROXY v1 headers
+(<a href="http://www.haproxy.org/download/1.8/doc/proxy-protocol.txt">http://www.haproxy.org/download/1.8/doc/proxy-protocol.txt</a>) in order to
+safely transport connection information such as the client&#8217;s address to the
+backend. The PROXY protocol is currently supported by apache, nginx and several
+other server programs.
+</p>
+</li>
+</ul></div>
+<div class="paragraph"><p>The event-driven implementation is based on libev (<a href="http://libev.schmorp.de">http://libev.schmorp.de</a>)
+and considerably reduces the cost of context switches and memory usage. In
+addition on systems (such as linux) supporting the <span class="monospaced">splice()</span> system call,
+<strong>ualpn</strong> is able to move network data without copying it to/from kernel/user
+address space.</p></div>
 </div>
 </div>
 <div class="sect1">
@@ -773,216 +798,147 @@ information see <a href="https://tools.ietf.org/html/rfc8555">https://tools.ietf
 <div class="sectionbody">
 <div class="dlist"><dl>
 <dt class="hdlist1">
-<strong>-a, --acme-url</strong>=<em>URL</em>
+<strong>-4, --ipv4</strong>
 </dt>
 <dd>
 <p>
-    ACMEv2 server directory object <em>URL</em>. If not specified <strong>uacme</strong>
-    uses one of the following:
-</p>
-<div class="dlist"><dl>
-<dt class="hdlist1">
-<em>https://acme-v02.api.letsencrypt.org/directory</em>
-</dt>
-<dd>
-<p>
-production URL
+    Only listen to IPv4 connections
 </p>
 </dd>
 <dt class="hdlist1">
-<em>https://acme-staging-v02.api.letsencrypt.org/directory</em>
+<strong>-6, --ipv6</strong>
 </dt>
 <dd>
 <p>
-    staging URL (see <strong>-s, --staging</strong> below)
-</p>
-</dd>
-</dl></div>
-</dd>
-<dt class="hdlist1">
-<strong>-b, --bits</strong>=<em>BITS</em>
-</dt>
-<dd>
-<p>
-    key bit length (default 2048 for RSA, 256 for EC). Only applies
-    to newly generated keys. RSA key length must be a multiple of 8
-    between 2048 and 8192. EC key length must be either 256
-    (<strong>NID_X9_62_prime256v1</strong> curve) or 384 (<strong>NID_secp384r1</strong> curve).
+    Only listen to IPv6 connections
 </p>
 </dd>
 <dt class="hdlist1">
-<strong>-c, --confdir</strong>=<em>CONFDIR</em>
+<strong>-b, --bind</strong> <em>address</em>[@<em>port</em>]
 </dt>
 <dd>
 <p>
-    Use configuration directory <em>CONFDIR</em> (default <em>/etc/ssl/uacme</em>).
-    The structure is as follows (multiple <em>DOMAINs</em> allowed)
-</p>
-<div class="dlist"><dl>
-<dt class="hdlist1">
-<em>CONFDIR/private/key.pem</em>
-</dt>
-<dd>
-<p>
-ACME account private key
+    Enable server mode and listen to <em>address</em>. The address must be
+    specified in numeric format using the standard IPv4 or IPv6 notation).
+    Optionally, a port number can be given (default is 443). This flag can be
+    specified multiple times to listen to multiple IP addresses. If this flag
+    is not specified and server mode was enabled by some other option,
+    <strong>ualpn</strong> listens to the wildcard interface; otherwise it runs in client
+    mode (see CLIENT MODE below).
 </p>
 </dd>
 <dt class="hdlist1">
-<em>CONFDIR/private/DOMAIN/key.pem</em>
+<strong>-c, --connect</strong> <em>address</em>[@<em>port</em>]
 </dt>
 <dd>
 <p>
-certificate key for <em>DOMAIN</em>
+    Enable server mode and add a new backend. The backend address must be
+    specified in numeric format using the standard IPv4 or IPv6 notation).
+    Optionally, a port number can be given (default is 443). This flag can be
+    specified multiple times to add multiple backends. This flag must be
+    specified at least once in server mode.
 </p>
 </dd>
 <dt class="hdlist1">
-<em>CONFDIR/DOMAIN/cert.pem</em>
+<strong>-d, --daemon</strong>
 </dt>
 <dd>
 <p>
-certificate for <em>DOMAIN</em>
-</p>
-</dd>
-</dl></div>
-</dd>
-<dt class="hdlist1">
-<strong>-d, --days</strong>=<em>DAYS</em>
-</dt>
-<dd>
-<p>
-    Do not reissue certificates that are still valid for longer
-    than <em>DAYS</em> (default 30).
+    Enable server mode and fork in the background
 </p>
 </dd>
 <dt class="hdlist1">
-<strong>-f, --force</strong>
+<strong>-l, --logfile</strong> <em>file</em>
 </dt>
 <dd>
 <p>
-    Force certificate reissuance regardless of expiration date.
+    Log to <em>file</em>. By default <strong>ualpn</strong> logs to <strong>syslog</strong> if <strong>-d, --daemon</strong>
+    was specified or <strong>stderr</strong> otherwise. See also <strong>-v, --verbose</strong>
 </p>
 </dd>
 <dt class="hdlist1">
-<strong>-h, --hook</strong>=<em>PROGRAM</em>
+<strong>-m, --max-auths</strong> <em>N</em>
 </dt>
 <dd>
 <p>
-    Challenge hook program. If not specified <strong>uacme</strong> interacts with
-    the user for every ACME challenge, printing information about the
-    challenge type, token and authorization on stderr.  If specified
-    <strong>uacme</strong> executes <em>PROGRAM</em> (a binary, a shell script or any file that
-    can be executed by the operating system) for every challenge with
-    the following 5 string arguments:
-</p>
-<div class="dlist"><dl>
-<dt class="hdlist1">
-<em>METHOD</em>
-</dt>
-<dd>
-<p>
-one of <strong>begin</strong>, <strong>done</strong> or <strong>failed</strong>.
-</p>
-<div class="dlist"><dl>
-<dt class="hdlist1">
-<strong>begin</strong>
-</dt>
-<dd>
-<p>
-is called at the beginning of the challenge.
-           <em>PROGRAM</em> must return 0 to accept it. Any other return
-           code declines the challenge. Neither <strong>done</strong> nor <strong>failed</strong>
-           method calls are made for declined challenges.
+    Enable server mode and allow managing ACMEv2 tls-alpn-01 challenges for
+    up to <em>N</em> different domains (default 100)
 </p>
 </dd>
 <dt class="hdlist1">
-<strong>done</strong>
+<strong>-n, --num-workers</strong> <em>N</em>
 </dt>
 <dd>
 <p>
-is called upon successful completion of an
-           accepted challenge.
+    Enable server mode and spawn <em>N</em> worker processes (default 2) to
+    handle connections. Note that worker processes are single threaded but
+    thanks to the event based implementation each can handle several
+    (potentially thousands) connections concurrently.
 </p>
 </dd>
 <dt class="hdlist1">
-<strong>failed</strong>
+<strong>-p, --proxy</strong> <em>N</em>
 </dt>
 <dd>
 <p>
-is called upon failure of an accepted challenge.
+    Enable server mode and disable (0) or specify (1, 2) the PROXY header
+    version (default 1). The backend server needs to be configured accordingly:
 </p>
-</dd>
-</dl></div>
+<div class="ulist"><ul>
+<li>
+<p>
+nginx: <a href="https://docs.nginx.com/nginx/admin-guide/load-balancer/using-proxy-protocol">https://docs.nginx.com/nginx/admin-guide/load-balancer/using-proxy-protocol</a>
+</p>
+</li>
+<li>
+<p>
+apache: <a href="https://httpd.apache.org/docs/2.4/mod/mod_remoteip.html">https://httpd.apache.org/docs/2.4/mod/mod_remoteip.html</a>
+</p>
+</li>
+</ul></div>
 </dd>
 <dt class="hdlist1">
-<em>TYPE</em>
+<strong>-P, --pidfile</strong> <em>file</em>
 </dt>
 <dd>
 <p>
-challenge type (for example <strong>dns-01</strong> or <strong>http-01</strong>)
-</p>
-</dd>
-<dt class="hdlist1">
-<em>IDENT</em>
-</dt>
-<dd>
-<p>
-The identifier the challenge refers to
-</p>
-</dd>
-<dt class="hdlist1">
-<em>TOKEN</em>
-</dt>
-<dd>
-<p>
-The challenge token
+    Specify pidfile location (default /var/run/ualpn.pid)
 </p>
 </dd>
 <dt class="hdlist1">
-<em>AUTH</em>
+<strong>-s, --sock</strong> <em>path</em>
 </dt>
 <dd>
 <p>
-The key authorization (for <strong>dns-01</strong> and <strong>tls-alpn-01</strong>
-           already converted to the base64-encoded SHA256 digest format)
-</p>
-</dd>
-</dl></div>
-</dd>
-<dt class="hdlist1">
-<strong>-m, --must-staple</strong>
-</dt>
-<dd>
-<p>
-    Request certificates with the RFC7633 Certificate Status Request
-    TLS Feature Extension, informally also known as "OCSP Must-Staple".
+    Specify unix socket path (default /var/run/ualpn.sock)
 </p>
 </dd>
 <dt class="hdlist1">
-<strong>-n, --never-create</strong>
+<strong>-S, --sock-mode</strong> <em>mode</em>
 </dt>
 <dd>
 <p>
-    By default <strong>uacme</strong> creates directories/keys if they do not exist.
-    When this option is specified <strong>uacme</strong> never does so and instead
-    exits with an error if anything required is missing.
+    Enable server mode and specify socket access permissions (default 644)
 </p>
 </dd>
 <dt class="hdlist1">
-<strong>-s, --staging</strong>
+<strong>-t, --terminate</strong>
 </dt>
 <dd>
 <p>
-    Use Let&#8217;s Encrypt staging URL for testing. This only works if
-    <strong>-a, --acme-url</strong> is <strong>NOT</strong> specified.
+    Try to terminate a running <strong>ualpn</strong> server. This is achieved by looking
+    up the process id stored by the server in the pidfile (see <strong>-P, --pidfile</strong>)
+    and signalling it to terminate.
 </p>
 </dd>
 <dt class="hdlist1">
-<strong>-t, --type</strong>=<strong>RSA</strong> | <strong>EC</strong>
+<strong>-u, --user</strong> <em>user</em><span class="monospaced">[:</span><em>group</em><span class="monospaced">]</span>
 </dt>
 <dd>
 <p>
-    Key type, either RSA or EC. Only applies to newly generated keys.
-    The bit length can be specified with <strong>-b, --bits</strong>.
+    Enable server mode and drop user (and optionally group) privileges to those
+    of <em>user</em> after binding the sockets. Also affects the ownership of the unix
+    socket, pidfile and logfile (if any).
 </p>
 </dd>
 <dt class="hdlist1">
@@ -990,10 +946,10 @@ The key authorization (for <strong>dns-01</strong> and <strong>tls-alpn-01</stro
 </dt>
 <dd>
 <p>
-    By default <strong>uacme</strong> only produces output upon errors or when user
-    interaction is required. When this option is specified <strong>uacme</strong>
-    prints information about what is going on on stderr. This option
-    can be specified more than once to increase verbosity.
+    By default <strong>ualpn</strong> only produces logs upon errors or warnings.
+    When this option is specified <strong>ualpn</strong> also logs notice messages.
+    This option can be specified more than once to increase verbosity and
+    include information (twice) or debug (three times) messages.
 </p>
 </dd>
 <dt class="hdlist1">
@@ -1002,14 +958,6 @@ The key authorization (for <strong>dns-01</strong> and <strong>tls-alpn-01</stro
 <dd>
 <p>
     Print program version on stderr and exit.
-</p>
-</dd>
-<dt class="hdlist1">
-<strong>-y, --yes</strong>
-</dt>
-<dd>
-<p>
-    Autoaccept ACME server terms (if any) upon new account creation.
 </p>
 </dd>
 <dt class="hdlist1">
@@ -1024,89 +972,75 @@ The key authorization (for <strong>dns-01</strong> and <strong>tls-alpn-01</stro
 </div>
 </div>
 <div class="sect1">
-<h2 id="_usage">USAGE</h2>
+<h2 id="_client_mode">CLIENT MODE</h2>
+<div class="sectionbody">
+<div class="paragraph"><p>In client mode <strong>ualpn</strong> pipes stdin/stdout to/from the unix socket of the
+running server instance of itself. The protocol is ASCII text based,
+case sensitive, line oriented, with two commands:</p></div>
+<div class="dlist"><dl>
+<dt class="hdlist1">
+<strong>auth</strong> <em>domain</em> <em>authorization</em>
+</dt>
+<dd>
+<p>
+    The <strong>auth</strong> command instructs the running <strong>ualpn</strong> server to handle ACMEv2
+    tls-alpn-01 challenges for <em>domain</em> with <em>authorization</em>. The latter
+    must contain the base64url encoding of the SHA-256 digest [FIPS180-4]
+    of the key authorization for the challenge. The <strong>uacme</strong> software
+    executes hook scripts with the correct <em>authorization</em> passed as
+    the 5th argument.  Upon successful invocation of this command <strong>ualpn</strong>
+    generates a self signed certificate as required by the tls-alpn-01
+    challenge, which it will then use to perform tls-alpn-01 handshakes
+    for <em>domain</em>.
+</p>
+</dd>
+<dt class="hdlist1">
+<strong>unauth</strong> <em>domain</em>
+</dt>
+<dd>
+<p>
+    The <strong>unauth</strong> command instructs the running <strong>ualpn</strong> server to no longer
+    handle ACMEv2 tls-alpn-01 challenges for <em>domain</em>.
+</p>
+</dd>
+</dl></div>
+<div class="paragraph"><p><strong>ualpn</strong> responds to both commands with a line beginning with either "OK" or
+"ERR", followed by a space and additional error information.</p></div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_examples">EXAMPLES</h2>
 <div class="sectionbody">
 <div class="dlist"><dl>
 <dt class="hdlist1">
-<strong>uacme</strong> [<em>OPTIONS</em> &#8230;] <strong>new</strong> [<em>EMAIL</em>]
+<span class="monospaced">ualpn -vv -d -u nobody:nogroup -c 127.0.0.1@4443 -S 666</span>
 </dt>
 <dd>
 <p>
-    Create a new ACME account with optional <em>EMAIL</em> contact. If the
-    account private key does not exist at <em>CONFDIR/private/key.pem</em>
-    a new key is generated unless <strong>-n, --never-create</strong> is specified.
-    A valid account must be created <strong>before</strong> any other operation can
-    succeed. Any certificate issued by the ACME server is associated
-    with a single account. An account can be associated with multiple
-    certificates, subject of course to the rate limits imposed by the
-    ACME server.
+    start <strong>ualpn</strong> as a daemon, binding to the default port 443 on the
+    wildcard interface. Proxy connections to port 4443 on 127.0.0.1
+    After opening the sockets, drop the user privileges and run as
+    nobody:nogroup. Allow anyone on the local host to access the unix
+    socket. Also increase the verbosity to include notice and
+    information messages.
 </p>
 </dd>
 <dt class="hdlist1">
-<strong>uacme</strong> [<em>OPTIONS</em> &#8230;] <strong>update</strong> [<em>EMAIL</em>]
+<span class="monospaced">echo "auth www.example.com DEi0apzMOdMT2DAro57oIvn-wEzPiYcAYDh2Cvjra3I" | ualpn</span>
 </dt>
 <dd>
 <p>
-    Update the <em>EMAIL</em> associated with the ACME account corresponding to
-    the account private key. If <em>EMAIL</em> is not specified the account
-    contact email is removed.
+    Instruct the running <strong>ualpn</strong> server to handle ACMEv2 tls-alpn-01 challenges
+    for www.example.com with the given key authorization.
 </p>
 </dd>
 <dt class="hdlist1">
-<strong>uacme</strong> [<em>OPTIONS</em> &#8230;] <strong>deactivate</strong>
+<span class="monospaced">echo "unauth www.example.com" | ualpn</span>
 </dt>
 <dd>
 <p>
-    Deactivate the ACME account corresponding to the account private
-    key. <strong>WARNING</strong> this action is irreversible. Users may wish to do
-    this when the account key is compromised or decommissioned.
-    A deactivated account can no longer request certificate issuances
-    and revocations or access resources related to the account.
-</p>
-</dd>
-<dt class="hdlist1">
-<strong>uacme</strong> [<em>OPTIONS</em> &#8230;] <strong>newkey</strong>
-</dt>
-<dd>
-<p>
-    Change the ACME account private key. If the new account private
-    key does not exist at <em>CONFDIR/private/newkey.pem</em> it is generated
-    unless <strong>-n, --never-create</strong> is specified. The new key is then
-    submitted to the server and if the operation succeeds the old key
-    is hardlinked to <em>CONFDIR/private/key-TIMESTAMP.pem</em> before
-    renaming <em>CONFDIR/private/newkey.pem</em> to <em>CONFDIR/private/key.pem</em>.
-</p>
-</dd>
-<dt class="hdlist1">
-<strong>uacme</strong> [<em>OPTIONS</em> &#8230;] <strong>issue</strong> <em>DOMAIN</em> [<em>ALTNAME</em> &#8230;]
-</dt>
-<dd>
-<p>
-    Issue a certificate for <em>DOMAIN</em> with zero or more <em>ALTNAMEs</em>.
-    If a certificate is already available at <em>CONFDIR/DOMAIN/cert.pem</em>
-    for the specified <em>DOMAIN</em> and <em>ALTNAMEs</em> and is still valid for
-    longer than <em>DAYS</em> no action is taken unless <strong>-f, --force</strong> is
-    specified. The new certificate is saved to <em>CONFDIR/DOMAIN/cert.pem</em>.
-    If the certificate file already exists it is hardlinked to
-    <em>CONFDIR/DOMAIN/cert-TIMESTAMP.pem</em> before overwriting.
-    The private key for the certificate is loaded from
-    <em>CONFDIR/private/DOMAIN/key.pem</em>. If no such file exists,
-    a new key is generated unless <strong>-n, --never-create</strong> is specified.
-    Wildcard DOMAINs or ALTNAMEs are dealt with correctly, as long as
-    the ACME server supports them; note that any such wildcards are
-    automatically removed from the configuration subdirectory name:
-    for example a certificate for <em>*.test.com</em> is saved to
-    <em>CONFDIR/test.com/cert.pem</em>.
-</p>
-</dd>
-<dt class="hdlist1">
-<strong>uacme</strong> [<em>OPTIONS</em> &#8230;] <strong>revoke</strong> <em>CERTFILE</em>
-</dt>
-<dd>
-<p>
-    Revoke the certificate stored in <em>CERTFILE</em>. Only certificates
-    associated with the account can be revoked. If successful
-    <em>CERTFILE</em> is renamed to <em>revoked-TIMESTAMP.pem</em>.
+    Instruct the running <strong>ualpn</strong> server to no longer handle ACMEv2 tls-alpn-01
+    challenges for www.example.com
 </p>
 </dd>
 </dl></div>
@@ -1129,14 +1063,6 @@ The key authorization (for <strong>dns-01</strong> and <strong>tls-alpn-01</stro
 </dt>
 <dd>
 <p>
-    Certificate not reissued because it is still current
-</p>
-</dd>
-<dt class="hdlist1">
-<strong>2</strong>
-</dt>
-<dd>
-<p>
     Failure (syntax or usage error; configuration error;
     processing failure; unexpected error).
 </p>
@@ -1145,16 +1071,14 @@ The key authorization (for <strong>dns-01</strong> and <strong>tls-alpn-01</stro
 </div>
 </div>
 <div class="sect1">
-<h2 id="_example_hook_script">EXAMPLE HOOK SCRIPT</h2>
+<h2 id="_example_uacme_hook_script">EXAMPLE UACME HOOK SCRIPT</h2>
 <div class="sectionbody">
-<div class="paragraph"><p>The <em>uacme.sh</em> hook script included in the distribution can be used
-to automate the certificate issuance with <em>http-01</em> challenges,
-provided a web server for the domain being validated runs on the
-same machine, with webroot at /var/www</p></div>
+<div class="paragraph"><p>The <em>ualpn.sh</em> hook script included in the distribution can be used
+to automate the certificate issuance with <strong>uacme</strong>, provided <strong>ualpn</strong>
+is listening on port 443 of the webserver for the domain being validated</p></div>
 <div class="literalblock">
 <div class="content monospaced">
 <pre>#!/bin/sh
-CHALLENGE_PATH=/var/www/.well-known/acme-challenge
 ARGS=5
 E_BADARGS=85</pre>
 </div></div>
@@ -1176,28 +1100,28 @@ AUTH=$5</pre>
 </div></div>
 <div class="literalblock">
 <div class="content monospaced">
+<pre>if [ "$TYPE" != "tls-alpn-01" ]; then
+    exit 1
+fi</pre>
+</div></div>
+<div class="literalblock">
+<div class="content monospaced">
 <pre>case "$METHOD" in
     "begin")
-        case "$TYPE" in
-            http-01)
-                echo -n "${AUTH}" &gt; "${CHALLENGE_PATH}/${TOKEN}"
-                exit $?
-                ;;
-            *)
-                exit 1
-                ;;
-        esac
+        UALPN_OUT=$(echo "auth $IDENT $AUTH" | ualpn)
+        if [ "x$UALPN_OUT" = "xOK" ]; then
+            exit 0
+        else
+            exit 1
+        fi
         ;;
     "done"|"failed")
-        case "$TYPE" in
-            http-01)
-                rm "${CHALLENGE_PATH}/${TOKEN}"
-                exit $?
-                ;;
-            *)
-                exit 1
-                ;;
-        esac
+        UALPN_OUT=$(echo "unauth $IDENT" | ualpn)
+        if [ "x$UALPN_OUT" = "xOK" ]; then
+            exit 0
+        else
+            exit 1
+        fi
         ;;
     *)
         echo "$0: invalid method" 1&gt;&amp;2
@@ -1217,13 +1141,13 @@ information.</p></div>
 <div class="sect1">
 <h2 id="_see_also">SEE ALSO</h2>
 <div class="sectionbody">
-<div class="paragraph"><p><strong>ualpn</strong>(2)</p></div>
+<div class="paragraph"><p><strong>uacme</strong>(2)</p></div>
 </div>
 </div>
 <div class="sect1">
 <h2 id="_author">AUTHOR</h2>
 <div class="sectionbody">
-<div class="paragraph"><p><strong>uacme</strong> was written by Nicola Di Lieto</p></div>
+<div class="paragraph"><p><strong>ualpn</strong> was written by Nicola Di Lieto</p></div>
 </div>
 </div>
 <div class="sect1">
@@ -1249,7 +1173,7 @@ along with this program.  If not, see <a href="http://www.gnu.org/licenses/">htt
 <div id="footer-text">
 Version 1.0.22<br>
 Last updated
- 2020-02-29 19:40:44 CET
+ 2020-03-01 20:43:06 CET
 </div>
 </div>
 </body>

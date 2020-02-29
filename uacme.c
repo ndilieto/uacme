@@ -18,6 +18,8 @@
  * <http://www.gnu.org/licenses/>.
  */
 
+#include "config.h"
+
 #include <ctype.h>
 #include <err.h>
 #include <errno.h>
@@ -1550,7 +1552,7 @@ int main(int argc, char **argv)
 
     if (version)
     {
-        msg(0, "version " VERSION);
+        msg(0, "version " PACKAGE_VERSION);
         goto out;
     }
 

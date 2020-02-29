@@ -1,0 +1,381 @@
+'\" t
+.\"     Title: ualpn
+.\"    Author: [see the "AUTHOR" section]
+.\" Generator: DocBook XSL Stylesheets v1.78.1 <http://docbook.sf.net/>
+.\"      Date: 03/01/2020
+.\"    Manual: User Commands
+.\"    Source: ualpn 1.0.22
+.\"  Language: English
+.\"
+.TH "UALPN" "1" "03/01/2020" "ualpn 1\&.0\&.22" "User Commands"
+.\" -----------------------------------------------------------------
+.\" * Define some portability stuff
+.\" -----------------------------------------------------------------
+.\" ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+.\" http://bugs.debian.org/507673
+.\" http://lists.gnu.org/archive/html/groff/2009-02/msg00013.html
+.\" ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+.ie \n(.g .ds Aq \(aq
+.el       .ds Aq '
+.\" -----------------------------------------------------------------
+.\" * set default formatting
+.\" -----------------------------------------------------------------
+.\" disable hyphenation
+.nh
+.\" disable justification (adjust text to left margin only)
+.ad l
+.\" -----------------------------------------------------------------
+.\" * MAIN CONTENT STARTS HERE *
+.\" -----------------------------------------------------------------
+.SH "NAME"
+ualpn \- lightweight transparent proxy with built\-in ACMEv2 tls\-alpn\-01 responder
+.SH "SYNOPSIS"
+.sp
+\fBualpn\fR [\fB\-?\fR|\fB\-\-help\fR] [\fB\-4\fR|\fB\-\-ipv4\fR] [\fB\-6\fR|\fB\-\-ipv6\fR] [\fB\-b\fR|\fB\-\-bind\fR \fIaddress\fR[@\fIport\fR]] [\fB\-c\fR|\fB\-\-connect\fR \fIaddress\fR[@\fIport\fR]] [\fB\-d\fR|\fB\-\-daemon\fR] [\fB\-l\fR|\fB\-\-logfile\fR \fIfile\fR] [\fB\-m\fR|\fB\-\-max\-auths\fR \fIN\fR] [\fB\-n\fR|\fB\-\-num\-workers\fR \fIN\fR] [\fB\-p\fR|\fB\-\-proxy\fR \fIN\fR] [\fB\-P\fR|\fB\-\-pidfile\fR \fIfile\fR] [\fB\-s\fR|\fB\-\-sock path\fR] [\fB\-S\fR|\fB\-\-sock\-mode\fR \fImode\fR] [\fB\-t\fR|\fB\-\-terminate\fR] [\fB\-u\fR|\fB\-\-user\fR \fIuser\fR[:\fIgroup\fR]] [\fB\-v\fR|\fB\-\-verbose\fR \&...] [\fB\-V\fR|\fB\-\-version\fR]
+.SH "DESCRIPTION"
+.sp
+\fBualpn\fR is a lightweight transparent proxy with built\-in ACMEv2 tls\-alpn\-01 challenge responder (https://tools\&.ietf\&.org/html/draft\-ietf\-acme\-tls\-alpn\-01)\&.
+.sp
+In client mode \fBualpn\fR connects to a running server mode instance of itself through a unix domain socket, in order to add or remove ACMEv2 authorizations\&. See CLIENT MODE below\&.
+.sp
+In server mode \fBualpn\fR listens for incoming connections (by default on port 443, which is mandatory for tls\-alpn\-01 challenges)\&. It then handles any such connection in one of two different ways:
+.sp
+.RS 4
+.ie n \{\
+\h'-04'\(bu\h'+03'\c
+.\}
+.el \{\
+.sp -1
+.IP \(bu 2.3
+.\}
+If the connection begins with a "ClientHello" TLS handshake packet including a "acme\-tls/1" RFC7301 Application Level Protocol Negotiation extension
+\fBand\fR
+a RFC6066 Server Name Indication extension matching a domain for which it has an authorization,
+\fBualpn\fR
+performs the tls\-alpn\-01 handshake and closes the connection;
+.RE
+.sp
+.RS 4
+.ie n \{\
+\h'-04'\(bu\h'+03'\c
+.\}
+.el \{\
+.sp -1
+.IP \(bu 2.3
+.\}
+otherwise
+\fBualpn\fR
+transparently proxies the connection to one of the backend servers it is configured with\&. By default
+\fBualpn\fR
+adds PROXY v1 headers (http://www\&.haproxy\&.org/download/1\&.8/doc/proxy\-protocol\&.txt) in order to safely transport connection information such as the client\(cqs address to the backend\&. The PROXY protocol is currently supported by apache, nginx and several other server programs\&.
+.RE
+.sp
+The event\-driven implementation is based on libev (http://libev\&.schmorp\&.de) and considerably reduces the cost of context switches and memory usage\&. In addition on systems (such as linux) supporting the splice() system call, \fBualpn\fR is able to move network data without copying it to/from kernel/user address space\&.
+.SH "OPTIONS"
+.PP
+\fB\-4, \-\-ipv4\fR
+.RS 4
+Only listen to IPv4 connections
+.RE
+.PP
+\fB\-6, \-\-ipv6\fR
+.RS 4
+Only listen to IPv6 connections
+.RE
+.PP
+\fB\-b, \-\-bind\fR \fIaddress\fR[@\fIport\fR]
+.RS 4
+Enable server mode and listen to
+\fIaddress\fR\&. The address must be specified in numeric format using the standard IPv4 or IPv6 notation)\&. Optionally, a port number can be given (default is 443)\&. This flag can be specified multiple times to listen to multiple IP addresses\&. If this flag is not specified and server mode was enabled by some other option,
+\fBualpn\fR
+listens to the wildcard interface; otherwise it runs in client mode (see CLIENT MODE below)\&.
+.RE
+.PP
+\fB\-c, \-\-connect\fR \fIaddress\fR[@\fIport\fR]
+.RS 4
+Enable server mode and add a new backend\&. The backend address must be specified in numeric format using the standard IPv4 or IPv6 notation)\&. Optionally, a port number can be given (default is 443)\&. This flag can be specified multiple times to add multiple backends\&. This flag must be specified at least once in server mode\&.
+.RE
+.PP
+\fB\-d, \-\-daemon\fR
+.RS 4
+Enable server mode and fork in the background
+.RE
+.PP
+\fB\-l, \-\-logfile\fR \fIfile\fR
+.RS 4
+Log to
+\fIfile\fR\&. By default
+\fBualpn\fR
+logs to
+\fBsyslog\fR
+if
+\fB\-d, \-\-daemon\fR
+was specified or
+\fBstderr\fR
+otherwise\&. See also
+\fB\-v, \-\-verbose\fR
+.RE
+.PP
+\fB\-m, \-\-max\-auths\fR \fIN\fR
+.RS 4
+Enable server mode and allow managing ACMEv2 tls\-alpn\-01 challenges for up to
+\fIN\fR
+different domains (default 100)
+.RE
+.PP
+\fB\-n, \-\-num\-workers\fR \fIN\fR
+.RS 4
+Enable server mode and spawn
+\fIN\fR
+worker processes (default 2) to handle connections\&. Note that worker processes are single threaded but thanks to the event based implementation each can handle several (potentially thousands) connections concurrently\&.
+.RE
+.PP
+\fB\-p, \-\-proxy\fR \fIN\fR
+.RS 4
+Enable server mode and disable (0) or specify (1, 2) the PROXY header version (default 1)\&. The backend server needs to be configured accordingly:
+.sp
+.RS 4
+.ie n \{\
+\h'-04'\(bu\h'+03'\c
+.\}
+.el \{\
+.sp -1
+.IP \(bu 2.3
+.\}
+nginx:
+https://docs\&.nginx\&.com/nginx/admin\-guide/load\-balancer/using\-proxy\-protocol
+.RE
+.sp
+.RS 4
+.ie n \{\
+\h'-04'\(bu\h'+03'\c
+.\}
+.el \{\
+.sp -1
+.IP \(bu 2.3
+.\}
+apache:
+https://httpd\&.apache\&.org/docs/2\&.4/mod/mod_remoteip\&.html
+.RE
+.RE
+.PP
+\fB\-P, \-\-pidfile\fR \fIfile\fR
+.RS 4
+Specify pidfile location (default /var/run/ualpn\&.pid)
+.RE
+.PP
+\fB\-s, \-\-sock\fR \fIpath\fR
+.RS 4
+Specify unix socket path (default /var/run/ualpn\&.sock)
+.RE
+.PP
+\fB\-S, \-\-sock\-mode\fR \fImode\fR
+.RS 4
+Enable server mode and specify socket access permissions (default 644)
+.RE
+.PP
+\fB\-t, \-\-terminate\fR
+.RS 4
+Try to terminate a running
+\fBualpn\fR
+server\&. This is achieved by looking up the process id stored by the server in the pidfile (see
+\fB\-P, \-\-pidfile\fR) and signalling it to terminate\&.
+.RE
+.PP
+\fB\-u, \-\-user\fR \fIuser\fR[:\fIgroup\fR]
+.RS 4
+Enable server mode and drop user (and optionally group) privileges to those of
+\fIuser\fR
+after binding the sockets\&. Also affects the ownership of the unix socket, pidfile and logfile (if any)\&.
+.RE
+.PP
+\fB\-v, \-\-verbose\fR
+.RS 4
+By default
+\fBualpn\fR
+only produces logs upon errors or warnings\&. When this option is specified
+\fBualpn\fR
+also logs notice messages\&. This option can be specified more than once to increase verbosity and include information (twice) or debug (three times) messages\&.
+.RE
+.PP
+\fB\-V, \-\-version\fR
+.RS 4
+Print program version on stderr and exit\&.
+.RE
+.PP
+\fB\-?, \-\-help\fR
+.RS 4
+Print a brief usage text on stderr and exit\&.
+.RE
+.SH "CLIENT MODE"
+.sp
+In client mode \fBualpn\fR pipes stdin/stdout to/from the unix socket of the running server instance of itself\&. The protocol is ASCII text based, case sensitive, line oriented, with two commands:
+.PP
+\fBauth\fR \fIdomain\fR \fIauthorization\fR
+.RS 4
+The
+\fBauth\fR
+command instructs the running
+\fBualpn\fR
+server to handle ACMEv2 tls\-alpn\-01 challenges for
+\fIdomain\fR
+with
+\fIauthorization\fR\&. The latter must contain the base64url encoding of the SHA\-256 digest [FIPS180\-4] of the key authorization for the challenge\&. The
+\fBuacme\fR
+software executes hook scripts with the correct
+\fIauthorization\fR
+passed as the 5th argument\&. Upon successful invocation of this command
+\fBualpn\fR
+generates a self signed certificate as required by the tls\-alpn\-01 challenge, which it will then use to perform tls\-alpn\-01 handshakes for
+\fIdomain\fR\&.
+.RE
+.PP
+\fBunauth\fR \fIdomain\fR
+.RS 4
+The
+\fBunauth\fR
+command instructs the running
+\fBualpn\fR
+server to no longer handle ACMEv2 tls\-alpn\-01 challenges for
+\fIdomain\fR\&.
+.RE
+.sp
+\fBualpn\fR responds to both commands with a line beginning with either "OK" or "ERR", followed by a space and additional error information\&.
+.SH "EXAMPLES"
+.PP
+ualpn \-vv \-d \-u nobody:nogroup \-c 127\&.0\&.0\&.1@4443 \-S 666
+.RS 4
+start
+\fBualpn\fR
+as a daemon, binding to the default port 443 on the wildcard interface\&. Proxy connections to port 4443 on 127\&.0\&.0\&.1 After opening the sockets, drop the user privileges and run as nobody:nogroup\&. Allow anyone on the local host to access the unix socket\&. Also increase the verbosity to include notice and information messages\&.
+.RE
+.PP
+echo "auth www\&.example\&.com DEi0apzMOdMT2DAro57oIvn\-wEzPiYcAYDh2Cvjra3I" | ualpn
+.RS 4
+Instruct the running
+\fBualpn\fR
+server to handle ACMEv2 tls\-alpn\-01 challenges for www\&.example\&.com with the given key authorization\&.
+.RE
+.PP
+echo "unauth www\&.example\&.com" | ualpn
+.RS 4
+Instruct the running
+\fBualpn\fR
+server to no longer handle ACMEv2 tls\-alpn\-01 challenges for www\&.example\&.com
+.RE
+.SH "EXIT STATUS"
+.PP
+\fB0\fR
+.RS 4
+Success
+.RE
+.PP
+\fB1\fR
+.RS 4
+Failure (syntax or usage error; configuration error; processing failure; unexpected error)\&.
+.RE
+.SH "EXAMPLE UACME HOOK SCRIPT"
+.sp
+The \fIualpn\&.sh\fR hook script included in the distribution can be used to automate the certificate issuance with \fBuacme\fR, provided \fBualpn\fR is listening on port 443 of the webserver for the domain being validated
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+#!/bin/sh
+ARGS=5
+E_BADARGS=85
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+if test $# \-ne "$ARGS"
+then
+    echo "Usage: $(basename "$0") method type ident token auth" 1>&2
+    exit $E_BADARGS
+fi
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+METHOD=$1
+TYPE=$2
+IDENT=$3
+TOKEN=$4
+AUTH=$5
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+if [ "$TYPE" != "tls\-alpn\-01" ]; then
+    exit 1
+fi
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+case "$METHOD" in
+    "begin")
+        UALPN_OUT=$(echo "auth $IDENT $AUTH" | ualpn)
+        if [ "x$UALPN_OUT" = "xOK" ]; then
+            exit 0
+        else
+            exit 1
+        fi
+        ;;
+    "done"|"failed")
+        UALPN_OUT=$(echo "unauth $IDENT" | ualpn)
+        if [ "x$UALPN_OUT" = "xOK" ]; then
+            exit 0
+        else
+            exit 1
+        fi
+        ;;
+    *)
+        echo "$0: invalid method" 1>&2
+        exit 1
+esac
+.fi
+.if n \{\
+.RE
+.\}
+.SH "BUGS"
+.sp
+If you believe you have found a bug, please create a new issue at https://github\&.com/ndilieto/uacme/issues with any applicable information\&.
+.SH "SEE ALSO"
+.sp
+\fBuacme\fR(2)
+.SH "AUTHOR"
+.sp
+\fBualpn\fR was written by Nicola Di Lieto
+.SH "COPYRIGHT"
+.sp
+Copyright \(co 2019,2020 Nicola Di Lieto <nicola\&.dilieto@gmail\&.com>
+.sp
+This file is part of \fBuacme\fR\&.
+.sp
+\fBuacme\fR is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version\&.
+.sp
+\fBuacme\fR is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE\&. See the GNU General Public License for more details\&.
+.sp
+You should have received a copy of the GNU General Public License along with this program\&. If not, see http://www\&.gnu\&.org/licenses/\&.

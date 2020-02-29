@@ -15,10 +15,32 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+ACLOCAL_AMFLAGS=-I build-aux/m4
+
 bin_PROGRAMS = uacme
+
+if ENABLE_UALPN
+bin_PROGRAMS += ualpn
+
+ualpn_SOURCES = ualpn.c base64.c base64.h log.c log.h
+ualpn_CFLAGS = $(PTHREAD_CFLAGS) $(WCFLAGS)
+ualpn_LDFLAGS = $(PTHREAD_LDFLAGS)
+if ENABLE_LIBEV
+ualpn_CFLAGS += -Ilibev
+ualpn_SOURCES += libev/ev.h
+ualpn_LDADD = libev.a
+
+noinst_LIBRARIES = libev.a
+libev_a_SOURCES = libev/ev.c
+libev_a_CFLAGS = $(PTHREAD_CFLAGS)
+endif
+endif
+
 uacme_SOURCES = uacme.c base64.c base64.h crypto.c crypto.h \
 		curlwrap.c curlwrap.h json.c json.h jsmn.h \
 		msg.c msg.h
+uacme_CFLAGS = $(CURL_CFLAGS) $(WCFLAGS)
+uacme_LDFLAGS = $(CURL_LDFLAGS)
 
 if ENABLE_READFILE
 uacme_SOURCES += read-file.c read-file.h
@@ -32,10 +54,28 @@ dist-hook:
 	echo $(VERSION) > $(distdir)/.tarball-version
 
 dist_pkgdata_SCRIPTS = uacme.sh
+if ENABLE_UALPN
+dist_pkgdata_SCRIPTS += ualpn.sh
+endif
 
 if ENABLE_DOCS
 dist_man1_MANS = uacme.1
 dist_html_DATA = uacme.1.html
+
+if ENABLE_UALPN
+dist_man1_MANS += ualpn.1
+dist_html_DATA += ualpn.1.html
+
+ualpn.1: ualpn.1.txt $(top_srcdir)/.version
+	$(A2X) -L -d manpage -f manpage -a revision=$(VERSION) $<
+
+ualpn.1.html: ualpn.1.txt $(top_srcdir)/.version
+	$(ASCIIDOC) -d manpage -b html5 -a revision=$(VERSION) $<
+
+$(top_srcdir)/docs/ualpn.html: ualpn.1.html
+	mkdir -p docs
+	cp ualpn.1.html $@
+endif
 
 uacme.1: uacme.1.txt $(top_srcdir)/.version
 	$(A2X) -L -d manpage -f manpage -a revision=$(VERSION) $<
@@ -46,7 +86,6 @@ uacme.1.html: uacme.1.txt $(top_srcdir)/.version
 $(top_srcdir)/docs/index.html: uacme.1.html
 	mkdir -p docs
 	cp uacme.1.html $@
-
 endif
 
 .PHONY: valgrind
@@ -56,5 +95,5 @@ valgrind: uacme
 	    $(builddir)/uacme $(VALGRIND_UACME_ARGS)
 
 EXTRA_DIST = GNUmakefile build-aux/git-version-gen uacme.sh uacme.1.txt \
-	     uacme.1 uacme.1.html
+	     uacme.1 uacme.1.html ualpn.1.txt ualpn.1 ualpn.1.html
 CLEANFILES = valgrind.log

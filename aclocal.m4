@@ -1475,3 +1475,4 @@ AC_SUBST([am__untar])
 
 m4_include([build-aux/m4/ax_check_enable_debug.m4])
 m4_include([build-aux/m4/ax_is_release.m4])
+m4_include([build-aux/m4/ax_pthread.m4])

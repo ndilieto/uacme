@@ -1,0 +1,276 @@
+UALPN(1)
+========
+:doctype: manpage
+:man source:   ualpn
+:man version:  {revision}
+:man manual:   User Commands
+
+
+NAME
+----
+ualpn - lightweight transparent proxy with built-in ACMEv2 tls-alpn-01 responder
+
+
+SYNOPSIS
+--------
+*ualpn* [*-?*|*--help*] [*-4*|*--ipv4*] [*-6*|*--ipv6*]
+    [*-b*|*--bind* 'address'[@'port']] [*-c*|*--connect* 'address'[@'port']]
+    [*-d*|*--daemon*] [*-l*|*--logfile* 'file'] [*-m*|*--max-auths* 'N']
+    [*-n*|*--num-workers* 'N'] [*-p*|*--proxy* 'N'] [*-P*|*--pidfile* 'file']
+    [*-s*|*--sock path*] [*-S*|*--sock-mode* 'mode'] [*-t*|*--terminate*]
+    [*-u*|*--user* 'user'`[:`'group']] [*-v*|*--verbose* ...] [*-V*|*--version*]
+
+
+DESCRIPTION
+-----------
+*ualpn* is a lightweight transparent proxy with built-in ACMEv2 tls-alpn-01
+challenge responder (<https://tools.ietf.org/html/draft-ietf-acme-tls-alpn-01>).
+
+In client mode *ualpn* connects to a running server mode instance of itself
+through a unix domain socket, in order to add or remove ACMEv2 authorizations.
+See CLIENT MODE below.
+
+In server mode *ualpn* listens for incoming connections (by default on port 443,
+which is mandatory for tls-alpn-01 challenges). It then handles any such
+connection in one of two different ways:
+
+* If the connection begins with a "ClientHello" TLS handshake packet including a
+"acme-tls/1" RFC7301 Application Level Protocol Negotiation extension *and* a 
+RFC6066 Server Name Indication extension matching a domain for which it has
+an authorization, *ualpn* performs the tls-alpn-01 handshake and closes the
+connection;
+* otherwise *ualpn* transparently proxies the connection to one of the backend
+servers it is configured with. By default *ualpn* adds PROXY v1 headers
+(<http://www.haproxy.org/download/1.8/doc/proxy-protocol.txt>) in order to
+safely transport connection information such as the client's address to the
+backend. The PROXY protocol is currently supported by apache, nginx and several
+other server programs.
+
+The event-driven implementation is based on libev (<http://libev.schmorp.de>)
+and considerably reduces the cost of context switches and memory usage. In
+addition on systems (such as linux) supporting the `splice()` system call,
+*ualpn* is able to move network data without copying it to/from kernel/user
+address space.
+
+
+OPTIONS
+-------
+*-4, --ipv4*::
+    Only listen to IPv4 connections
+
+*-6, --ipv6*::
+    Only listen to IPv6 connections
+
+*-b, --bind* 'address'[@'port']::
+    Enable server mode and listen to 'address'. The address must be
+    specified in numeric format using the standard IPv4 or IPv6 notation).
+    Optionally, a port number can be given (default is 443). This flag can be
+    specified multiple times to listen to multiple IP addresses. If this flag
+    is not specified and server mode was enabled by some other option,
+    *ualpn* listens to the wildcard interface; otherwise it runs in client
+    mode (see CLIENT MODE below).
+
+*-c, --connect* 'address'[@'port']::
+    Enable server mode and add a new backend. The backend address must be
+    specified in numeric format using the standard IPv4 or IPv6 notation).
+    Optionally, a port number can be given (default is 443). This flag can be
+    specified multiple times to add multiple backends. This flag must be
+    specified at least once in server mode.
+
+*-d, --daemon*::
+    Enable server mode and fork in the background
+
+*-l, --logfile* 'file'::
+    Log to 'file'. By default *ualpn* logs to *syslog* if *-d, --daemon*
+    was specified or *stderr* otherwise. See also *-v, --verbose*
+
+*-m, --max-auths* 'N'::
+    Enable server mode and allow managing ACMEv2 tls-alpn-01 challenges for
+    up to 'N' different domains (default 100)
+
+*-n, --num-workers* 'N'::
+    Enable server mode and spawn 'N' worker processes (default 2) to
+    handle connections. Note that worker processes are single threaded but
+    thanks to the event based implementation each can handle several
+    (potentially thousands) connections concurrently.
+
+*-p, --proxy* 'N'::
+    Enable server mode and disable (0) or specify (1, 2) the PROXY header
+    version (default 1). The backend server needs to be configured accordingly:
+    * nginx: <https://docs.nginx.com/nginx/admin-guide/load-balancer/using-proxy-protocol>
+    * apache: <https://httpd.apache.org/docs/2.4/mod/mod_remoteip.html>
+
+*-P, --pidfile* 'file'::
+    Specify pidfile location (default /var/run/ualpn.pid)
+
+*-s, --sock* 'path'::
+    Specify unix socket path (default /var/run/ualpn.sock)
+
+*-S, --sock-mode* 'mode'::
+    Enable server mode and specify socket access permissions (default 644)
+
+*-t, --terminate*::
+    Try to terminate a running *ualpn* server. This is achieved by looking
+    up the process id stored by the server in the pidfile (see *-P, --pidfile*)
+    and signalling it to terminate.
+
+*-u, --user* 'user'`[:`'group'`]`::
+    Enable server mode and drop user (and optionally group) privileges to those
+    of 'user' after binding the sockets. Also affects the ownership of the unix
+    socket, pidfile and logfile (if any).
+
+*-v, --verbose*::
+    By default *ualpn* only produces logs upon errors or warnings.
+    When this option is specified *ualpn* also logs notice messages.
+    This option can be specified more than once to increase verbosity and
+    include information (twice) or debug (three times) messages.
+
+*-V, --version*::
+    Print program version on stderr and exit.
+
+*-?, --help*::
+    Print a brief usage text on stderr and exit.
+
+
+CLIENT MODE
+-----------
+
+In client mode *ualpn* pipes stdin/stdout to/from the unix socket of the
+running server instance of itself. The protocol is ASCII text based,
+case sensitive, line oriented, with two commands:
+
+*auth* 'domain' 'authorization'::
+    The *auth* command instructs the running *ualpn* server to handle ACMEv2
+    tls-alpn-01 challenges for 'domain' with 'authorization'. The latter
+    must contain the base64url encoding of the SHA-256 digest [FIPS180-4]
+    of the key authorization for the challenge. The *uacme* software
+    executes hook scripts with the correct 'authorization' passed as
+    the 5th argument.  Upon successful invocation of this command *ualpn*
+    generates a self signed certificate as required by the tls-alpn-01
+    challenge, which it will then use to perform tls-alpn-01 handshakes
+    for 'domain'.
+
+*unauth* 'domain'::
+    The *unauth* command instructs the running *ualpn* server to no longer
+    handle ACMEv2 tls-alpn-01 challenges for 'domain'.
+
+*ualpn* responds to both commands with a line beginning with either "OK" or
+"ERR", followed by a space and additional error information.
+
+
+EXAMPLES
+--------
+
+`ualpn -vv -d -u nobody:nogroup -c 127.0.0.1@4443 -S 666`::
+    start *ualpn* as a daemon, binding to the default port 443 on the
+    wildcard interface. Proxy connections to port 4443 on 127.0.0.1 
+    After opening the sockets, drop the user privileges and run as
+    nobody:nogroup. Allow anyone on the local host to access the unix
+    socket. Also increase the verbosity to include notice and
+    information messages.
+
+`echo "auth www.example.com DEi0apzMOdMT2DAro57oIvn-wEzPiYcAYDh2Cvjra3I" | ualpn`::
+    Instruct the running *ualpn* server to handle ACMEv2 tls-alpn-01 challenges
+    for www.example.com with the given key authorization.
+    
+`echo "unauth www.example.com" | ualpn`::
+    Instruct the running *ualpn* server to no longer handle ACMEv2 tls-alpn-01
+    challenges for www.example.com
+
+
+EXIT STATUS
+-----------
+*0*::
+    Success
+
+*1*::
+    Failure (syntax or usage error; configuration error; 
+    processing failure; unexpected error).
+
+
+EXAMPLE UACME HOOK SCRIPT
+-------------------------
+
+The 'ualpn.sh' hook script included in the distribution can be used
+to automate the certificate issuance with *uacme*, provided *ualpn*
+is listening on port 443 of the webserver for the domain being validated
+
+    #!/bin/sh
+    ARGS=5
+    E_BADARGS=85
+
+    if test $# -ne "$ARGS"
+    then
+        echo "Usage: $(basename "$0") method type ident token auth" 1>&2
+        exit $E_BADARGS
+    fi
+    
+    METHOD=$1
+    TYPE=$2
+    IDENT=$3
+    TOKEN=$4
+    AUTH=$5
+    
+    if [ "$TYPE" != "tls-alpn-01" ]; then
+        exit 1
+    fi
+
+    case "$METHOD" in
+        "begin")
+            UALPN_OUT=$(echo "auth $IDENT $AUTH" | ualpn)
+            if [ "x$UALPN_OUT" = "xOK" ]; then
+                exit 0
+            else
+                exit 1
+            fi
+            ;;
+        "done"|"failed")
+            UALPN_OUT=$(echo "unauth $IDENT" | ualpn)
+            if [ "x$UALPN_OUT" = "xOK" ]; then
+                exit 0
+            else
+                exit 1
+            fi
+            ;;
+        *)
+            echo "$0: invalid method" 1>&2 
+            exit 1
+    esac
+
+
+BUGS
+----
+If you believe you have found a bug, please create a new issue
+at https://github.com/ndilieto/uacme/issues with any applicable
+information. 
+
+
+SEE ALSO
+--------
+*uacme*(2)
+
+
+AUTHOR
+------
+*ualpn* was written by Nicola Di Lieto
+
+
+COPYRIGHT
+---------
+Copyright (C) 2019,2020 Nicola Di Lieto <nicola.dilieto@gmail.com>
+
+This file is part of *uacme*.
+
+*uacme* is free software: you can redistribute it and/or modify it
+under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+*uacme* is distributed in the hope that it will be useful, but
+WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
