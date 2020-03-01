@@ -13,7 +13,7 @@ proxying it to the webserver.
 While running **ualpn** also listens to a UNIX domain socket so that it
 can be fed the necessary tls-alpn-01 key authorizations for the domains
 being validated by the ACME server. **ualpn** was designed to be easy to
-integrate with not only **uacme** but also to other ACME clients.
+integrate with not only **uacme** but also other ACME clients.
 
 # getting started, quick and dirty
 
@@ -29,7 +29,7 @@ make && sudo make install
   * for apache: https://httpd.apache.org/docs/2.4/mod/mod_remoteip.html
 * launch ualpn as a daemon and check the logs (by default in syslog)
 ```
-sudo ualpn -v -d -u nobody:nogroup -c 127.0.0.1:4443 -S 666
+sudo ualpn -v -d -u nobody:nogroup -c 127.0.0.1@4443 -S 666
 ```
 * create an ACME account and try obtaining a certificate with tls-alpn-01 challenge
 ```

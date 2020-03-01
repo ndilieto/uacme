@@ -2548,7 +2548,7 @@ void usage(void)
         "usage: %s [-?|--help] [-4|--ipv4] [-6|--ipv6]\n"
         "\t[-b|--bind address[@port] [-c|--connect address[@port]\n"
         "\t[-d|--daemon] [-l|--logfile file] [-m|--max-auths N]\n"
-        "\t[-n|--num-workers number] [-p|--proxy N] [-P|--pidfile file]\n"
+        "\t[-n|--num-workers N] [-p|--proxy N] [-P|--pidfile file]\n"
         "\t[-s|--sock path] [-S|--sock-mode mode] [-t|--terminate]\n"
         "\t[-u|--user user[:group]] [-v|--verbose ...] [-V|--version]\n",
         g.progname);
