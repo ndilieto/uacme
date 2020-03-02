@@ -2871,7 +2871,7 @@ int main(int argc, char **argv)
                 }
                 for (int j = 0; j < 5; j++) {
                     if (kill(n, 0) && errno == ESRCH)
-                        cleanup_and_exit(0, EXIT_FAILURE);
+                        cleanup_and_exit(0, EXIT_SUCCESS);
                     else
                         sleep(1);
                 }
