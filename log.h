@@ -47,6 +47,7 @@ DECLARE_LOG_FUNC(info,   LOG_INFO)
 DECLARE_LOG_FUNC(notice, LOG_NOTICE)
 DECLARE_LOG_FUNC(warn,   LOG_WARNING)
 DECLARE_LOG_FUNC(err,    LOG_ERR)
+DECLARE_LOG_FUNC(crit,   LOG_CRIT)
 
 void log_stderr(int priority, const char *format, ...);
 void set_log_func(void (*f)(int priority, const char *format, ...));

@@ -1,13 +1,13 @@
 '\" t
 .\"     Title: ualpn
 .\"    Author: [see the "AUTHOR" section]
-.\" Generator: DocBook XSL Stylesheets v1.78.1 <http://docbook.sf.net/>
-.\"      Date: 03/01/2020
+.\" Generator: DocBook XSL Stylesheets v1.79.1 <http://docbook.sf.net/>
+.\"      Date: 03/02/2020
 .\"    Manual: User Commands
 .\"    Source: ualpn 1.0.22
 .\"  Language: English
 .\"
-.TH "UALPN" "1" "03/01/2020" "ualpn 1\&.0\&.22" "User Commands"
+.TH "UALPN" "1" "03/02/2020" "ualpn 1\&.0\&.22" "User Commands"
 .\" -----------------------------------------------------------------
 .\" * Define some portability stuff
 .\" -----------------------------------------------------------------
@@ -31,7 +31,7 @@
 ualpn \- lightweight transparent proxy with built\-in ACMEv2 tls\-alpn\-01 responder
 .SH "SYNOPSIS"
 .sp
-\fBualpn\fR [\fB\-?\fR|\fB\-\-help\fR] [\fB\-4\fR|\fB\-\-ipv4\fR] [\fB\-6\fR|\fB\-\-ipv6\fR] [\fB\-b\fR|\fB\-\-bind\fR \fIaddress\fR[@\fIport\fR]] [\fB\-c\fR|\fB\-\-connect\fR \fIaddress\fR[@\fIport\fR]] [\fB\-d\fR|\fB\-\-daemon\fR] [\fB\-l\fR|\fB\-\-logfile\fR \fIfile\fR] [\fB\-m\fR|\fB\-\-max\-auths\fR \fIN\fR] [\fB\-n\fR|\fB\-\-num\-workers\fR \fIN\fR] [\fB\-p\fR|\fB\-\-proxy\fR \fIN\fR] [\fB\-P\fR|\fB\-\-pidfile\fR \fIfile\fR] [\fB\-s\fR|\fB\-\-sock path\fR] [\fB\-S\fR|\fB\-\-sock\-mode\fR \fImode\fR] [\fB\-t\fR|\fB\-\-terminate\fR] [\fB\-u\fR|\fB\-\-user\fR \fIuser\fR[:\fIgroup\fR]] [\fB\-v\fR|\fB\-\-verbose\fR \&...] [\fB\-V\fR|\fB\-\-version\fR]
+\fBualpn\fR [\fB\-?\fR|\fB\-\-help\fR] [\fB\-V\fR|\fB\-\-version\fR] [\fB\-4\fR|\fB\-\-ipv4\fR] [\fB\-6\fR|\fB\-\-ipv6\fR] [\fB\-b\fR|\fB\-\-bind\fR \fIaddress\fR[@\fIport\fR]] [\fB\-c\fR|\fB\-\-connect\fR \fIaddress\fR[@\fIport\fR]] [\fB\-d\fR|\fB\-\-daemon\fR] [\fB\-l\fR|\fB\-\-logfile\fR \fIfile\fR] [\fB\-m\fR|\fB\-\-max\-auths\fR \fIN\fR] [\fB\-n\fR|\fB\-\-num\-workers\fR \fIN\fR] [\fB\-p\fR|\fB\-\-proxy\fR \fIN\fR] [\fB\-P\fR|\fB\-\-pidfile\fR \fIfile\fR] [\fB\-r\fR|\fB\-\-chroot dir] [\fR\-s*|\fB\-\-sock path\fR] [\fB\-S\fR|\fB\-\-sock\-mode\fR \fImode\fR] [\fB\-t\fR|\fB\-\-terminate\fR] [\fB\-u\fR|\fB\-\-user\fR \fIuser\fR[:\fIgroup\fR]] [\fB\-v\fR|\fB\-\-verbose\fR \&...]
 .SH "DESCRIPTION"
 .sp
 \fBualpn\fR is a lightweight transparent proxy with built\-in ACMEv2 tls\-alpn\-01 challenge responder (https://tools\&.ietf\&.org/html/draft\-ietf\-acme\-tls\-alpn\-01)\&.
@@ -162,6 +162,15 @@ https://httpd\&.apache\&.org/docs/2\&.4/mod/mod_remoteip\&.html
 \fB\-P, \-\-pidfile\fR \fIfile\fR
 .RS 4
 Specify pidfile location (default /var/run/ualpn\&.pid)
+.RE
+.PP
+\fB\-r, \-\-chroot\fR \fIdir\fR
+.RS 4
+Enable server mode and specify a directory to
+\fIchroot\fR
+to\&. If logging to syslog it is necessary to ensure that a syslogd(8) socket is available at /dev/log in the chroot directory, otherwise
+\fBualpn\fR
+will not produce any log output\&.
 .RE
 .PP
 \fB\-s, \-\-sock\fR \fIpath\fR

@@ -133,10 +133,12 @@ typedef struct client {
     buffer_t buf_f2b;
     buffer_t buf_b2f;
 #endif
-    char frontend_host[MAXHOST];
-    char frontend_serv[MAXSERV];
-    char backend_host[MAXHOST];
-    char backend_serv[MAXSERV];
+    char lhost_f[MAXHOST];
+    char lserv_f[MAXSERV];
+    char rhost_f[MAXHOST];
+    char rserv_f[MAXSERV];
+    char rhost_b[MAXHOST];
+    char rserv_b[MAXSERV];
     bool backend_initialized;
     int backend_retries;
     enum {
@@ -204,6 +206,7 @@ static struct globs {
     unsigned max_auths;
     char **argv;
     char *progname;
+    char *chroot;
     char *pidfile;
     char *socket;
     mode_t sockmode;
@@ -237,6 +240,7 @@ static struct globs {
     .num_workers = 2,
     .max_auths = 100,
     .progname = NULL,
+    .chroot = NULL,
     .pidfile = NULL,
     .socket = NULL,
     .sockmode = S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH,
@@ -1027,7 +1031,7 @@ static ssize_t tls_pull_func(gnutls_transport_ptr_t p, void *data, size_t size)
         gnutls_transport_set_errno(c->tls, errno);
         if (errno != EAGAIN && errno != EWOULDBLOCK) {
             warn("client %08x: frontend failed to read from %s:%s", c->id,
-                    c->frontend_host, c->frontend_serv);
+                    c->rhost_f, c->rserv_f);
             client_done(EV_A_ c, DRAIN_FRONTEND);
         } else if (c->fd_f != -1 && c->state != STATE_DONE)
             ev_io_start(EV_A_ &c->io_rxf);
@@ -1049,7 +1053,7 @@ static ssize_t tls_pull_func(gnutls_transport_ptr_t p, void *data, size_t size)
         return -1;
     } else if (recv(c->fd_f, data, s, 0) != s) {
         warn("client %08x: frontend failed to buffer data from %s:%s", c->id,
-                c->frontend_host, c->frontend_serv);
+                c->rhost_f, c->rserv_f);
         client_done(EV_A_ c, DRAIN_FRONTEND);
         return 0;
     }
@@ -1084,7 +1088,7 @@ static ssize_t tls_push_func(gnutls_transport_ptr_t p, const void *data,
         gnutls_transport_set_errno(c->tls, errno);
         if (errno != EAGAIN && errno != EWOULDBLOCK) {
             warn("client %08x: frontend failed to buffer data from %s:%s",
-                    c->id, c->frontend_host, c->frontend_serv);
+                    c->id, c->rhost_f, c->rserv_f);
             client_done(EV_A_ c, DRAIN_FRONTEND);
             return -1;
         }
@@ -1274,7 +1278,7 @@ static void cb_client_rxb(EV_P_ ev_io *w, int revents)
         case -1:
             if (errno != EAGAIN && errno != EWOULDBLOCK) {
                 warn("client %08x: backend failed to splice from %s:%s",
-                        c->id, c->backend_host, c->backend_serv);
+                        c->id, c->rhost_b, c->rserv_b);
                 client_done(EV_A_ c, DRAIN_BACKEND);
                 return;
             }
@@ -1295,7 +1299,7 @@ static void cb_client_rxb(EV_P_ ev_io *w, int revents)
         case -1:
             if (errno != EAGAIN && errno != EWOULDBLOCK) {
                 warn("client %08x: backend failed to read from %s:%s",
-                        c->id, c->backend_host, c->backend_serv);
+                        c->id, c->rhost_b, c->rserv_b);
                 client_done(EV_A_ c, DRAIN_BACKEND);
                 return;
             }
@@ -1332,23 +1336,32 @@ static int connect_backend(client_t *c)
 
     for (str_t *s = g.connect; s; s = s->next) {
         str_t *last = NULL;
-        rc = parse_addr(g.connect->str, flags, g.family, &ai);
+        rc = parse_addr(s->str, flags, g.family, &ai);
         if (rc != 0) {
             warnx("client %08x: failed to parse backend address '%s': %s",
-                    c->id, g.connect->str,
+                    c->id, s->str,
                     rc == EAI_SYSTEM ? strerror(errno) : gai_strerror(rc));
             continue;
         }
 
         rc = getnameinfo(ai->ai_addr, ai->ai_addrlen,
-                c->backend_host, sizeof(c->backend_host),
-                c->backend_serv, sizeof(c->backend_serv),
+                c->rhost_b, sizeof(c->rhost_b),
+                c->rserv_b, sizeof(c->rserv_b),
                 NI_NUMERICHOST | NI_NUMERICSERV);
         if (rc != 0) {
             warnx("client %08x: failed to get backend address info: %s",
                     rc == EAI_SYSTEM ? strerror(errno) : gai_strerror(rc));
             freeaddrinfo(ai);
             continue;
+        }
+
+        if (strcmp(c->lhost_f, c->rhost_b) == 0 &&
+                strcmp(c->lserv_f, c->rserv_b) == 0) {
+            critx("client %08x: loop detected: connection back to self "
+                    "(%s:%s), terminating", c->id, c->rhost_b, c->rserv_b);
+            freeaddrinfo(ai);
+            g_shm->shutdown = true;
+            return -1;
         }
 
         c->fd_b = socket(ai->ai_family, ai->ai_socktype, ai->ai_protocol);
@@ -1378,7 +1391,8 @@ static int connect_backend(client_t *c)
         rc = connect(c->fd_b, ai->ai_addr, ai->ai_addrlen);
         if (rc == -1 && errno != EINPROGRESS) {
             warn("client %08x: backend failed to connect to %s:%s", c->id,
-                    c->backend_host, c->backend_serv);
+                    c->rhost_b, c->rserv_b);
+            close(c->fd_b);
             c->fd_b = -1;
             freeaddrinfo(ai);
             continue;
@@ -1387,7 +1401,7 @@ static int connect_backend(client_t *c)
         freeaddrinfo(ai);
 
         debugx("client %08x: backend initiated connection to %s:%s", c->id,
-                c->backend_host, c->backend_serv);
+                c->rhost_b, c->rserv_b);
 
         SGLIB_DL_LIST_GET_LAST(str_t, g.connect, prev, next, last);
         if (last != s) {
@@ -1415,10 +1429,10 @@ static void cb_client_txb(EV_P_ ev_io *w, int revents)
         if (getpeername(c->fd_b, (struct sockaddr *)&addr, &len) == -1) {
             if (++c->backend_retries > 3)
                 warn("client %08x: backend failed to connect to %s:%s", c->id,
-                        c->backend_host, c->backend_serv);
+                        c->rhost_b, c->rserv_b);
             else {
                 debug("client %08x: backend failed to connect to %s:%s", c->id,
-                        c->backend_host, c->backend_serv);
+                        c->rhost_b, c->rserv_b);
                 close(c->fd_b);
                 c->fd_b = -1;
                 ev_io_stop(EV_A_ &c->io_rxb);
@@ -1435,7 +1449,7 @@ static void cb_client_txb(EV_P_ ev_io *w, int revents)
         }
         ev_io_start(EV_A_ &c->io_rxb);
         noticex("client %08x: backend connected to %s:%s", c->id,
-                c->backend_host, c->backend_serv);
+                c->rhost_b, c->rserv_b);
         c->state = STATE_PROXY;
     }
 
@@ -1446,14 +1460,14 @@ static void cb_client_txb(EV_P_ ev_io *w, int revents)
         switch (s) {
             case 0:
                 warnx("client %08x: backend failed to splice to %s:%s",
-                        c->id, c->backend_host, c->backend_serv);
+                        c->id, c->rhost_b, c->rserv_b);
                 client_done(EV_A_ c, DRAIN_BACKEND);
                 return;
 
             case -1:
                 if (errno != EAGAIN && errno != EWOULDBLOCK) {
                     warn("client %08x: backend failed to splice to %s:%s",
-                        c->id, c->backend_host, c->backend_serv);
+                        c->id, c->rhost_b, c->rserv_b);
                     client_done(EV_A_ c, DRAIN_BACKEND);
                     return;
                 }
@@ -1476,7 +1490,7 @@ static void cb_client_txb(EV_P_ ev_io *w, int revents)
             case -1:
                 if (errno != EAGAIN && errno != EWOULDBLOCK) {
                     warn("client %08x: backend failed to write to %s:%s",
-                            c->id, c->backend_host, c->backend_serv);
+                            c->id, c->rhost_b, c->rserv_b);
                     client_done(EV_A_ c, DRAIN_BACKEND);
                     return;
                 }
@@ -1510,7 +1524,7 @@ static void cb_client_rxf(EV_P_ ev_io *w, int revents)
         } else if (len == -1) {
             if (errno != EAGAIN && errno != EWOULDBLOCK) {
                 warn("client %08x: frontend failed to read from %s:%s",
-                        c->id, c->frontend_host, c->frontend_serv);
+                        c->id, c->rhost_f, c->rserv_f);
                 client_done(EV_A_ c, DRAIN_FRONTEND);
             }
             return;
@@ -1568,7 +1582,7 @@ static void cb_client_rxf(EV_P_ ev_io *w, int revents)
             case -1:
                 if (errno != EAGAIN && errno != EWOULDBLOCK) {
                     warn("client %08x: frontend failed to splice from %s:%s",
-                            c->id, c->frontend_host, c->frontend_serv);
+                            c->id, c->rhost_f, c->rserv_f);
                     client_done(EV_A_ c, DRAIN_FRONTEND);
                     return;
                 }
@@ -1589,7 +1603,7 @@ static void cb_client_rxf(EV_P_ ev_io *w, int revents)
             case -1:
                 if (errno != EAGAIN && errno != EWOULDBLOCK) {
                     warn("client %08x: frontend failed to read from %s:%s",
-                            c->id, c->frontend_host, c->frontend_serv);
+                            c->id, c->rhost_f, c->rserv_f);
                     client_done(EV_A_ c, DRAIN_FRONTEND);
                     return;
                 }
@@ -1621,14 +1635,14 @@ static void cb_client_txf(EV_P_ ev_io *w, int revents)
     switch (s) {
         case 0:
             warnx("client %08x: frontend failed to splice to %s:%s",
-                    c->id, c->frontend_host, c->frontend_serv);
+                    c->id, c->rhost_f, c->rserv_f);
             client_done(EV_A_ c, DRAIN_FRONTEND);
             return;
 
         case -1:
             if (errno != EAGAIN && errno != EWOULDBLOCK) {
                 warnx("client %08x: frontend failed to splice to %s:%s",
-                        c->id, c->frontend_host, c->frontend_serv);
+                        c->id, c->rhost_f, c->rserv_f);
                 client_done(EV_A_ c, DRAIN_FRONTEND);
                 return;
             }
@@ -1649,7 +1663,7 @@ static void cb_client_txf(EV_P_ ev_io *w, int revents)
         case -1:
             if (errno != EAGAIN && errno != EWOULDBLOCK) {
                 warnx("client %08x: frontend failed to write to %s:%s",
-                        c->id, c->frontend_host, c->frontend_serv);
+                        c->id, c->rhost_f, c->rserv_f);
                 client_done(EV_A_ c, DRAIN_FRONTEND);
                 return;
             }
@@ -1874,8 +1888,6 @@ static void cb_cleanup(EV_P_ ev_cleanup *w, int revents)
 
 static int client_new(EV_P_ int fd, addr_t *addr)
 {
-    char lhost[NI_MAXHOST];
-    char lserv[NI_MAXSERV];
     union {
         char buf[108];
         struct {
@@ -1924,8 +1936,7 @@ static int client_new(EV_P_ int fd, addr_t *addr)
     c->id = 0xFFFFFFFF & (unsigned int)random();
 
     rc = getnameinfo(&addr[0].addr.sa, addr[0].len,
-            c->frontend_host, sizeof(c->frontend_host),
-            c->frontend_serv, sizeof(c->frontend_serv),
+            c->rhost_f, sizeof(c->rhost_f), c->rserv_f, sizeof(c->rserv_f),
             NI_NUMERICHOST | NI_NUMERICSERV);
     if (rc != 0) {
         warnx("client_new: getnameinfo: %s", rc == EAI_SYSTEM ?
@@ -1935,8 +1946,9 @@ static int client_new(EV_P_ int fd, addr_t *addr)
         return -1;
     }
 
-    rc = getnameinfo(&addr[1].addr.sa, addr[1].len, lhost, sizeof(lhost),
-            lserv, sizeof(lserv), NI_NUMERICHOST | NI_NUMERICSERV);
+    rc = getnameinfo(&addr[1].addr.sa, addr[1].len,
+            c->lhost_f, sizeof(c->lhost_f), c->lserv_f, sizeof(c->lserv_f),
+            NI_NUMERICHOST | NI_NUMERICSERV);
     if (rc != 0) {
         warnx("client_new: getnameinfo: %s", rc == EAI_SYSTEM ?
                 strerror(errno) : gai_strerror(rc));
@@ -1945,8 +1957,8 @@ static int client_new(EV_P_ int fd, addr_t *addr)
         return -1;
     }
 
-    noticex("new client %08x: frontend connection from %s:%s",
-            c->id, c->frontend_host, c->frontend_serv);
+    noticex("new client %08x: frontend connection to %s:%s from %s:%s",
+            c->id, c->lhost_f, c->lserv_f, c->rhost_f, c->rserv_f);
 
 #if EV_MULTIPLICITY
     c->loop = EV_A;
@@ -1957,7 +1969,7 @@ static int client_new(EV_P_ int fd, addr_t *addr)
             addr[1].addr.sa.sa_family == AF_INET) {
         if (g.proxy == 1) {
             snprintf(proxy.buf, sizeof(proxy.buf), "PROXY TCP4 %s %s %s %s\r\n",
-                    c->frontend_host, lhost, c->frontend_serv, lserv);
+                    c->rhost_f, c->lhost_f, c->rserv_f, c->lserv_f);
             proxy_len = strlen(proxy.buf);
         } else if (g.proxy == 2) {
             proxy_len += 12;
@@ -1972,7 +1984,7 @@ static int client_new(EV_P_ int fd, addr_t *addr)
                 addr[1].addr.sa.sa_family == AF_INET6) {
         if (g.proxy == 1) {
             snprintf(proxy.buf, sizeof(proxy.buf), "PROXY TCP6 %s %s %s %s\r\n",
-                    c->frontend_host, lhost, c->frontend_serv, lserv);
+                    c->rhost_f, c->lhost_f, c->rserv_f, c->lserv_f);
             proxy_len = strlen(proxy.buf);
         } else if (g.proxy == 2) {
             proxy_len += 36;
@@ -2226,7 +2238,7 @@ static void cleanup_and_exit(int stage, int return_code)
         default:
         case 4:
             ev_loop_destroy(EV_DEFAULT_UC);
-            if (g.pidfile)
+            if (g.pidfile && !g.chroot)
                 unlink(g.pidfile);
             sem_destroy(&g_shm->logsem);
             //intentional fallthrough
@@ -2242,7 +2254,7 @@ static void cleanup_and_exit(int stage, int return_code)
         case 0:
             if (g.sockfd != -1) {
                 close(g.sockfd);
-                if (g.socket)
+                if (g.socket && !g.chroot)
                     unlink(g.socket);
             }
             if (g.daemon && g.pipefd[1] != -1) {
@@ -2256,6 +2268,7 @@ static void cleanup_and_exit(int stage, int return_code)
             free(g.user);
             free(g.socket);
             free(g.pidfile);
+            free(g.chroot);
             while (g.bind) {
                 str_t *s = g.bind;
                 g.bind = g.bind->next;
@@ -2497,6 +2510,9 @@ static void log_function(int priority, const char *format, ...)
         case LOG_ERR:
             pr = "ERR";
             break;
+        case LOG_CRIT:
+            pr = "CRIT";
+            break;
         default:
             pr = "UNKNOWN";
     }
@@ -2512,12 +2528,10 @@ static void log_function(int priority, const char *format, ...)
             r = vfprintf(g.logfile, format, ap);
             va_end(ap);
         }
-        if (r < 0 || fputc('\n', g.logfile) == EOF) {
+        if (r < 0 || fputc('\n', g.logfile) == EOF || fflush(g.logfile)) {
             fprintf(stderr, "%s/%ld: [CRIT] failed to write to log file: %s\n",
                     g.progname, (long)getpid(), strerror(errno));
-            abort();
         }
-        fflush(g.logfile);
         if (g_shm)
             sem_post(&g_shm->logsem);
     }
@@ -2545,12 +2559,12 @@ static void log_function(int priority, const char *format, ...)
 void usage(void)
 {
     fprintf(stderr,
-        "usage: %s [-?|--help] [-4|--ipv4] [-6|--ipv6]\n"
+        "usage: %s [-?|--help] [-V|--version] [-4|--ipv4] [-6|--ipv6]\n"
         "\t[-b|--bind address[@port] [-c|--connect address[@port]\n"
         "\t[-d|--daemon] [-l|--logfile file] [-m|--max-auths N]\n"
         "\t[-n|--num-workers N] [-p|--proxy N] [-P|--pidfile file]\n"
-        "\t[-s|--sock path] [-S|--sock-mode mode] [-t|--terminate]\n"
-        "\t[-u|--user user[:group]] [-v|--verbose ...] [-V|--version]\n",
+        "\t[-r|--chroot dir] [-s|--sock path] [-S|--sock-mode mode]\n"
+        "\t[-t|--terminate] [-u|--user user[:group]] [-v|--verbose ...]\n",
         g.progname);
 }
 
@@ -2568,6 +2582,7 @@ int main(int argc, char **argv)
         {"num-workers", required_argument,  NULL,   'n'},
         {"pidfile",     required_argument,  NULL,   'P'},
         {"proxy",       required_argument,  NULL,   'p'},
+        {"chroot",      required_argument,  NULL,   'r'},
         {"sock",        required_argument,  NULL,   's'},
         {"sock-mode",   required_argument,  NULL,   'S'},
         {"user",        required_argument,  NULL,   'u'},
@@ -2608,7 +2623,7 @@ int main(int argc, char **argv)
     {
         char *endptr;
         int option_index;
-        int c = getopt_long(argc, argv, "46b:c:dl:m:n:p:P:s:S:tu:vVh?",
+        int c = getopt_long(argc, argv, "46b:c:dl:m:n:p:P:r:s:S:tu:vVh?",
                 options, &option_index);
         if (c == -1)
             break;
@@ -2743,6 +2758,19 @@ int main(int argc, char **argv)
                 g.proxy = n;
                 break;
 
+            case 'r':
+                if (geteuid() != 0)
+                    warnx("-r,--chroot requires running as root - ignored");
+                else {
+                    g.chroot = strdup(optarg);
+                    if (!g.chroot) {
+                        err("strdup");
+                        cleanup_and_exit(0, EXIT_FAILURE);
+                    }
+                    server_mode = true;
+                }
+                break;
+
             case 's':
                 g.socket = strdup(optarg);
                 if (!g.socket) {
@@ -2774,7 +2802,6 @@ int main(int argc, char **argv)
                 break;
 
             case 'u':
-                server_mode = true;
                 if (geteuid() != 0)
                     warnx("-u,--user requires running as root - ignored");
                 else {
@@ -2801,6 +2828,7 @@ int main(int argc, char **argv)
                         cleanup_and_exit(0, EXIT_FAILURE);
                     }
                     g.uid = pwd->pw_uid;
+                    server_mode = true;
                 }
                 break;
 
@@ -2861,28 +2889,31 @@ int main(int argc, char **argv)
                 errx("failed to parse %s", g.pidfile);
             fclose(f);
             cleanup_and_exit(0, EXIT_FAILURE);
-        } else if (g.stop) {
-            for (int i = 0; i < 3; i++) {
-                if (i > 0)
-                    infox("resending SIGTERM to process %ld", n);
-                if (kill(n, SIGTERM)) {
-                    err("failed to send SIGTERM to process %ld", n);
-                    cleanup_and_exit(0, EXIT_FAILURE);
-                }
-                for (int j = 0; j < 5; j++) {
-                    if (kill(n, 0) && errno == ESRCH)
-                        cleanup_and_exit(0, EXIT_SUCCESS);
-                    else
+        } else {
+            fclose(f);
+            if (g.stop) {
+                for (int i = 0; i < 3; i++) {
+                    if (i > 0)
+                        infox("resending SIGTERM to process %ld", n);
+                    if (kill(n, SIGTERM)) {
+                        err("failed to send SIGTERM to process %ld", n);
+                        cleanup_and_exit(0, EXIT_FAILURE);
+                    }
+                    for (int j = 0; j < 5; j++) {
                         sleep(1);
+                        if (kill(n, 0) && errno == ESRCH) {
+                            unlink(g.pidfile);
+                            unlink(g.socket);
+                            cleanup_and_exit(0, EXIT_SUCCESS);
+                        }
+                    }
                 }
+                warnx("failed to stop process %ld", n);
+                cleanup_and_exit(0, EXIT_FAILURE);
+            } else if (kill(n, 0) == 0 || errno != ESRCH) {
+                errx("another instance (pid %ld) is already running", n);
+                cleanup_and_exit(0, EXIT_FAILURE);
             }
-            warnx("sending SIGKILL to process %ld", n);
-            if (kill(n, SIGKILL))
-                err("failed to send SIGKILL to process %ld", n);
-            cleanup_and_exit(0, EXIT_FAILURE);
-        } else if (kill(n, 0) == 0 || errno != ESRCH) {
-            errx("another instance (pid %ld) is already running", n);
-            cleanup_and_exit(0, EXIT_FAILURE);
         }
     }
 
@@ -2962,7 +2993,6 @@ int main(int argc, char **argv)
     }
 
     if (g.daemon) {
-        char buf[0x10];
         if (pipe(g.pipefd)) {
             err("failed to create pipe");
             cleanup_and_exit(0, EXIT_FAILURE);
@@ -2975,6 +3005,7 @@ int main(int argc, char **argv)
             cleanup_and_exit(0, EXIT_FAILURE);
         } else if (pid != 0) {
             // parent
+            char buf[0x10];
             n = read(g.pipefd[0], buf, sizeof(buf));
             close(g.pipefd[0]);
             g.pipefd[0] = -1;
@@ -3124,6 +3155,17 @@ int main(int argc, char **argv)
             infox("open file descriptor limit: %lld", (long long)rl.rlim_cur);
     }
 
+    for (n = 0; n < 9; n++) {
+        const char *backends[] = {
+            "SELECT", "POLL", "EPOLL", "KQUEUE",
+            "DEVPOLL", "PORT", "LINUXAIO", "IOURING", "unknown"
+        };
+        if (n == 8 || (ev_backend(EV_DEFAULT) & (1 << n))) {
+            infox("libev initialized (backend %s)", backends[n]);
+            break;
+        }
+    }
+
     ev_io_init(&g.controller, cb_controller_accept, g.sockfd, EV_READ);
     ev_set_priority(&g.controller, +2);
     ev_io_start(EV_DEFAULT_ &g.controller);
@@ -3220,8 +3262,43 @@ int main(int argc, char **argv)
         freeaddrinfo(ai);
     }
 
+    if (g.user) {
+        if (g.socket && chown(g.socket, g.uid, g.gid))
+            warn("failed to change owner/group of %s", g.socket);
+        if (g.pidfile && chown(g.pidfile, g.uid, g.gid))
+            warn("failed to change owner/group of %s", g.pidfile);
+        if (g.logfilename && chown(g.logfilename, g.uid, g.gid))
+            warn("failed to change owner/group of %s", g.logfilename);
+    }
+
+    if (g.chroot) {
+        if (chdir(g.chroot)) {
+            err("chdir(\"%s\") failed", g.chroot);
+            cleanup_and_exit(4, EXIT_FAILURE);
+        }
+        noticex("changing root directory (%s)", g.chroot);
+        if (g.daemon && !g.logfilename) {
+            struct stat st;
+            if (stat("dev/log", &st)) {
+                if (errno == ENOENT)
+                    warnx("%s/dev/log missing, logging will probably not work",
+                            g.chroot);
+                else {
+                    err("stat(\"%s/dev/log\") failed", g.chroot);
+                    cleanup_and_exit(4, EXIT_FAILURE);
+                }
+            } else if (!S_ISSOCK(st.st_mode))
+                warnx("%s/dev/log is no socket, logging will probably not work",
+                            g.chroot);
+        }
+        if (chroot(".")) {
+            err("chroot(\"%s\") failed", g.chroot);
+            cleanup_and_exit(4, EXIT_FAILURE);
+        }
+    }
+
     if (g.group) {
-        infox("changing group (%s)", g.group);
+        noticex("changing group (%s)", g.group);
         if (setgid(g.gid) != 0) {
             err("setgid(%d) failed", g.gid);
             cleanup_and_exit(4, EXIT_FAILURE);
@@ -3232,13 +3309,7 @@ int main(int argc, char **argv)
     }
 
     if (g.user) {
-        infox("changing user (%s)", g.user);
-        if (g.socket && chown(g.socket, g.uid, getgid()))
-            warn("failed to change owner/group of %s", g.socket);
-        if (g.pidfile && chown(g.pidfile, g.uid, getgid()))
-            warn("failed to change owner/group of %s", g.pidfile);
-        if (g.logfilename && chown(g.logfilename, g.uid, getgid()))
-            warn("failed to change owner/group of %s", g.logfilename);
+        noticex("changing user (%s)", g.user);
         if (setuid(g.uid) != 0) {
             err("setuid(%d) failed", g.uid);
             cleanup_and_exit(4, EXIT_FAILURE);
@@ -3266,5 +3337,8 @@ int main(int argc, char **argv)
         errx("failed to listen to all address");
         cleanup_and_exit(UINT_MAX, EXIT_FAILURE);
     }
+
+    // it should never get here
+    return EXIT_FAILURE;
 }
 

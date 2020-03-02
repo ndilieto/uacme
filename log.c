@@ -51,6 +51,9 @@ void log_stderr(int priority, const char *format, ...)
         case LOG_ERR:
             pri = "ERR";
             break;
+        case LOG_CRIT:
+            pri = "CRIT";
+            break;
         default:
             pri = "UNKNOWN";
     }
@@ -123,4 +126,5 @@ DEFINE_LOG_FUNC(info,   LOG_INFO)
 DEFINE_LOG_FUNC(notice, LOG_NOTICE)
 DEFINE_LOG_FUNC(warn,   LOG_WARNING)
 DEFINE_LOG_FUNC(err,    LOG_ERR)
+DEFINE_LOG_FUNC(crit,   LOG_CRIT)
 

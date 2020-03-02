@@ -746,12 +746,12 @@ UALPN(1) Manual Page
 <div class="sect1">
 <h2 id="_synopsis">SYNOPSIS</h2>
 <div class="sectionbody">
-<div class="paragraph"><p><strong>ualpn</strong> [<strong>-?</strong>|<strong>--help</strong>] [<strong>-4</strong>|<strong>--ipv4</strong>] [<strong>-6</strong>|<strong>--ipv6</strong>]
+<div class="paragraph"><p><strong>ualpn</strong> [<strong>-?</strong>|<strong>--help</strong>]  [<strong>-V</strong>|<strong>--version</strong>] [<strong>-4</strong>|<strong>--ipv4</strong>] [<strong>-6</strong>|<strong>--ipv6</strong>]
     [<strong>-b</strong>|<strong>--bind</strong> <em>address</em>[@<em>port</em>]] [<strong>-c</strong>|<strong>--connect</strong> <em>address</em>[@<em>port</em>]]
     [<strong>-d</strong>|<strong>--daemon</strong>] [<strong>-l</strong>|<strong>--logfile</strong> <em>file</em>] [<strong>-m</strong>|<strong>--max-auths</strong> <em>N</em>]
     [<strong>-n</strong>|<strong>--num-workers</strong> <em>N</em>] [<strong>-p</strong>|<strong>--proxy</strong> <em>N</em>] [<strong>-P</strong>|<strong>--pidfile</strong> <em>file</em>]
-    [<strong>-s</strong>|<strong>--sock path</strong>] [<strong>-S</strong>|<strong>--sock-mode</strong> <em>mode</em>] [<strong>-t</strong>|<strong>--terminate</strong>]
-    [<strong>-u</strong>|<strong>--user</strong> <em>user</em><span class="monospaced">[:</span><em>group</em>]] [<strong>-v</strong>|<strong>--verbose</strong> &#8230;] [<strong>-V</strong>|<strong>--version</strong>]</p></div>
+    [<strong>-r</strong>|<strong>--chroot dir] [</strong>-s*|<strong>--sock path</strong>] [<strong>-S</strong>|<strong>--sock-mode</strong> <em>mode</em>]
+    [<strong>-t</strong>|<strong>--terminate</strong>] [<strong>-u</strong>|<strong>--user</strong> <em>user</em><span class="monospaced">[:</span><em>group</em>]] [<strong>-v</strong>|<strong>--verbose</strong> &#8230;]</p></div>
 </div>
 </div>
 <div class="sect1">
@@ -903,6 +903,17 @@ apache: <a href="https://httpd.apache.org/docs/2.4/mod/mod_remoteip.html">https:
 <dd>
 <p>
     Specify pidfile location (default /var/run/ualpn.pid)
+</p>
+</dd>
+<dt class="hdlist1">
+<strong>-r, --chroot</strong> <em>dir</em>
+</dt>
+<dd>
+<p>
+    Enable server mode and specify a directory to <em>chroot</em> to. If logging to
+    syslog it is necessary to ensure that a syslogd(8) socket is available
+    at /dev/log in the chroot directory, otherwise <strong>ualpn</strong> will not produce
+    any log output.
 </p>
 </dd>
 <dt class="hdlist1">
@@ -1173,7 +1184,7 @@ along with this program.  If not, see <a href="http://www.gnu.org/licenses/">htt
 <div id="footer-text">
 Version 1.0.22<br>
 Last updated
- 2020-03-01 20:43:06 CET
+ 2020-03-02 11:04:15 CET
 </div>
 </div>
 </body>

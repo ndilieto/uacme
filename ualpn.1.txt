@@ -13,12 +13,12 @@ ualpn - lightweight transparent proxy with built-in ACMEv2 tls-alpn-01 responder
 
 SYNOPSIS
 --------
-*ualpn* [*-?*|*--help*] [*-4*|*--ipv4*] [*-6*|*--ipv6*]
+*ualpn* [*-?*|*--help*]  [*-V*|*--version*] [*-4*|*--ipv4*] [*-6*|*--ipv6*]
     [*-b*|*--bind* 'address'[@'port']] [*-c*|*--connect* 'address'[@'port']]
     [*-d*|*--daemon*] [*-l*|*--logfile* 'file'] [*-m*|*--max-auths* 'N']
     [*-n*|*--num-workers* 'N'] [*-p*|*--proxy* 'N'] [*-P*|*--pidfile* 'file']
-    [*-s*|*--sock path*] [*-S*|*--sock-mode* 'mode'] [*-t*|*--terminate*]
-    [*-u*|*--user* 'user'`[:`'group']] [*-v*|*--verbose* ...] [*-V*|*--version*]
+    [*-r*|*--chroot dir] [*-s*|*--sock path*] [*-S*|*--sock-mode* 'mode']
+    [*-t*|*--terminate*] [*-u*|*--user* 'user'`[:`'group']] [*-v*|*--verbose* ...]
 
 
 DESCRIPTION
@@ -102,6 +102,12 @@ OPTIONS
 
 *-P, --pidfile* 'file'::
     Specify pidfile location (default /var/run/ualpn.pid)
+
+*-r, --chroot* 'dir'::
+    Enable server mode and specify a directory to 'chroot' to. If logging to
+    syslog it is necessary to ensure that a syslogd(8) socket is available
+    at /dev/log in the chroot directory, otherwise *ualpn* will not produce
+    any log output.
 
 *-s, --sock* 'path'::
     Specify unix socket path (default /var/run/ualpn.sock)
