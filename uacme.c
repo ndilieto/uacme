@@ -48,7 +48,7 @@
 typedef struct acme
 {
     privkey_t key;
-    privkey_t dkey;
+    privkey_t ckey;
     json_value_t *json;
     json_value_t *account;
     json_value_t *dir;
@@ -61,11 +61,11 @@ typedef struct acme
     const char *directory;
     const char *hook;
     const char *email;
-    const char *domain;
+    const char *ident;
     const char * const *names;
     const char *confdir;
     char *keydir;
-    char *dkeydir;
+    char *ckeydir;
     char *certdir;
 } acme_t;
 
@@ -381,8 +381,8 @@ char *identifiers(const char * const *names)
     }
     while (names && *names)
     {
-        if (asprintf(&ids, "%s{\"type\":\"dns\",\"value\":\"%s\"},",
-                    tmp, *(names++)) < 0)
+        if (asprintf(&ids, "%s{\"type\":\"%s\",\"value\":\"%s\"},",
+                    tmp, is_ip(*names, 0, 0) ? "ip" : "dns", *names) < 0)
         {
             warnx("identifiers: asprintf failed");
             free(tmp);
@@ -391,6 +391,7 @@ char *identifiers(const char * const *names)
         free(tmp);
         tmp = ids;
         ids = NULL;
+        names++;
     }
     tmp[strlen(tmp)-1] = 0;
     if (asprintf(&ids, "%s]}", tmp) < 0)
@@ -526,7 +527,8 @@ bool account_new(acme_t *a, bool yes)
                     }
                     if (json_compare_string(a->json, "status", "valid"))
                     {
-                        const char* status = json_find_string(a->json, "status");
+                        const char *status = json_find_string(a->json,
+                                "status");
                         warnx("account created but status is not valid (%s)",
                                 status ? status : "unknown");
                         return false;
@@ -582,7 +584,7 @@ bool account_retrieve(acme_t *a)
             acme_error(a);
             return false;
     }
-    const char* status = json_find_string(a->json, "status");
+    const char *status = json_find_string(a->json, "status");
     if (status && strcmp(status, "valid"))
     {
         warnx("invalid account status (%s)", status);
@@ -866,7 +868,9 @@ bool authorize(acme_t *a)
             goto out;
         }
         const json_value_t *ident = json_find(a->json, "identifier");
-        if (json_compare_string(ident, "type", "dns") != 0)
+        const char *ident_type = json_find_string(ident, "type");
+        if (!ident_type || (strcmp(ident_type, "dns") != 0 &&
+                strcmp(ident_type, "ip") != 0))
         {
             warnx("no valid identifier in auth %s",
                     auths->v.array.values[i].v.value);
@@ -1047,7 +1051,7 @@ bool cert_issue(acme_t *a, bool status_req)
         goto out;
     }
 
-    msg(1, "creating new order for %s at %s", a->domain, url);
+    msg(1, "creating new order for %s at %s", a->ident, url);
     if (201 != acme_post(a, url, ids))
     {
         warnx("failed to create new order at %s", url);
@@ -1111,7 +1115,7 @@ bool cert_issue(acme_t *a, bool status_req)
     }
 
     msg(1, "generating certificate request");
-    csr = csr_gen(a->names, status_req, a->dkey);
+    csr = csr_gen(a->names, status_req, a->ckey);
     if (!csr)
     {
         warnx("failed to generate certificate signing request");
@@ -1326,9 +1330,11 @@ out:
     return success;
 }
 
-bool validate_domain_str(const char *s)
+bool validate_identifier_str(const char *s)
 {
     size_t len = 0;
+    if (is_ip(s, 0, 0))
+        return true;
     for (size_t j = 0; j < strlen(s); j++)
     {
         switch (s[j])
@@ -1377,7 +1383,7 @@ void usage(const char *progname)
         "\t[-n|--never-create] [-s|--staging] [-t|--type RSA | EC]\n"
         "\t[-v|--verbose ...] [-V|--version] [-y|--yes] [-?|--help]\n"
         "\tnew [EMAIL] | update [EMAIL] | deactivate | newkey |\n"
-        "\tissue DOMAIN [ALTNAME ...]] | revoke CERTFILE\n", progname);
+        "\tissue IDENTIFIER [ALTNAME ...]] | revoke CERTFILE\n", progname);
 }
 
 int main(int argc, char **argv)
@@ -1633,16 +1639,16 @@ int main(int argc, char **argv)
         a.names = (const char * const *)argv + optind;
         for (const char * const *name = a.names; *name; name++)
         {
-            if (!validate_domain_str(*name))
+            if (!validate_identifier_str(*name))
             {
                 goto out;
             }
         }
 
-        a.domain = a.names[0];
-        if (a.domain[0] == '*' && a.domain[1] == '.')
+        a.ident = a.names[0];
+        if (a.ident[0] == '*' && a.ident[1] == '.')
         {
-            a.domain += 2;
+            a.ident += 2;
         }
     }
     else if (strcmp(action, "revoke") == 0)
@@ -1689,16 +1695,16 @@ int main(int argc, char **argv)
         goto out;
     }
 
-    if (a.domain)
+    if (a.ident)
     {
-        if (asprintf(&a.dkeydir, "%s/private/%s", a.confdir, a.domain) < 0)
+        if (asprintf(&a.ckeydir, "%s/private/%s", a.confdir, a.ident) < 0)
         {
-            a.dkeydir = NULL;
+            a.ckeydir = NULL;
             warnx("asprintf failed");
             goto out;
         }
 
-        if (asprintf(&a.certdir, "%s/%s", a.confdir, a.domain) < 0)
+        if (asprintf(&a.certdir, "%s/%s", a.confdir, a.ident) < 0)
         {
             a.certdir = NULL;
             warnx("asprintf failed");
@@ -1756,7 +1762,7 @@ int main(int argc, char **argv)
     }
     else if (strcmp(action, "issue") == 0)
     {
-        if (!check_or_mkdir(!never, a.dkeydir, S_IRWXU))
+        if (!check_or_mkdir(!never, a.ckeydir, S_IRWXU))
         {
             goto out;
         }
@@ -1767,8 +1773,8 @@ int main(int argc, char **argv)
             goto out;
         }
 
-        if (!(a.dkey = key_load(never ? PK_NONE : type,
-                        bits, "%s/key.pem", a.dkeydir)))
+        if (!(a.ckey = key_load(never ? PK_NONE : type,
+                        bits, "%s/key.pem", a.ckeydir)))
         {
             goto out;
         }
@@ -1805,7 +1811,7 @@ int main(int argc, char **argv)
 
 out:
     if (a.key) privkey_deinit(a.key);
-    if (a.dkey) privkey_deinit(a.dkey);
+    if (a.ckey) privkey_deinit(a.ckey);
     json_free(a.json);
     json_free(a.account);
     json_free(a.dir);
@@ -1816,7 +1822,7 @@ out:
     free(a.body);
     free(a.type);
     free(a.keydir);
-    free(a.dkeydir);
+    free(a.ckeydir);
     free(a.certdir);
     crypto_deinit();
     curl_global_cleanup();

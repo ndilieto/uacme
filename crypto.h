@@ -75,6 +75,7 @@ char *jws_thumbprint(privkey_t);
 char *jws_encode(const char *, const char *, privkey_t);
 keytype_t key_type(privkey_t);
 privkey_t key_load(keytype_t, int bits, const char *, ...);
+bool is_ip(const char *, unsigned char *, size_t *);
 char *csr_gen(const char * const *, bool, privkey_t);
 char *cert_der_base64url(const char *);
 bool cert_valid(const char *, const char * const *, int);

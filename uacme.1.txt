@@ -19,7 +19,7 @@ SYNOPSIS
     [*-s*|*--staging*] [*-t*|*--type* *RSA*|*EC*] [*-v*|*--verbose* ...]
     [*-V*|*--version*] [*-y*|*--yes*] [*-?*|*--help*]
     *new* ['EMAIL'] | *update* ['EMAIL'] | *deactivate* | *newkey* |
-    *issue* 'DOMAIN' ['ALTNAME' ...]] | *revoke* 'CERTFILE'
+    *issue* 'IDENTIFIER' ['ALTNAME' ...]] | *revoke* 'CERTFILE'
 
 
 DESCRIPTION
@@ -51,10 +51,11 @@ OPTIONS
 
 *-c, --confdir*='CONFDIR'::
     Use configuration directory 'CONFDIR' (default '/etc/ssl/uacme').
-    The structure is as follows (multiple 'DOMAINs' allowed)
+    The structure is as follows (multiple 'IDENTIFIERs' allowed)
         'CONFDIR/private/key.pem'::: ACME account private key
-        'CONFDIR/private/DOMAIN/key.pem'::: certificate key for 'DOMAIN'
-        'CONFDIR/DOMAIN/cert.pem'::: certificate for 'DOMAIN'
+        'CONFDIR/private/IDENTIFIER/key.pem'::: certificate key for
+        'IDENTIFIER'
+        'CONFDIR/IDENTIFIER/cert.pem'::: certificate for 'IDENTIFIER'
 
 *-d, --days*='DAYS'::
     Do not reissue certificates that are still valid for longer
@@ -150,22 +151,24 @@ USAGE
     is hardlinked to 'CONFDIR/private/key-TIMESTAMP.pem' before
     renaming 'CONFDIR/private/newkey.pem' to 'CONFDIR/private/key.pem'.
 
-*uacme* ['OPTIONS' ...] *issue* 'DOMAIN' ['ALTNAME' ...]::
-    Issue a certificate for 'DOMAIN' with zero or more 'ALTNAMEs'. 
-    If a certificate is already available at 'CONFDIR/DOMAIN/cert.pem'
-    for the specified 'DOMAIN' and 'ALTNAMEs' and is still valid for
+*uacme* ['OPTIONS' ...] *issue* 'IDENTIFIER' ['ALTNAME' ...]::
+    Issue a certificate for 'IDENTIFIER' with zero or more 'ALTNAMEs'.
+    If a certificate is already available at 'CONFDIR/IDENTIFIER/cert.pem'
+    for the specified 'IDENTIFIER' and 'ALTNAMEs' and is still valid for
     longer than 'DAYS' no action is taken unless *-f, --force* is
-    specified. The new certificate is saved to 'CONFDIR/DOMAIN/cert.pem'.
+    specified. The new certificate is saved to 'CONFDIR/IDENTIFIER/cert.pem'.
     If the certificate file already exists it is hardlinked to
-    'CONFDIR/DOMAIN/cert-TIMESTAMP.pem' before overwriting.
+    'CONFDIR/IDENTIFIER/cert-TIMESTAMP.pem' before overwriting.
     The private key for the certificate is loaded from
-    'CONFDIR/private/DOMAIN/key.pem'. If no such file exists,
+    'CONFDIR/private/IDENTIFIER/key.pem'. If no such file exists,
     a new key is generated unless *-n, --never-create* is specified.
-    Wildcard DOMAINs or ALTNAMEs are dealt with correctly, as long as
+    Wildcard IDENTIFIERs or ALTNAMEs are dealt with correctly, as long as
     the ACME server supports them; note that any such wildcards are 
     automatically removed from the configuration subdirectory name:
     for example a certificate for '*.test.com' is saved to
     'CONFDIR/test.com/cert.pem'.
+    IP address IDENTIFIERs and ALTNAMEs are also supported according to
+    <https://tools.ietf.org/html/rfc8738#section-3>
 
 *uacme* ['OPTIONS' ...] *revoke* 'CERTFILE'::
     Revoke the certificate stored in 'CERTFILE'. Only certificates
