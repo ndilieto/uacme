@@ -74,7 +74,7 @@
 
 typedef struct auth {
     ev_tstamp timestamp;
-    char domain[0x100];
+    char ident[0x100];
     char auth[0x30];
     uint8_t key[0x80];
     size_t key_size;
@@ -84,7 +84,7 @@ typedef struct auth {
     struct auth *left, *right;
 } auth_t;
 
-#define ACME_AUTH_CMP(x,y) (strcasecmp(((x)->domain), ((y)->domain)))
+#define ACME_AUTH_CMP(x,y) (strcasecmp(((x)->ident), ((y)->ident)))
 
 SGLIB_DEFINE_RBTREE_PROTOTYPES(auth_t, left, right, rb, ACME_AUTH_CMP)
 SGLIB_DEFINE_RBTREE_FUNCTIONS(auth_t, left, right, rb, ACME_AUTH_CMP)
@@ -151,7 +151,7 @@ typedef struct client {
     } state;
     gnutls_session_t tls;
     gnutls_certificate_credentials_t cred;
-    char domain[0x100];
+    char ident[0x100];
     char auth[0x30];
     struct client *prev, *next;
 } client_t;
@@ -438,13 +438,13 @@ int auth_unlock(void) {
     return rc;
 }
 
-auth_t *get_auth(const char *domain)
+auth_t *get_auth(const char *ident)
 {
     auth_t *a;
     if (auth_lock(100) != 0)
         return NULL;
     for (a = g_shm->auths; a; ) {
-        int c = strcasecmp(domain, a->domain);
+        int c = strcasecmp(ident, a->ident);
         if (c < 0)
             a = a->left;
         else if (c > 0)
@@ -456,11 +456,12 @@ auth_t *get_auth(const char *domain)
     return a;
 }
 
-int auth_crt(const char *domain, const uint8_t *id, size_t id_len,
+int auth_crt(const char *ident, const uint8_t *id, size_t id_len,
         gnutls_datum_t *crt, gnutls_datum_t *key)
 {
     gnutls_x509_privkey_t k;
     gnutls_x509_crt_t c;
+    struct addrinfo *ai;
     uint8_t serial[0x10];
     uint8_t keyid[0x100];
     size_t keyid_size = sizeof(keyid);
@@ -499,7 +500,7 @@ int auth_crt(const char *domain, const uint8_t *id, size_t id_len,
     }
 
     rc = gnutls_x509_crt_set_dn_by_oid(c, GNUTLS_OID_X520_COMMON_NAME, 0,
-            domain, strlen(domain));
+            ident, strlen(ident));
     if (rc != GNUTLS_E_SUCCESS) {
         warnx("auth_crt: gnutls_x509_crt_set_dn_by_oid: %s",
                 gnutls_strerror(rc));
@@ -509,7 +510,7 @@ int auth_crt(const char *domain, const uint8_t *id, size_t id_len,
     }
 
     rc = gnutls_x509_crt_set_issuer_dn_by_oid(c, GNUTLS_OID_X520_COMMON_NAME,
-            0, domain, strlen(domain));
+            0, ident, strlen(ident));
     if (rc != GNUTLS_E_SUCCESS) {
         warnx("auth_crt: gnutls_x509_crt_set_issuer_dn_by_oid: %s",
                 gnutls_strerror(rc));
@@ -563,8 +564,19 @@ int auth_crt(const char *domain, const uint8_t *id, size_t id_len,
         return rc;
     }
 
-    rc = gnutls_x509_crt_set_subject_alt_name(c, GNUTLS_SAN_DNSNAME,
-            domain, strlen(domain), GNUTLS_FSAN_APPEND);
+    rc = parse_addr(ident, AI_NUMERICHOST | AI_NUMERICSERV, AF_UNSPEC, &ai);
+    if (rc == 0 && ai->ai_family == AF_INET) {
+        struct sockaddr_in *addr = (struct sockaddr_in *)ai->ai_addr;
+        rc = gnutls_x509_crt_set_subject_alt_name(c, GNUTLS_SAN_IPADDRESS,
+                &addr->sin_addr, sizeof(addr->sin_addr), GNUTLS_FSAN_APPEND);
+    } else if (rc == 0 && ai->ai_family == AF_INET6) {
+        struct sockaddr_in6 *addr = (struct sockaddr_in6 *)ai->ai_addr;
+        rc = gnutls_x509_crt_set_subject_alt_name(c, GNUTLS_SAN_IPADDRESS,
+                &addr->sin6_addr, sizeof(addr->sin6_addr), GNUTLS_FSAN_APPEND);
+    } else
+        rc = gnutls_x509_crt_set_subject_alt_name(c, GNUTLS_SAN_DNSNAME,
+                ident, strlen(ident), GNUTLS_FSAN_APPEND);
+
     if (rc != GNUTLS_E_SUCCESS) {
         warnx("auth_crt: gnutls_x509_crt_set_subject_alt_name: %s",
                 gnutls_strerror(rc));
@@ -701,20 +713,51 @@ static void controller_handle_cmd(controller_t *c, char *line, ev_tstamp ts)
 {
     char *saveptr;
     char *cmd = strtok_r(line, " \t", &saveptr);
-    char *domain = strtok_r(NULL, " \t", &saveptr);
+    char *ident = strtok_r(NULL, " \t", &saveptr);
     char *auth = strtok_r(NULL, " \t", &saveptr);
-    size_t domain_len = domain ? strlen(domain) : 0;
+    size_t ident_len = ident ? strlen(ident) : 0;
+    struct addrinfo *ai;
+    char arpa[80];
 
     if (!cmd || (strcmp(cmd, "auth") && strcmp(cmd, "unauth"))) {
         buf_puts(&c->buf_send,
-                "ERR usage: auth <domain> <auth> | unauth <domain>\n");
+                "ERR usage: auth <ident> <auth> | unauth <ident>\n");
         return;
-    } else if (domain_len == 0 || domain_len > 250 ||
-            domain_len != strspn(domain, "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-                "abcdefghijklmnopqrstuvwxyz0123456789-_.")) {
-        buf_puts(&c->buf_send, "ERR invalid domain\n");
+    }
+
+    if (ident_len == 0 || ident_len > 250 ||
+            ident_len != strspn(ident, "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+                "abcdefghijklmnopqrstuvwxyz0123456789-_.:")) {
+        buf_puts(&c->buf_send, "ERR invalid ident\n");
         return;
-    } else if (strcmp(cmd, "auth") == 0) {
+    }
+
+    memset(arpa, 0, sizeof(arpa));
+    if (parse_addr(ident, AI_NUMERICHOST|AI_NUMERICSERV, AF_UNSPEC, &ai) == 0) {
+        memset(arpa, 0, sizeof(arpa));
+        if (ai->ai_family == AF_INET) {
+            struct sockaddr_in *ain = (struct sockaddr_in *)ai->ai_addr;
+            uint32_t addr = ain->sin_addr.s_addr;
+            snprintf(arpa, sizeof(arpa), "%d.%d.%d.%d.in-addr.arpa",
+                    (addr >> 24) & 0xFF, (addr >> 16) & 0xFF,
+                    (addr >> 8) & 0xFF, addr & 0xFF);
+        } else if (ai->ai_family == AF_INET6) {
+            struct sockaddr_in6 *ain6 = (struct sockaddr_in6 *)ai->ai_addr;
+            unsigned char *addr = ain6->sin6_addr.s6_addr;
+            char *p = arpa;
+            for (int i = sizeof(ain6->sin6_addr.s6_addr) - 1; i >= 0 &&
+                    p < arpa + sizeof(arpa) - 5; i--) {
+                *p++ = "0123456789abcdef"[addr[i] & 0xF];
+                *p++ = '.';
+                *p++ = "0123456789abcdef"[(addr[i] >> 4) & 0xF];
+                *p++ = '.';
+            }
+            strncat(p, "ip6.arpa", sizeof(arpa) - (p - arpa) - 1);
+        }
+        freeaddrinfo(ai);
+    }
+
+    if (strcmp(cmd, "auth") == 0) {
         size_t id_len;
         uint8_t id[0x22] = {
             0x04, // OCTET_STRING
@@ -728,14 +771,14 @@ static void controller_handle_cmd(controller_t *c, char *line, ev_tstamp ts)
             return;
         }
 
-        auth_t *a = get_auth(domain);
+        auth_t *a = get_auth(arpa[0] ? arpa : ident);
         if (a && strcmp(a->auth, auth) == 0) {
             buf_puts(&c->buf_send, "ERR already inserted\n");
             return;
         }
 
         gnutls_datum_t crt, key;
-        if (auth_crt(domain, id, sizeof(id), &crt, &key) != GNUTLS_E_SUCCESS) {
+        if (auth_crt(ident, id, sizeof(id), &crt, &key) != GNUTLS_E_SUCCESS) {
             buf_puts(&c->buf_send, "ERR crypto failure\n");
             return;
         }
@@ -758,7 +801,7 @@ static void controller_handle_cmd(controller_t *c, char *line, ev_tstamp ts)
             }
             a = g_shm->avail;
             SGLIB_DL_LIST_DELETE(auth_t, g_shm->avail, a, left, right);
-            strncpy(a->domain, domain, sizeof(a->domain));
+            strncpy(a->ident, arpa[0] ? arpa : ident, sizeof(a->ident));
             sglib_auth_t_add(&g_shm->auths, a);
             g.auths_touched = true;
         }
@@ -771,17 +814,21 @@ static void controller_handle_cmd(controller_t *c, char *line, ev_tstamp ts)
         auth_unlock();
         gnutls_free(key.data);
         gnutls_free(crt.data);
-        noticex("controller %08x: new auth %s for %s", c->id, auth, domain);
+        if (arpa[0])
+            noticex("controller %08x: new auth %s for %s (%s)", c->id, auth,
+                    ident, arpa);
+        else
+            noticex("controller %08x: new auth %s for %s", c->id, auth, ident);
     } else if (strcmp(cmd, "unauth") == 0) {
         if (auth) {
             buf_puts(&c->buf_send, "ERR too many parameters\n");
             return;
         }
 
-        auth_t *a = get_auth(domain);
+        auth_t *a = get_auth(arpa[0] ? arpa : ident);
         if (!a) {
             infox("controller %08x: failed to remove missing auth for %s",
-                    c->id, domain);
+                    c->id, ident);
             buf_puts(&c->buf_send, "ERR not found\n");
             return;
         }
@@ -795,7 +842,11 @@ static void controller_handle_cmd(controller_t *c, char *line, ev_tstamp ts)
         SGLIB_DL_LIST_ADD(auth_t, g_shm->avail, a, left, right);
         g.auths_touched = true;
         auth_unlock();
-        noticex("controller %08x: removed auth for %s", c->id, domain);
+        if (arpa[0])
+            noticex("controller %08x: removed auth for %s (%s)", c->id, ident,
+                    arpa);
+        else
+            noticex("controller %08x: removed auth for %s", c->id, ident);
     }
     buf_puts(&c->buf_send, "OK\n");
 }
@@ -1132,20 +1183,20 @@ static int tls_post_client_hello_func(gnutls_session_t s)
     if (rc != GNUTLS_E_SUCCESS) {
         warnx("client %08x: acme-tls/1 handshake with auth %s for %s failed: "
                 "gnutls_certificate_set_x509_key_mem: %s", c->id, auth->auth,
-                auth->domain, gnutls_strerror(rc));
+                auth->ident, gnutls_strerror(rc));
         return rc;
     }
 
     rc = gnutls_credentials_set(c->tls, GNUTLS_CRD_CERTIFICATE, c->cred);
     if (rc != GNUTLS_E_SUCCESS) {
         warnx("client %08x: acme-tls/1 handshake with auth %s for %s failed: "
-                "gnutls_credentials_set: %s", c->id, auth->auth, auth->domain,
+                "gnutls_credentials_set: %s", c->id, auth->auth, auth->ident,
                 gnutls_strerror(rc));
         return rc;
     }
 
     strncpy(c->auth, auth->auth, sizeof(c->auth));
-    strncpy(c->domain, auth->domain, sizeof(c->domain));
+    strncpy(c->ident, auth->ident, sizeof(c->ident));
 
 #if HAVE_SPLICE
     c->n_f2b = 0;
@@ -1549,10 +1600,10 @@ static void cb_client_rxf(EV_P_ ev_io *w, int revents)
         if (c->state == STATE_ACME) {
             if (rc == GNUTLS_E_SUCCESS)
                 noticex("client %08x: acme-tls/1 handshake with auth %s for %s "
-                        "completed", c->id, c->auth, c->domain);
+                        "completed", c->id, c->auth, c->ident);
             else
                 warnx("client %08x: acme-tls/1 handshake with auth %s for %s "
-                        "failed: %s", c->id, c->auth, c->domain,
+                        "failed: %s", c->id, c->auth, c->ident,
                         gnutls_strerror(rc));
             client_done(EV_A_ c, DRAIN_NONE);
             return;
@@ -1685,10 +1736,10 @@ static void cb_client_txf(EV_P_ ev_io *w, int revents)
             return;
         if (rc == GNUTLS_E_SUCCESS)
             noticex("client %08x: acme-tls/1 handshake with auth %s for %s "
-                    "completed", c->id, c->auth, c->domain);
+                    "completed", c->id, c->auth, c->ident);
         else
             warnx("client %08x: acme-tls/1 handshake with auth %s for %s "
-                    "failed: %s", c->id, c->auth, c->domain,
+                    "failed: %s", c->id, c->auth, c->ident,
                     gnutls_strerror(rc));
         client_done(EV_A_ c, DRAIN_NONE);
         return;
@@ -2426,7 +2477,7 @@ static void cb_timer(EV_P_ ev_timer *w, int revents)
                 sglib_auth_t_delete(&g_shm->auths, a);
                 SGLIB_DL_LIST_ADD(auth_t, g_shm->avail, a, left, right);
                 g.auths_touched = true;
-                infox("removed expired auth for %s", a->domain);
+                infox("removed expired auth for %s", a->ident);
                 auth_unlock();
             }
         } else

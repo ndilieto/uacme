@@ -36,7 +36,7 @@ ualpn \- lightweight transparent proxy with built\-in ACMEv2 tls\-alpn\-01 respo
 .sp
 \fBualpn\fR is a lightweight transparent proxy with built\-in RFC8737 ACMEv2 tls\-alpn\-01 challenge responder (https://tools\&.ietf\&.org/html/RFC8737)\&.
 .sp
-In client mode \fBualpn\fR connects to a running server mode instance of itself through a unix domain socket, in order to add or remove ACMEv2 authorizations\&. See CLIENT MODE below\&.
+Depending on how it is invoked, \fBualpn\fR runs in either client or server mode\&. In client mode \fBualpn\fR connects to a running server mode instance of itself through a unix domain socket, in order to add or remove ACMEv2 authorizations\&. See CLIENT MODE below\&.
 .sp
 In server mode \fBualpn\fR listens for incoming connections (by default on port 443, which is mandatory for tls\-alpn\-01 challenges)\&. It then handles any such connection in one of two different ways:
 .sp
@@ -48,9 +48,9 @@ In server mode \fBualpn\fR listens for incoming connections (by default on port 
 .sp -1
 .IP \(bu 2.3
 .\}
-If the connection begins with a "ClientHello" TLS handshake packet including a "acme\-tls/1" RFC7301 Application Level Protocol Negotiation extension
+if the connection begins with a "ClientHello" TLS handshake packet including a "acme\-tls/1" RFC7301 Application Level Protocol Negotiation extension
 \fBand\fR
-a RFC6066 Server Name Indication extension matching a domain for which it has an authorization,
+a RFC6066 Server Name Indication extension matching an identifier for which it has an authorization,
 \fBualpn\fR
 performs the tls\-alpn\-01 handshake and closes the connection;
 .RE
@@ -120,7 +120,7 @@ otherwise\&. See also
 .RS 4
 Enable server mode and allow managing ACMEv2 tls\-alpn\-01 challenges for up to
 \fIN\fR
-different domains (default 100)
+different identifiers (default 100)
 .RE
 .PP
 \fB\-n, \-\-num\-workers\fR \fIN\fR
@@ -220,33 +220,39 @@ Print a brief usage text on stderr and exit\&.
 .sp
 In client mode \fBualpn\fR pipes stdin/stdout to/from the unix socket of the running server instance of itself\&. The protocol is ASCII text based, case sensitive, line oriented, with two commands:
 .PP
-\fBauth\fR \fIdomain\fR \fIauthorization\fR
+\fBauth\fR \fIidentifier\fR \fIauthorization\fR
 .RS 4
 The
 \fBauth\fR
 command instructs the running
 \fBualpn\fR
 server to handle ACMEv2 tls\-alpn\-01 challenges for
-\fIdomain\fR
-with
-\fIauthorization\fR\&. The latter must contain the base64url encoding of the SHA\-256 digest [FIPS180\-4] of the key authorization for the challenge\&. The
+\fIidentifier\fR, which can be a string representing either a domain (type
+dns
+according to RFC8555 section 9\&.7\&.8) or an IP address (type
+ip
+according to RFC8738 section 6)\&.
+\fIauthorization\fR
+must contain the base64url encoding of the SHA\-256 digest of the key authorization computed according to RFC8737 section 3 (note the
 \fBuacme\fR
 software executes hook scripts with the correct
 \fIauthorization\fR
-passed as the 5th argument\&. Upon successful invocation of this command
+passed as the 5th argument)\&. Upon successful invocation of the
+\fBauth\fR
+command
 \fBualpn\fR
-generates a self signed certificate as required by the tls\-alpn\-01 challenge, which it will then use to perform tls\-alpn\-01 handshakes for
-\fIdomain\fR\&.
+generates a self signed certificate as required by the tls\-alpn\-01 challenge, and will then use it to perform tls\-alpn\-01 handshakes for the given
+\fIidentifier\fR\&.
 .RE
 .PP
-\fBunauth\fR \fIdomain\fR
+\fBunauth\fR \fIidentifier\fR
 .RS 4
 The
 \fBunauth\fR
 command instructs the running
 \fBualpn\fR
 server to no longer handle ACMEv2 tls\-alpn\-01 challenges for
-\fIdomain\fR\&.
+\fIidentifier\fR\&.
 .RE
 .sp
 \fBualpn\fR responds to both commands with a line beginning with either "OK" or "ERR", followed by a space and additional error information\&.
