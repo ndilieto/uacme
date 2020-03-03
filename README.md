@@ -1,7 +1,7 @@
 # experimental branch
 
 This branch contains **ualpn**, the new transparent proxy with built-in
-tls-alpn-01 responder.
+[RFC8737](https://tools.ietf.org/html/rfc8737) tls-alpn-01 responder.
 
 The intended use case is **ualpn** listening on port 443 for incoming
 HTTPS connections. Most of the time it will just transparently proxy
@@ -10,10 +10,10 @@ machine or another TCP port on the same machine). But when a tls-alpn-01
 challenge handshake comes in, **ualpn** handles it on the fly instead of
 proxying it to the webserver.
 
-While running **ualpn** also listens to a UNIX domain socket so that it
-can be fed the necessary tls-alpn-01 key authorizations for the domains
-being validated by the ACME server. **ualpn** was designed to be easy to
-integrate with not only **uacme** but also other ACME clients.
+**ualpn** also listens to a UNIX domain socket so that it can be fed the
+necessary tls-alpn-01 key authorizations for the domains being validated
+by the ACME server. **ualpn** was designed to be easy to integrate with
+not only **uacme** but also other ACME clients.
 
 # getting started, quick and dirty
 

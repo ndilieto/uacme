@@ -2,12 +2,12 @@
 .\"     Title: ualpn
 .\"    Author: [see the "AUTHOR" section]
 .\" Generator: DocBook XSL Stylesheets v1.79.1 <http://docbook.sf.net/>
-.\"      Date: 03/02/2020
+.\"      Date: 03/03/2020
 .\"    Manual: User Commands
 .\"    Source: ualpn 1.0.22
 .\"  Language: English
 .\"
-.TH "UALPN" "1" "03/02/2020" "ualpn 1\&.0\&.22" "User Commands"
+.TH "UALPN" "1" "03/03/2020" "ualpn 1\&.0\&.22" "User Commands"
 .\" -----------------------------------------------------------------
 .\" * Define some portability stuff
 .\" -----------------------------------------------------------------
@@ -34,7 +34,7 @@ ualpn \- lightweight transparent proxy with built\-in ACMEv2 tls\-alpn\-01 respo
 \fBualpn\fR [\fB\-?\fR|\fB\-\-help\fR] [\fB\-V\fR|\fB\-\-version\fR] [\fB\-4\fR|\fB\-\-ipv4\fR] [\fB\-6\fR|\fB\-\-ipv6\fR] [\fB\-b\fR|\fB\-\-bind\fR \fIaddress\fR[@\fIport\fR]] [\fB\-c\fR|\fB\-\-connect\fR \fIaddress\fR[@\fIport\fR]] [\fB\-d\fR|\fB\-\-daemon\fR] [\fB\-l\fR|\fB\-\-logfile\fR \fIfile\fR] [\fB\-m\fR|\fB\-\-max\-auths\fR \fIN\fR] [\fB\-n\fR|\fB\-\-num\-workers\fR \fIN\fR] [\fB\-p\fR|\fB\-\-proxy\fR \fIN\fR] [\fB\-P\fR|\fB\-\-pidfile\fR \fIfile\fR] [\fB\-r\fR|\fB\-\-chroot dir] [\fR\-s*|\fB\-\-sock path\fR] [\fB\-S\fR|\fB\-\-sock\-mode\fR \fImode\fR] [\fB\-t\fR|\fB\-\-terminate\fR] [\fB\-u\fR|\fB\-\-user\fR \fIuser\fR[:\fIgroup\fR]] [\fB\-v\fR|\fB\-\-verbose\fR \&...]
 .SH "DESCRIPTION"
 .sp
-\fBualpn\fR is a lightweight transparent proxy with built\-in ACMEv2 tls\-alpn\-01 challenge responder (https://tools\&.ietf\&.org/html/draft\-ietf\-acme\-tls\-alpn\-01)\&.
+\fBualpn\fR is a lightweight transparent proxy with built\-in RFC8737 ACMEv2 tls\-alpn\-01 challenge responder (https://tools\&.ietf\&.org/html/RFC8737)\&.
 .sp
 In client mode \fBualpn\fR connects to a running server mode instance of itself through a unix domain socket, in order to add or remove ACMEv2 authorizations\&. See CLIENT MODE below\&.
 .sp

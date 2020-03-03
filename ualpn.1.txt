@@ -23,8 +23,8 @@ SYNOPSIS
 
 DESCRIPTION
 -----------
-*ualpn* is a lightweight transparent proxy with built-in ACMEv2 tls-alpn-01
-challenge responder (<https://tools.ietf.org/html/draft-ietf-acme-tls-alpn-01>).
+*ualpn* is a lightweight transparent proxy with built-in RFC8737 ACMEv2 
+tls-alpn-01 challenge responder (<https://tools.ietf.org/html/RFC8737>).
 
 In client mode *ualpn* connects to a running server mode instance of itself
 through a unix domain socket, in order to add or remove ACMEv2 authorizations.
