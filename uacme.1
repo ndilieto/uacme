@@ -2,12 +2,12 @@
 .\"     Title: uacme
 .\"    Author: [see the "AUTHOR" section]
 .\" Generator: DocBook XSL Stylesheets v1.79.1 <http://docbook.sf.net/>
-.\"      Date: 03/02/2020
+.\"      Date: 03/03/2020
 .\"    Manual: User Commands
 .\"    Source: uacme 1.0.22
 .\"  Language: English
 .\"
-.TH "UACME" "1" "03/02/2020" "uacme 1\&.0\&.22" "User Commands"
+.TH "UACME" "1" "03/03/2020" "uacme 1\&.0\&.22" "User Commands"
 .\" -----------------------------------------------------------------
 .\" * Define some portability stuff
 .\" -----------------------------------------------------------------
@@ -31,7 +31,7 @@
 uacme \- ACMEv2 client written in plain C code with minimal dependencies
 .SH "SYNOPSIS"
 .sp
-\fBuacme\fR [\fB\-a\fR|\fB\-\-acme\-url\fR \fIURL\fR] [\fB\-b\fR|\fB\-\-bits\fR \fIBITS\fR] [\fB\-c\fR|\fB\-\-confdir\fR \fIDIR\fR] [\fB\-d\fR|\fB\-\-days\fR \fIDAYS\fR] [\fB\-f\fR|\fB\-\-force\fR] [\fB\-h\fR|\fB\-\-hook\fR \fIPROGRAM\fR] [\fB\-m\fR|\fB\-\-must\-staple\fR] [\fB\-n\fR|\fB\-\-never\fR] [\fB\-s\fR|\fB\-\-staging\fR] [\fB\-t\fR|\fB\-\-type\fR \fBRSA\fR|\fBEC\fR] [\fB\-v\fR|\fB\-\-verbose\fR \&...] [\fB\-V\fR|\fB\-\-version\fR] [\fB\-y\fR|\fB\-\-yes\fR] [\fB\-?\fR|\fB\-\-help\fR] \fBnew\fR [\fIEMAIL\fR] | \fBupdate\fR [\fIEMAIL\fR] | \fBdeactivate\fR | \fBnewkey\fR | \fBissue\fR \fIDOMAIN\fR [\fIALTNAME\fR \&...]] | \fBrevoke\fR \fICERTFILE\fR
+\fBuacme\fR [\fB\-a\fR|\fB\-\-acme\-url\fR \fIURL\fR] [\fB\-b\fR|\fB\-\-bits\fR \fIBITS\fR] [\fB\-c\fR|\fB\-\-confdir\fR \fIDIR\fR] [\fB\-d\fR|\fB\-\-days\fR \fIDAYS\fR] [\fB\-f\fR|\fB\-\-force\fR] [\fB\-h\fR|\fB\-\-hook\fR \fIPROGRAM\fR] [\fB\-m\fR|\fB\-\-must\-staple\fR] [\fB\-n\fR|\fB\-\-never\fR] [\fB\-s\fR|\fB\-\-staging\fR] [\fB\-t\fR|\fB\-\-type\fR \fBRSA\fR|\fBEC\fR] [\fB\-v\fR|\fB\-\-verbose\fR \&...] [\fB\-V\fR|\fB\-\-version\fR] [\fB\-y\fR|\fB\-\-yes\fR] [\fB\-?\fR|\fB\-\-help\fR] \fBnew\fR [\fIEMAIL\fR] | \fBupdate\fR [\fIEMAIL\fR] | \fBdeactivate\fR | \fBnewkey\fR | \fBissue\fR \fIIDENTIFIER\fR [\fIALTNAME\fR \&...]] | \fBrevoke\fR \fICERTFILE\fR
 .SH "DESCRIPTION"
 .sp
 \fBuacme\fR is a client for the ACMEv2 protocol described in RFC8555, written in plain C code with minimal dependencies (libcurl and one of GnuTLS, OpenSSL or mbedTLS)\&. The ACMEv2 protocol allows a Certificate Authority (https://letsencrypt\&.org is a popular one) and an applicant to automate the process of verification and certificate issuance\&. The protocol also provides facilities for other certificate management functions, such as certificate revocation\&. For more information see https://tools\&.ietf\&.org/html/rfc8555
@@ -70,7 +70,7 @@ Use configuration directory
 \fICONFDIR\fR
 (default
 \fI/etc/ssl/uacme\fR)\&. The structure is as follows (multiple
-\fIDOMAINs\fR
+\fIIDENTIFIERs\fR
 allowed)
 .PP
 \fICONFDIR/private/key\&.pem\fR
@@ -78,16 +78,16 @@ allowed)
 ACME account private key
 .RE
 .PP
-\fICONFDIR/private/DOMAIN/key\&.pem\fR
+\fICONFDIR/private/IDENTIFIER/key\&.pem\fR
 .RS 4
 certificate key for
-\fIDOMAIN\fR
+\fIIDENTIFIER\fR
 .RE
 .PP
-\fICONFDIR/DOMAIN/cert\&.pem\fR
+\fICONFDIR/IDENTIFIER/cert\&.pem\fR
 .RS 4
 certificate for
-\fIDOMAIN\fR
+\fIIDENTIFIER\fR
 .RE
 .RE
 .PP
@@ -268,15 +268,15 @@ to
 \fICONFDIR/private/key\&.pem\fR\&.
 .RE
 .PP
-\fBuacme\fR [\fIOPTIONS\fR \&...] \fBissue\fR \fIDOMAIN\fR [\fIALTNAME\fR \&...]
+\fBuacme\fR [\fIOPTIONS\fR \&...] \fBissue\fR \fIIDENTIFIER\fR [\fIALTNAME\fR \&...]
 .RS 4
 Issue a certificate for
-\fIDOMAIN\fR
+\fIIDENTIFIER\fR
 with zero or more
 \fIALTNAMEs\fR\&. If a certificate is already available at
-\fICONFDIR/DOMAIN/cert\&.pem\fR
+\fICONFDIR/IDENTIFIER/cert\&.pem\fR
 for the specified
-\fIDOMAIN\fR
+\fIIDENTIFIER\fR
 and
 \fIALTNAMEs\fR
 and is still valid for longer than
@@ -284,15 +284,16 @@ and is still valid for longer than
 no action is taken unless
 \fB\-f, \-\-force\fR
 is specified\&. The new certificate is saved to
-\fICONFDIR/DOMAIN/cert\&.pem\fR\&. If the certificate file already exists it is hardlinked to
-\fICONFDIR/DOMAIN/cert\-TIMESTAMP\&.pem\fR
+\fICONFDIR/IDENTIFIER/cert\&.pem\fR\&. If the certificate file already exists it is hardlinked to
+\fICONFDIR/IDENTIFIER/cert\-TIMESTAMP\&.pem\fR
 before overwriting\&. The private key for the certificate is loaded from
-\fICONFDIR/private/DOMAIN/key\&.pem\fR\&. If no such file exists, a new key is generated unless
+\fICONFDIR/private/IDENTIFIER/key\&.pem\fR\&. If no such file exists, a new key is generated unless
 \fB\-n, \-\-never\-create\fR
-is specified\&. Wildcard DOMAINs or ALTNAMEs are dealt with correctly, as long as the ACME server supports them; note that any such wildcards are automatically removed from the configuration subdirectory name: for example a certificate for
+is specified\&. Wildcard IDENTIFIERs or ALTNAMEs are dealt with correctly, as long as the ACME server supports them; note that any such wildcards are automatically removed from the configuration subdirectory name: for example a certificate for
 \fI*\&.test\&.com\fR
 is saved to
-\fICONFDIR/test\&.com/cert\&.pem\fR\&.
+\fICONFDIR/test\&.com/cert\&.pem\fR\&. IP address IDENTIFIERs and ALTNAMEs are also supported according to
+https://tools\&.ietf\&.org/html/rfc8738#section\-3
 .RE
 .PP
 \fBuacme\fR [\fIOPTIONS\fR \&...] \fBrevoke\fR \fICERTFILE\fR

@@ -22,11 +22,14 @@
 
 #include <err.h>
 #include <errno.h>
+#include <netdb.h>
 #include <stdarg.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
 #include <sys/stat.h>
+#include <sys/socket.h>
+#include <sys/types.h>
 #include <unistd.h>
 
 #include "base64.h"
@@ -2011,12 +2014,61 @@ out:
     return key;
 }
 
+bool is_ip(const char *s, unsigned char *ip, size_t *ip_len)
+{
+    bool ret = false;
+    struct addrinfo hints, *ai;
+    memset(&hints, 0, sizeof(hints));
+    hints.ai_flags = AI_NUMERICHOST | AI_NUMERICSERV;
+    hints.ai_family = AF_UNSPEC;
+
+    if (getaddrinfo(s, NULL, &hints, &ai) == 0)
+    {
+        if (ai->ai_family == AF_INET)
+        {
+            if (ip_len && *ip_len >= sizeof(struct in_addr))
+            {
+                struct sockaddr_in *s = (struct sockaddr_in *)ai->ai_addr;
+                *ip_len = sizeof(struct in_addr);
+                if (ip)
+                    memcpy(ip, &s->sin_addr, sizeof(struct in_addr));
+            }
+            ret = true;
+        }
+        else if (ai->ai_family == AF_INET6)
+        {
+            if (ip_len && *ip_len >= sizeof(struct in6_addr))
+            {
+                struct sockaddr_in6 *s = (struct sockaddr_in6 *)ai->ai_addr;
+                *ip_len = sizeof(struct in6_addr);
+                if (ip)
+                    memcpy(ip, &s->sin6_addr, sizeof(struct in6_addr));
+            }
+            ret = true;
+        }
+        else
+        {
+            if (ip_len)
+                *ip_len = 0;
+        }
+        freeaddrinfo(ai);
+    }
+    else if (ip_len)
+        *ip_len = 0;
+
+    return ret;
+}
+
 char *csr_gen(const char * const *names, bool status_req, privkey_t key)
 {
     char *req = NULL;
     unsigned char *csrdata = NULL;
     size_t csrsize = 0;
     int r;
+#if !defined(USE_OPENSSL)
+    unsigned char ip[16];
+    size_t ip_len;
+#endif
 #if defined(USE_GNUTLS)
     unsigned int key_usage = 0;
     gnutls_digest_algorithm_t hash_type;
@@ -2122,8 +2174,13 @@ char *csr_gen(const char * const *names, bool status_req, privkey_t key)
 
     while (*names)
     {
-        r = gnutls_x509_crq_set_subject_alt_name(crq, GNUTLS_SAN_DNSNAME,
-                *names, strlen(*names), GNUTLS_FSAN_APPEND);
+        ip_len = sizeof(ip);
+        if (is_ip(*names, ip, &ip_len))
+            r = gnutls_x509_crq_set_subject_alt_name(crq, GNUTLS_SAN_IPADDRESS,
+                    ip, ip_len, GNUTLS_FSAN_APPEND);
+        else
+            r = gnutls_x509_crq_set_subject_alt_name(crq, GNUTLS_SAN_DNSNAME,
+                    *names, strlen(*names), GNUTLS_FSAN_APPEND);
         if (r != GNUTLS_E_SUCCESS)
         {
             warnx("csr_gen: gnutls_x509_set_subject_alt_name: %s",
@@ -2263,23 +2320,23 @@ char *csr_gen(const char * const *names, bool status_req, privkey_t key)
         openssl_error("csr_gen");
         goto out;
     }
-    if (asprintf(&san, "DNS:%s", *names++) < 0)
+    if (asprintf(&san, "%s:%s", is_ip(*names, 0, 0) ? "IP" : "DNS", *names) < 0)
     {
         warnx("csr_gen: asprintf failed");
         san = NULL;
         goto out;
     }
-    while (*names)
+    while (*++names)
     {
         char *tmp = NULL;
-        if (asprintf(&tmp, "%s,DNS:%s", san, *names) < 0)
+        if (asprintf(&tmp, "%s,%s:%s", san, is_ip(*names, 0, 0) ? "IP" : "DNS",
+                    *names) < 0)
         {
             warnx("csr_gen: asprintf failed");
             goto out;
         }
         free(san);
         san = tmp;
-        names++;
     }
     exts = sk_X509_EXTENSION_new_null();
     if (!exts)
@@ -2383,12 +2440,27 @@ char *csr_gen(const char * const *names, bool status_req, privkey_t key)
         size_t len = 0;
         size_t count = 0;
         while (names[count]) count++;
-        while (count)
+        while (count--)
         {
-            count--;
-            r = mbedtls_asn1_write_raw_buffer(&p, buf,
-                    (const unsigned char *)names[count],
-                    strlen(names[count]));
+            const unsigned char *data;
+            size_t data_len;
+            unsigned char tag;
+
+            ip_len = sizeof(ip);
+            if (is_ip(names[count], ip, &ip_len))
+            {
+                tag = MBEDTLS_ASN1_CONTEXT_SPECIFIC | 7;
+                data = ip;
+                data_len = ip_len;
+            }
+            else
+            {
+                tag = MBEDTLS_ASN1_CONTEXT_SPECIFIC | 2;
+                data = (const unsigned char *)names[count];
+                data_len = strlen(names[count]);
+            }
+
+            r = mbedtls_asn1_write_raw_buffer(&p, buf, data, data_len);
             if (r >= 0)
             {
                 len += r;
@@ -2403,7 +2475,7 @@ char *csr_gen(const char * const *names, bool status_req, privkey_t key)
                         _mbedtls_strerror(r));
                 goto out;
             }
-            r = mbedtls_asn1_write_len(&p, buf, strlen(names[count]));
+            r = mbedtls_asn1_write_len(&p, buf, data_len);
             if (r >= 0)
             {
                 len += r;
@@ -2418,8 +2490,7 @@ char *csr_gen(const char * const *names, bool status_req, privkey_t key)
                         _mbedtls_strerror(r));
                 goto out;
             }
-            r = mbedtls_asn1_write_tag(&p, buf,
-                    MBEDTLS_ASN1_CONTEXT_SPECIFIC|2);
+            r = mbedtls_asn1_write_tag(&p, buf, tag);
             if (r >= 0)
             {
                 len += r;

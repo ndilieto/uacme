@@ -752,7 +752,7 @@ UACME(1) Manual Page
     [<strong>-s</strong>|<strong>--staging</strong>] [<strong>-t</strong>|<strong>--type</strong> <strong>RSA</strong>|<strong>EC</strong>] [<strong>-v</strong>|<strong>--verbose</strong> &#8230;]
     [<strong>-V</strong>|<strong>--version</strong>] [<strong>-y</strong>|<strong>--yes</strong>] [<strong>-?</strong>|<strong>--help</strong>]
     <strong>new</strong> [<em>EMAIL</em>] | <strong>update</strong> [<em>EMAIL</em>] | <strong>deactivate</strong> | <strong>newkey</strong> |
-    <strong>issue</strong> <em>DOMAIN</em> [<em>ALTNAME</em> &#8230;]] | <strong>revoke</strong> <em>CERTFILE</em></p></div>
+    <strong>issue</strong> <em>IDENTIFIER</em> [<em>ALTNAME</em> &#8230;]] | <strong>revoke</strong> <em>CERTFILE</em></p></div>
 </div>
 </div>
 <div class="sect1">
@@ -816,7 +816,7 @@ production URL
 <dd>
 <p>
     Use configuration directory <em>CONFDIR</em> (default <em>/etc/ssl/uacme</em>).
-    The structure is as follows (multiple <em>DOMAINs</em> allowed)
+    The structure is as follows (multiple <em>IDENTIFIERs</em> allowed)
 </p>
 <div class="dlist"><dl>
 <dt class="hdlist1">
@@ -828,19 +828,20 @@ ACME account private key
 </p>
 </dd>
 <dt class="hdlist1">
-<em>CONFDIR/private/DOMAIN/key.pem</em>
+<em>CONFDIR/private/IDENTIFIER/key.pem</em>
 </dt>
 <dd>
 <p>
-certificate key for <em>DOMAIN</em>
+certificate key for
+        <em>IDENTIFIER</em>
 </p>
 </dd>
 <dt class="hdlist1">
-<em>CONFDIR/DOMAIN/cert.pem</em>
+<em>CONFDIR/IDENTIFIER/cert.pem</em>
 </dt>
 <dd>
 <p>
-certificate for <em>DOMAIN</em>
+certificate for <em>IDENTIFIER</em>
 </p>
 </dd>
 </dl></div>
@@ -1078,25 +1079,27 @@ The key authorization (for <strong>dns-01</strong> and <strong>tls-alpn-01</stro
 </p>
 </dd>
 <dt class="hdlist1">
-<strong>uacme</strong> [<em>OPTIONS</em> &#8230;] <strong>issue</strong> <em>DOMAIN</em> [<em>ALTNAME</em> &#8230;]
+<strong>uacme</strong> [<em>OPTIONS</em> &#8230;] <strong>issue</strong> <em>IDENTIFIER</em> [<em>ALTNAME</em> &#8230;]
 </dt>
 <dd>
 <p>
-    Issue a certificate for <em>DOMAIN</em> with zero or more <em>ALTNAMEs</em>.
-    If a certificate is already available at <em>CONFDIR/DOMAIN/cert.pem</em>
-    for the specified <em>DOMAIN</em> and <em>ALTNAMEs</em> and is still valid for
+    Issue a certificate for <em>IDENTIFIER</em> with zero or more <em>ALTNAMEs</em>.
+    If a certificate is already available at <em>CONFDIR/IDENTIFIER/cert.pem</em>
+    for the specified <em>IDENTIFIER</em> and <em>ALTNAMEs</em> and is still valid for
     longer than <em>DAYS</em> no action is taken unless <strong>-f, --force</strong> is
-    specified. The new certificate is saved to <em>CONFDIR/DOMAIN/cert.pem</em>.
+    specified. The new certificate is saved to <em>CONFDIR/IDENTIFIER/cert.pem</em>.
     If the certificate file already exists it is hardlinked to
-    <em>CONFDIR/DOMAIN/cert-TIMESTAMP.pem</em> before overwriting.
+    <em>CONFDIR/IDENTIFIER/cert-TIMESTAMP.pem</em> before overwriting.
     The private key for the certificate is loaded from
-    <em>CONFDIR/private/DOMAIN/key.pem</em>. If no such file exists,
+    <em>CONFDIR/private/IDENTIFIER/key.pem</em>. If no such file exists,
     a new key is generated unless <strong>-n, --never-create</strong> is specified.
-    Wildcard DOMAINs or ALTNAMEs are dealt with correctly, as long as
+    Wildcard IDENTIFIERs or ALTNAMEs are dealt with correctly, as long as
     the ACME server supports them; note that any such wildcards are
     automatically removed from the configuration subdirectory name:
     for example a certificate for <em>*.test.com</em> is saved to
     <em>CONFDIR/test.com/cert.pem</em>.
+    IP address IDENTIFIERs and ALTNAMEs are also supported according to
+    <a href="https://tools.ietf.org/html/rfc8738#section-3">https://tools.ietf.org/html/rfc8738#section-3</a>
 </p>
 </dd>
 <dt class="hdlist1">
@@ -1249,7 +1252,7 @@ along with this program.  If not, see <a href="http://www.gnu.org/licenses/">htt
 <div id="footer-text">
 Version 1.0.22<br>
 Last updated
- 2020-03-02 10:23:07 CET
+ 2020-03-03 22:36:40 CET
 </div>
 </div>
 </body>
