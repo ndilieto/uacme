@@ -8,7 +8,7 @@ UALPN(1)
 
 NAME
 ----
-ualpn - lightweight transparent proxy with built-in ACMEv2 tls-alpn-01 responder
+ualpn - lightweight proxying ACMEv2 tls-alpn-01 responder
 
 
 SYNOPSIS
@@ -23,8 +23,8 @@ SYNOPSIS
 
 DESCRIPTION
 -----------
-*ualpn* is a lightweight transparent proxy with built-in RFC8737 ACMEv2 
-tls-alpn-01 challenge responder (<https://tools.ietf.org/html/RFC8737>).
+*ualpn* is a lightweight proxying ACMEv2 tls-alpn-01 challenge responder
+compliant with RFC8737 (<https://tools.ietf.org/html/RFC8737>).
 
 Depending on how it is invoked, *ualpn* runs in either client or server mode.
 In client mode *ualpn* connects to a running server mode instance of itself
@@ -102,7 +102,7 @@ OPTIONS
     * apache: <https://httpd.apache.org/docs/2.4/mod/mod_remoteip.html>
 
 *-P, --pidfile* 'file'::
-    Specify pidfile location (default /var/run/ualpn.pid)
+    Specify pidfile location (default {runstatedir}/ualpn.pid)
 
 *-r, --chroot* 'dir'::
     Enable server mode and specify a directory to 'chroot' to. If logging to
@@ -111,7 +111,7 @@ OPTIONS
     any log output.
 
 *-s, --sock* 'path'::
-    Specify unix socket path (default /var/run/ualpn.sock)
+    Specify unix socket path (default {runstatedir}/ualpn.sock)
 
 *-S, --sock-mode* 'mode'::
     Enable server mode and specify socket access permissions (default 644)

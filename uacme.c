@@ -45,7 +45,7 @@
 
 #define PRODUCTION_URL "https://acme-v02.api.letsencrypt.org/directory"
 #define STAGING_URL "https://acme-staging-v02.api.letsencrypt.org/directory"
-#define DEFAULT_CONFDIR "/etc/ssl/uacme"
+#define DEFAULT_CONFDIR SYSCONFDIR "/ssl/uacme"
 
 typedef struct acme
 {

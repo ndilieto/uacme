@@ -16,6 +16,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 ACLOCAL_AMFLAGS=-I build-aux/m4
+ARFLAGS=cr
 
 bin_PROGRAMS = uacme
 
@@ -23,22 +24,25 @@ if ENABLE_UALPN
 bin_PROGRAMS += ualpn
 
 ualpn_SOURCES = ualpn.c base64.c base64.h log.c log.h
-ualpn_CFLAGS = $(PTHREAD_CFLAGS) $(WCFLAGS)
-ualpn_LDFLAGS = $(PTHREAD_LDFLAGS)
+ualpn_CPPFLAGS = -DRUNSTATEDIR="\"${runstatedir}\""
+		 -DSYSCONFDIR="\"${sysconfdir}\""
+ualpn_CFLAGS = $(WCFLAGS)
+ualpn_LDFLAGS = $(UALPN_LDFLAGS)
 if ENABLE_LIBEV
-ualpn_CFLAGS += -Ilibev
 ualpn_SOURCES += libev/ev.h
+ualpn_CPPFLAGS += -Ilibev
 ualpn_LDADD = libev.a
 
 noinst_LIBRARIES = libev.a
 libev_a_SOURCES = libev/ev.c
-libev_a_CFLAGS = $(PTHREAD_CFLAGS)
 endif
 endif
 
 uacme_SOURCES = uacme.c base64.c base64.h crypto.c crypto.h \
 		curlwrap.c curlwrap.h json.c json.h jsmn.h \
 		msg.c msg.h
+uacme_CPPFLAGS = -DRUNSTATEDIR="\"${runstatedir}\"" \
+		 -DSYSCONFDIR="\"${sysconfdir}\""
 uacme_CFLAGS = $(CURL_CFLAGS) $(WCFLAGS)
 uacme_LDFLAGS = $(CURL_LDFLAGS)
 
@@ -66,22 +70,30 @@ if ENABLE_UALPN
 dist_man1_MANS += ualpn.1
 dist_html_DATA += ualpn.1.html
 
-ualpn.1: ualpn.1.txt $(top_srcdir)/.version
-	$(A2X) -L -d manpage -f manpage -a revision=$(VERSION) $<
+ualpn.1: ualpn.1.txt $(top_srcdir)/.version Makefile
+	$(AM_V_GEN)$(A2X) -L -d manpage -f manpage -a revision=$(VERSION) \
+	    -a sysconfdir="${sysconfdir}" \
+	    -a runstatedir="${runstatedir}" $<
 
-ualpn.1.html: ualpn.1.txt $(top_srcdir)/.version
-	$(ASCIIDOC) -d manpage -b html5 -a revision=$(VERSION) $<
+ualpn.1.html: ualpn.1.txt $(top_srcdir)/.version Makefile
+	$(AM_V_GEN)$(ASCIIDOC) -d manpage -b html5 -a revision=$(VERSION) \
+	    -a sysconfdir="${sysconfdir}" \
+	    -a runstatedir="${runstatedir}" $<
 
 $(top_srcdir)/docs/ualpn.html: ualpn.1.html
 	mkdir -p docs
 	cp ualpn.1.html $@
 endif
 
-uacme.1: uacme.1.txt $(top_srcdir)/.version
-	$(A2X) -L -d manpage -f manpage -a revision=$(VERSION) $<
+uacme.1: uacme.1.txt $(top_srcdir)/.version Makefile
+	$(AM_V_GEN)$(A2X) -L -d manpage -f manpage -a revision=$(VERSION) \
+	    -a sysconfdir="${sysconfdir}" \
+	    -a runstatedir="${runstatedir}" $<
 
-uacme.1.html: uacme.1.txt $(top_srcdir)/.version
-	$(ASCIIDOC) -d manpage -b html5 -a revision=$(VERSION) $<
+uacme.1.html: uacme.1.txt $(top_srcdir)/.version Makefile
+	$(AM_V_GEN)$(ASCIIDOC) -d manpage -b html5 -a revision=$(VERSION) \
+	    -a sysconfdir="${sysconfdir}" \
+	    -a runstatedir="${runstatedir}" $<
 
 $(top_srcdir)/docs/index.html: uacme.1.html
 	mkdir -p docs

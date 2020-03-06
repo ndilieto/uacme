@@ -50,7 +50,7 @@ OPTIONS
     (*NID_X9_62_prime256v1* curve) or 384 (*NID_secp384r1* curve).
 
 *-c, --confdir*='CONFDIR'::
-    Use configuration directory 'CONFDIR' (default '/etc/ssl/uacme').
+    Use configuration directory 'CONFDIR' (default '{sysconfdir}/ssl/uacme').
     The structure is as follows (multiple 'IDENTIFIERs' allowed)
         'CONFDIR/private/key.pem'::: ACME account private key
         'CONFDIR/private/IDENTIFIER/key.pem'::: certificate key for

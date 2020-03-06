@@ -2924,7 +2924,7 @@ int main(int argc, char **argv)
         warnx("extra argument ignored: %s", argv[optind++]);
 
     if (!g.pidfile) {
-        if (asprintf(&g.pidfile, "/var/run/%s.pid", g.progname) < 0) {
+        if (asprintf(&g.pidfile, RUNSTATEDIR "/%s.pid", g.progname) < 0) {
             g.pidfile = NULL;
             err("asprintf");
             cleanup_and_exit(0, EXIT_FAILURE);
@@ -2932,7 +2932,7 @@ int main(int argc, char **argv)
     }
 
     if (!g.socket) {
-        if (asprintf(&g.socket, "/var/run/%s.sock", g.progname) < 0) {
+        if (asprintf(&g.socket, RUNSTATEDIR "/%s.sock", g.progname) < 0) {
             g.socket = NULL;
             err("asprintf");
             cleanup_and_exit(0, EXIT_FAILURE);

@@ -310,19 +310,25 @@ if test "x$OPT_UALPN" != "xno" -a "x$OPT_GNUTLS" = "xno"; then
 fi
 
 if test "x$OPT_UALPN" != "xno"; then
+    AM_PROG_AR
+    AC_CHECK_FUNCS([open_memstream], [],
+                   AC_MSG_ERROR([open_memstream not found]))
     AC_ARG_ENABLE(splice, AS_HELP_STRING([--disable-splice], [disable splice]))
     if test "x$enable_splice" != "xno"; then
         AC_CHECK_FUNCS([splice])
     fi
-    AX_PTHREAD([], AC_MSG_ERROR([pthread not found]))
-    AC_CHECK_FUNCS([open_memstream], [],
-                   AC_MSG_ERROR([open_memstream not found]))
-    AC_CHECK_LIB(ev, ev_version_major, [], with_included_libev=yes)
-    if test "x$with_included_libev" = "xyes"; then
-        AC_MSG_NOTICE([libev not found, using included copy])
-        m4_include([libev/libev.m4])
-    fi
+    LIBS_ORIG=$LIBS
+    LIBS=
+    AC_SEARCH_LIBS([sem_init], [pthread], [],
+                   AC_MSG_ERROR([sem_init not found]))
+    AC_SEARCH_LIBS([ev_version_major], [ev], [],
+                   [AC_MSG_NOTICE([libev not found, using included copy])
+                    with_included_libev=yes
+                    m4_include([libev/libev.m4])])
+    UALPN_LDFLAGS=$LIBS
+    LIBS=$LIBS_ORIG
 fi
+AC_SUBST(UALPN_LDFLAGS)
 AM_CONDITIONAL(ENABLE_UALPN, test "x$OPT_UALPN" = "xyes")
 AM_CONDITIONAL(ENABLE_LIBEV, test "x$with_included_libev" = "xyes")
 
@@ -337,6 +343,17 @@ if test "x$enable_docs" = "xyes"; then
     AS_IF([test "x$A2X" = "xno"], [AC_MSG_ERROR([Could not find a2x.])])
     AS_IF([test "x$ASCIIDOC" = "xno"], [AC_MSG_ERROR([Could not find asciidoc.])])
 fi
+
+AS_CASE([$prefix:$localstatedir],
+        [NONE:'${prefix}/var' | /usr:'${prefix}/var' | /usr/local:'${prefix}/var'],
+         [localstatedir=/var; AC_MSG_NOTICE([--localstatedir defaulted to /var])])
+AC_SUBST([localstatedir])
+
+AS_CASE([$prefix:$sysconfdir],
+        [NONE:'${prefix}/etc' | /usr:'${prefix}/etc' | /usr/local:'${prefix}/etc'],
+         [sysconfdir=/etc; AC_MSG_NOTICE([--sysconfdir defaulted to /etc])])
+AC_SUBST([sysconfdir])
+
 AC_CONFIG_HEADERS([config.h])
 AC_CONFIG_FILES([Makefile])
 AC_OUTPUT
