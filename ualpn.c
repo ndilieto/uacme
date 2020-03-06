@@ -133,6 +133,7 @@ typedef struct client {
     buffer_t buf_f2b;
     buffer_t buf_b2f;
 #endif
+    size_t brx, btx, frx, ftx;
     char lhost_f[MAXHOST];
     char lserv_f[MAXSERV];
     char rhost_f[MAXHOST];
@@ -1019,7 +1020,8 @@ static void client_done(EV_P_ client_t *c, drain_t drain)
         if (c->buf_b2f.n == 0) {
 #endif
             ev_io_stop(EV_A_ &c->io_txf);
-            infox("client %08x: frontend connection closed", c->id);
+            infox("client %08x: frontend connection closed (rx=%zu tx=%zu)",
+                    c->id, c->frx, c->ftx);
             shutdown(c->fd_f, SHUT_RDWR);
             close(c->fd_f);
             c->fd_f = -1;
@@ -1037,7 +1039,8 @@ static void client_done(EV_P_ client_t *c, drain_t drain)
         if (c->buf_f2b.n == 0) {
 #endif
             ev_io_stop(EV_A_ &c->io_txb);
-            infox("client %08x: backend connection closed", c->id);
+            infox("client %08x: backend connection closed (rx=%zu tx=%zu)",
+                    c->id, c->brx, c->btx);
             shutdown(c->fd_b, SHUT_RDWR);
             close(c->fd_b);
             c->fd_b = -1;
@@ -1089,8 +1092,10 @@ static ssize_t tls_pull_func(gnutls_transport_ptr_t p, void *data, size_t size)
         return -1;
     }
 
-    if (c->state == STATE_ACME)
+    if (c->state == STATE_ACME) {
+        c->frx += s;
         return s;
+    }
 
 #if HAVE_SPLICE
     s = write(c->fd_f2b[1], data, s);
@@ -1102,11 +1107,16 @@ static ssize_t tls_pull_func(gnutls_transport_ptr_t p, void *data, size_t size)
     if (s == -1) {
         gnutls_transport_set_errno(c->tls, errno);
         return -1;
-    } else if (recv(c->fd_f, data, s, 0) != s) {
-        warn("client %08x: frontend failed to buffer data from %s:%s", c->id,
-                c->rhost_f, c->rserv_f);
-        client_done(EV_A_ c, DRAIN_FRONTEND);
-        return 0;
+    } else {
+        ssize_t sr = recv(c->fd_f, data, s, 0);
+        if (sr > 0)
+            c->frx += sr;
+        if (sr != s) {
+            warn("client %08x: frontend failed to buffer data from %s:%s",
+                    c->id, c->rhost_f, c->rserv_f);
+            client_done(EV_A_ c, DRAIN_FRONTEND);
+            return 0;
+        }
     }
     return s;
 }
@@ -1339,10 +1349,12 @@ static void cb_client_rxb(EV_P_ ev_io *w, int revents)
 
         default:
             c->n_b2f += s;
+            c->brx += s;
             break;
     }
 #else
-    switch (buf_readv(c->fd_b, &c->buf_b2f)) {
+    ssize_t s = buf_readv(c->fd_b, &c->buf_b2f);
+    switch (s) {
         case 0:
             client_done(EV_A_ c, DRAIN_BACKEND);
             return;
@@ -1361,6 +1373,7 @@ static void cb_client_rxb(EV_P_ ev_io *w, int revents)
             break;
 
         default:
+            c->brx += s;
             break;
     }
 #endif
@@ -1504,8 +1517,8 @@ static void cb_client_txb(EV_P_ ev_io *w, int revents)
         c->state = STATE_PROXY;
     }
 
-#if HAVE_SPLICE
     if (c->state == STATE_PROXY || c->state == STATE_DONE) {
+#if HAVE_SPLICE
         ssize_t s = splice(c->fd_f2b[0], NULL, c->fd_b, NULL, 4*PIPE_BUF,
                 SPLICE_F_MOVE | SPLICE_F_NONBLOCK);
         switch (s) {
@@ -1528,12 +1541,12 @@ static void cb_client_txb(EV_P_ ev_io *w, int revents)
 
             default:
                 c->n_f2b -= s;
+                c->btx += s;
                 break;
         }
-    }
 #else
-    if (c->state == STATE_PROXY || c->state == STATE_DONE) {
-        switch (buf_writev(c->fd_b, &c->buf_f2b)) {
+        ssize_t s = buf_writev(c->fd_b, &c->buf_f2b);
+        switch (s) {
             case 0:
                 ev_io_stop(EV_A_ &c->io_txb);
                 break;
@@ -1548,10 +1561,11 @@ static void cb_client_txb(EV_P_ ev_io *w, int revents)
                 break;
 
             default:
+                c->btx += s;
                 break;
         }
-    }
 #endif
+    }
     if (c->state == STATE_DONE)
         client_done(EV_A_ c, DRAIN_NONE);
     else if (c->fd_f != -1)
@@ -1643,10 +1657,12 @@ static void cb_client_rxf(EV_P_ ev_io *w, int revents)
 
             default:
                 c->n_f2b += s;
+                c->frx += s;
                 break;
         }
 #else
-        switch (buf_readv(c->fd_f, &c->buf_f2b)) {
+        ssize_t s = buf_readv(c->fd_f, &c->buf_f2b) {
+        switch (s) {
             case 0:
                 client_done(EV_A_ c, DRAIN_FRONTEND);
                 return;
@@ -1665,6 +1681,7 @@ static void cb_client_rxf(EV_P_ ev_io *w, int revents)
                 break;
 
             default:
+                c->frx += s;
                 break;
         }
 #endif
@@ -1703,10 +1720,12 @@ static void cb_client_txf(EV_P_ ev_io *w, int revents)
 
         default:
             c->n_b2f -= s;
+            c->ftx += s;
             break;
     }
 #else
-    switch (buf_writev(c->fd_f, &c->buf_b2f)) {
+    ssize_t s = buf_writev(c->fd_f, &c->buf_b2f);
+    switch (s) {
         case 0:
             ev_io_stop(EV_A_ &c->io_txf);
             break;
@@ -1721,6 +1740,7 @@ static void cb_client_txf(EV_P_ ev_io *w, int revents)
             break;
 
         default:
+            c->ftx += s;
             break;
     }
 #endif
@@ -1904,14 +1924,16 @@ static void cb_cleanup(EV_P_ ev_cleanup *w, int revents)
     while (g.clients) {
         client_t *client = g.clients;
         if (client->fd_f != -1) {
-            infox("client %08x: frontend connection closed", client->id);
+            infox("client %08x: frontend connection closed (rx=%zu tx=%zu)",
+                    client->id, client->frx, client->ftx);
             shutdown(client->fd_f, SHUT_RDWR);
             close(client->fd_f);
             ev_io_stop(EV_A_ &client->io_txf);
             ev_io_stop(EV_A_ &client->io_rxf);
         }
         if (client->fd_b != -1) {
-            infox("client %08x: backend connection closed", client->id);
+            infox("client %08x: backend connection closed (rx=%zu tx=%zu)",
+                    client->id, client->brx, client->btx);
             shutdown(client->fd_b, SHUT_RDWR);
             close(client->fd_b);
             ev_io_stop(EV_A_ &client->io_txb);
