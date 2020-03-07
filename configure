@@ -6024,6 +6024,104 @@ rm -rf conftest*
 
 fi
 
+for ac_header in err.h
+do :
+  ac_fn_c_check_header_mongrel "$LINENO" "err.h" "ac_cv_header_err_h" "$ac_includes_default"
+if test "x$ac_cv_header_err_h" = xyes; then :
+  cat >>confdefs.h <<_ACEOF
+#define HAVE_ERR_H 1
+_ACEOF
+
+else
+  as_fn_error $? "uacme requires err.h" "$LINENO" 5
+fi
+
+done
+
+for ac_header in getopt.h
+do :
+  ac_fn_c_check_header_mongrel "$LINENO" "getopt.h" "ac_cv_header_getopt_h" "$ac_includes_default"
+if test "x$ac_cv_header_getopt_h" = xyes; then :
+  cat >>confdefs.h <<_ACEOF
+#define HAVE_GETOPT_H 1
+_ACEOF
+
+else
+  as_fn_error $? "uacme requires sys/wait.h" "$LINENO" 5
+fi
+
+done
+
+for ac_header in netdb.h
+do :
+  ac_fn_c_check_header_mongrel "$LINENO" "netdb.h" "ac_cv_header_netdb_h" "$ac_includes_default"
+if test "x$ac_cv_header_netdb_h" = xyes; then :
+  cat >>confdefs.h <<_ACEOF
+#define HAVE_NETDB_H 1
+_ACEOF
+
+else
+  as_fn_error $? "uacme requires netdb.h" "$LINENO" 5
+fi
+
+done
+
+for ac_header in sys/socket.h
+do :
+  ac_fn_c_check_header_mongrel "$LINENO" "sys/socket.h" "ac_cv_header_sys_socket_h" "$ac_includes_default"
+if test "x$ac_cv_header_sys_socket_h" = xyes; then :
+  cat >>confdefs.h <<_ACEOF
+#define HAVE_SYS_SOCKET_H 1
+_ACEOF
+
+else
+  as_fn_error $? "uacme requires sys/socket.h" "$LINENO" 5
+fi
+
+done
+
+for ac_header in sys/stat.h
+do :
+  ac_fn_c_check_header_mongrel "$LINENO" "sys/stat.h" "ac_cv_header_sys_stat_h" "$ac_includes_default"
+if test "x$ac_cv_header_sys_stat_h" = xyes; then :
+  cat >>confdefs.h <<_ACEOF
+#define HAVE_SYS_STAT_H 1
+_ACEOF
+
+else
+  as_fn_error $? "uacme requires sys/stat.h" "$LINENO" 5
+fi
+
+done
+
+for ac_header in sys/types.h
+do :
+  ac_fn_c_check_header_mongrel "$LINENO" "sys/types.h" "ac_cv_header_sys_types_h" "$ac_includes_default"
+if test "x$ac_cv_header_sys_types_h" = xyes; then :
+  cat >>confdefs.h <<_ACEOF
+#define HAVE_SYS_TYPES_H 1
+_ACEOF
+
+else
+  as_fn_error $? "uacme requires sys/types.h" "$LINENO" 5
+fi
+
+done
+
+for ac_header in sys/wait.h
+do :
+  ac_fn_c_check_header_mongrel "$LINENO" "sys/wait.h" "ac_cv_header_sys_wait_h" "$ac_includes_default"
+if test "x$ac_cv_header_sys_wait_h" = xyes; then :
+  cat >>confdefs.h <<_ACEOF
+#define HAVE_SYS_WAIT_H 1
+_ACEOF
+
+else
+  as_fn_error $? "uacme requires sys/wait.h" "$LINENO" 5
+fi
+
+done
+
 for ac_func in asprintf vasprintf
 do :
   as_ac_var=`$as_echo "ac_cv_func_$ac_func" | $as_tr_sh`
@@ -6034,7 +6132,20 @@ if eval test \"x\$"$as_ac_var"\" = x"yes"; then :
 _ACEOF
 
 else
-  as_fn_error $? "(v)asprintf not found" "$LINENO" 5
+  as_fn_error $? "uacme requires (v)asprintf" "$LINENO" 5
+fi
+done
+
+for ac_func in getopt_long
+do :
+  ac_fn_c_check_func "$LINENO" "getopt_long" "ac_cv_func_getopt_long"
+if test "x$ac_cv_func_getopt_long" = xyes; then :
+  cat >>confdefs.h <<_ACEOF
+#define HAVE_GETOPT_LONG 1
+_ACEOF
+
+else
+  as_fn_error $? "uacme requires getopt_long" "$LINENO" 5
 fi
 done
 
@@ -6920,6 +7031,61 @@ fi
 
 done
 
+    for ac_header in sys/resource.h
+do :
+  ac_fn_c_check_header_mongrel "$LINENO" "sys/resource.h" "ac_cv_header_sys_resource_h" "$ac_includes_default"
+if test "x$ac_cv_header_sys_resource_h" = xyes; then :
+  cat >>confdefs.h <<_ACEOF
+#define HAVE_SYS_RESOURCE_H 1
+_ACEOF
+
+else
+  as_fn_error $? "ualpn requires sys/resource.h" "$LINENO" 5
+fi
+
+done
+
+    for ac_header in sys/uio.h
+do :
+  ac_fn_c_check_header_mongrel "$LINENO" "sys/uio.h" "ac_cv_header_sys_uio_h" "$ac_includes_default"
+if test "x$ac_cv_header_sys_uio_h" = xyes; then :
+  cat >>confdefs.h <<_ACEOF
+#define HAVE_SYS_UIO_H 1
+_ACEOF
+
+else
+  as_fn_error $? "ualpn requires sys/uio.h" "$LINENO" 5
+fi
+
+done
+
+    for ac_header in sys/un.h
+do :
+  ac_fn_c_check_header_mongrel "$LINENO" "sys/un.h" "ac_cv_header_sys_un_h" "$ac_includes_default"
+if test "x$ac_cv_header_sys_un_h" = xyes; then :
+  cat >>confdefs.h <<_ACEOF
+#define HAVE_SYS_UN_H 1
+_ACEOF
+
+else
+  as_fn_error $? "ualpn requires sys/un.h" "$LINENO" 5
+fi
+
+done
+
+    for ac_func in open_memstream
+do :
+  ac_fn_c_check_func "$LINENO" "open_memstream" "ac_cv_func_open_memstream"
+if test "x$ac_cv_func_open_memstream" = xyes; then :
+  cat >>confdefs.h <<_ACEOF
+#define HAVE_OPEN_MEMSTREAM 1
+_ACEOF
+
+else
+  as_fn_error $? "ualpn requires open_memstream" "$LINENO" 5
+fi
+done
+
     for ac_func in mmap
 do :
   ac_fn_c_check_func "$LINENO" "mmap" "ac_cv_func_mmap"
@@ -6939,8 +7105,8 @@ $as_echo_n "checking if mmap(MAP_ANON|MAP_SHARED) works... " >&6; }
   cat confdefs.h - <<_ACEOF >conftest.$ac_ext
 /* end confdefs.h.  */
 #include <sys/mman.h>
-                         int main() {return MAP_FAILED == mmap(0, 4096,
-                            PROT_READ|PROT_WRITE, MAP_ANON|MAP_SHARED, -1, 0);}
+                         int main() {return mmap(0, 4096, PROT_READ|PROT_WRITE,
+                            MAP_ANON|MAP_SHARED, -1, 0) == MAP_FAILED;}
 _ACEOF
 if ac_fn_c_try_compile "$LINENO"; then :
   { $as_echo "$as_me:${as_lineno-$LINENO}: result: yes" >&5
@@ -6948,40 +7114,65 @@ $as_echo "yes" >&6; }
 else
   { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
 $as_echo "no" >&6; }
-            as_fn_error $? "ualpn requires mmap(MAP_ANON|MAP_SHARED)" "$LINENO" 5
+            { $as_echo "$as_me:${as_lineno-$LINENO}: falling back to mmap(\"/dev/zero\", MAP_SHARED)" >&5
+$as_echo "$as_me: falling back to mmap(\"/dev/zero\", MAP_SHARED)" >&6;}
+
+$as_echo "#define HAVE_MAP_DEVZERO 1" >>confdefs.h
+
 fi
 rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
 else
   cat confdefs.h - <<_ACEOF >conftest.$ac_ext
 /* end confdefs.h.  */
 #include <sys/mman.h>
-                     int main() {return MAP_FAILED == mmap(0, 4096,
-                        PROT_READ|PROT_WRITE, MAP_ANON|MAP_SHARED, -1, 0);}
+                     int main() {return mmap(0, 4096, PROT_READ|PROT_WRITE,
+                        MAP_ANON|MAP_SHARED, -1, 0) == MAP_FAILED;}
 _ACEOF
 if ac_fn_c_try_run "$LINENO"; then :
-  { $as_echo "$as_me:${as_lineno-$LINENO}: result: yes" >&5
+
+$as_echo "#define HAVE_MAP_ANON 1" >>confdefs.h
+
+        { $as_echo "$as_me:${as_lineno-$LINENO}: result: yes" >&5
 $as_echo "yes" >&6; }
 else
   { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
 $as_echo "no" >&6; }
-        as_fn_error $? "ualpn requires mmap(MAP_ANON|MAP_SHARED)" "$LINENO" 5
+        { $as_echo "$as_me:${as_lineno-$LINENO}: checking if mmap(\"/dev/zero\", MAP_SHARED) works" >&5
+$as_echo_n "checking if mmap(\"/dev/zero\", MAP_SHARED) works... " >&6; }
+        if test "$cross_compiling" = yes; then :
+  { { $as_echo "$as_me:${as_lineno-$LINENO}: error: in \`$ac_pwd':" >&5
+$as_echo "$as_me: error: in \`$ac_pwd':" >&2;}
+as_fn_error $? "cannot run test program while cross compiling
+See \`config.log' for more details" "$LINENO" 5; }
+else
+  cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+#include <sys/mman.h>
+                         #include <sys/stat.h>
+                         #include <fcntl.h>
+                         int main() {return mmap(0, 4096, PROT_READ|PROT_WRITE,
+                            MAP_ANON|MAP_SHARED, open("/dev/zero", O_RDWR), 0) ==
+                            MAP_FAILED;}
+_ACEOF
+if ac_fn_c_try_run "$LINENO"; then :
+
+$as_echo "#define HAVE_MAP_DEVZERO 1" >>confdefs.h
+
+            { $as_echo "$as_me:${as_lineno-$LINENO}: result: yes" >&5
+$as_echo "yes" >&6; }
+else
+  { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
+$as_echo "no" >&6; }
+            as_fn_error $? "ualpn requires MAP_ANON or mmap(\"/dev/zero\", MAP_SHARED)" "$LINENO" 5
 fi
 rm -f core *.core core.conftest.* gmon.out bb.out conftest$ac_exeext \
   conftest.$ac_objext conftest.beam conftest.$ac_ext
 fi
 
-    for ac_func in open_memstream
-do :
-  ac_fn_c_check_func "$LINENO" "open_memstream" "ac_cv_func_open_memstream"
-if test "x$ac_cv_func_open_memstream" = xyes; then :
-  cat >>confdefs.h <<_ACEOF
-#define HAVE_OPEN_MEMSTREAM 1
-_ACEOF
-
-else
-  as_fn_error $? "ualpn requires open_memstream" "$LINENO" 5
 fi
-done
+rm -f core *.core core.conftest.* gmon.out bb.out conftest$ac_exeext \
+  conftest.$ac_objext conftest.beam conftest.$ac_ext
+fi
 
     # Check whether --enable-splice was given.
 if test "${enable_splice+set}" = set; then :

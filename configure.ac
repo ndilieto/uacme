@@ -40,12 +40,29 @@ fi
 AX_CHECK_COMPILE_FLAG([$CFLAGS -Wall], [WCFLAGS="-Wall"])
 AX_CHECK_COMPILE_FLAG([$CFLAGS -Wextra], [WCFLAGS="$WCFLAGS -Wextra"])
 AX_CHECK_COMPILE_FLAG([$CFLAGS -pedantic], [WCFLAGS="$WCFLAGS -pedantic"])
-AX_CHECK_COMPILE_FLAG([$CFLAGS -fno-strict-aliasing], [WCFLAGS="$WCFLAGS -fno-strict-aliasing"])
+AX_CHECK_COMPILE_FLAG([$CFLAGS -fno-strict-aliasing],
+                      [WCFLAGS="$WCFLAGS -fno-strict-aliasing"])
 AC_SUBST([WCFLAGS])
 
 AC_SYS_LARGEFILE
+AC_CHECK_HEADERS([err.h], [],
+                 AC_MSG_ERROR([uacme requires err.h]))
+AC_CHECK_HEADERS([getopt.h], [],
+                 AC_MSG_ERROR([uacme requires sys/wait.h]))
+AC_CHECK_HEADERS([netdb.h], [],
+                 AC_MSG_ERROR([uacme requires netdb.h]))
+AC_CHECK_HEADERS([sys/socket.h], [],
+                 AC_MSG_ERROR([uacme requires sys/socket.h]))
+AC_CHECK_HEADERS([sys/stat.h], [],
+                 AC_MSG_ERROR([uacme requires sys/stat.h]))
+AC_CHECK_HEADERS([sys/types.h], [],
+                 AC_MSG_ERROR([uacme requires sys/types.h]))
+AC_CHECK_HEADERS([sys/wait.h], [],
+                 AC_MSG_ERROR([uacme requires sys/wait.h]))
 AC_CHECK_FUNCS([asprintf vasprintf], [],
-               AC_MSG_ERROR([(v)asprintf not found]))
+               AC_MSG_ERROR([uacme requires (v)asprintf]))
+AC_CHECK_FUNCS([getopt_long], [],
+               AC_MSG_ERROR([uacme requires getopt_long]))
 AC_CHECK_FUNCS([setproctitle])
 
 if test -n "$PKG_CONFIG"; then
@@ -309,23 +326,43 @@ if test "x$OPT_UALPN" != "xno"; then
         AC_MSG_ERROR([ualpn requires GnuTLS])
     fi
     AM_PROG_AR
-    AC_CHECK_HEADERS([sys/mman.h], [], AC_MSG_ERROR([ualpn requires sys/mman.h]))
-    AC_CHECK_FUNCS([mmap],[], AC_MSG_ERROR([ualpn requires mmap]))
-    AC_MSG_CHECKING([if mmap(MAP_ANON|MAP_SHARED) works])
-    AC_RUN_IFELSE([AC_LANG_SOURCE([#include <sys/mman.h>
-                     int main() {return MAP_FAILED == mmap(0, 4096,
-                        PROT_READ|PROT_WRITE, MAP_ANON|MAP_SHARED, -1, 0);}])],
-        AC_MSG_RESULT([yes]),
-        AC_MSG_RESULT([no])
-        AC_MSG_ERROR([ualpn requires mmap(MAP_ANON|MAP_SHARED)]),
-        AC_COMPILE_IFELSE([AC_LANG_SOURCE([#include <sys/mman.h>
-                         int main() {return MAP_FAILED == mmap(0, 4096,
-                            PROT_READ|PROT_WRITE, MAP_ANON|MAP_SHARED, -1, 0);}])],
-            AC_MSG_RESULT([yes]),
-            AC_MSG_RESULT([no])
-            AC_MSG_ERROR([ualpn requires mmap(MAP_ANON|MAP_SHARED)])))
+    AC_CHECK_HEADERS([sys/mman.h], [],
+                     AC_MSG_ERROR([ualpn requires sys/mman.h]))
+    AC_CHECK_HEADERS([sys/resource.h], [],
+                     AC_MSG_ERROR([ualpn requires sys/resource.h]))
+    AC_CHECK_HEADERS([sys/uio.h], [],
+                     AC_MSG_ERROR([ualpn requires sys/uio.h]))
+    AC_CHECK_HEADERS([sys/un.h], [],
+                     AC_MSG_ERROR([ualpn requires sys/un.h]))
     AC_CHECK_FUNCS([open_memstream], [],
                    AC_MSG_ERROR([ualpn requires open_memstream]))
+    AC_CHECK_FUNCS([mmap],[],
+                   AC_MSG_ERROR([ualpn requires mmap]))
+    AC_MSG_CHECKING([if mmap(MAP_ANON|MAP_SHARED) works])
+    AC_RUN_IFELSE([AC_LANG_SOURCE([#include <sys/mman.h>
+                     int main() {return mmap(0, 4096, PROT_READ|PROT_WRITE,
+                        MAP_ANON|MAP_SHARED, -1, 0) == MAP_FAILED;}])],
+        AC_DEFINE(HAVE_MAP_ANON, 1, [if mmap(MAP_ANON|MAP_SHARED) works])
+        AC_MSG_RESULT([yes]),
+        AC_MSG_RESULT([no])
+        AC_MSG_CHECKING([if mmap("/dev/zero", MAP_SHARED) works])
+        AC_RUN_IFELSE([AC_LANG_SOURCE([#include <sys/mman.h>
+                         #include <sys/stat.h>
+                         #include <fcntl.h>
+                         int main() {return mmap(0, 4096, PROT_READ|PROT_WRITE,
+                            MAP_ANON|MAP_SHARED, open("/dev/zero", O_RDWR), 0) ==
+                            MAP_FAILED;}])],
+            AC_DEFINE(HAVE_MAP_DEVZERO, 1, [if mmap("/dev/zero", MAP_SHARED) works])
+            AC_MSG_RESULT([yes]),
+            AC_MSG_RESULT([no])
+            AC_MSG_ERROR([ualpn requires MAP_ANON or mmap("/dev/zero", MAP_SHARED)])),
+        AC_COMPILE_IFELSE([AC_LANG_SOURCE([#include <sys/mman.h>
+                         int main() {return mmap(0, 4096, PROT_READ|PROT_WRITE,
+                            MAP_ANON|MAP_SHARED, -1, 0) == MAP_FAILED;}])],
+            AC_MSG_RESULT([yes]),
+            AC_MSG_RESULT([no])
+            AC_MSG_NOTICE([falling back to mmap("/dev/zero", MAP_SHARED)])
+            AC_DEFINE(HAVE_MAP_DEVZERO, 1, [if mmap("/dev/zero", MAP_SHARED) works])))
     AC_ARG_ENABLE(splice, AS_HELP_STRING([--disable-splice], [disable splice]))
     if test "x$enable_splice" != "xno"; then
         AC_CHECK_FUNCS([splice])

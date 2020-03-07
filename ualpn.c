@@ -212,6 +212,9 @@ static struct globs {
     char *socket;
     mode_t sockmode;
     int sockfd;
+#if HAVE_MAP_DEVZERO
+    int devzero;
+#endif
     int pipefd[2];
     char *user;
     uid_t uid;
@@ -246,6 +249,9 @@ static struct globs {
     .socket = NULL,
     .sockmode = S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH,
     .sockfd = -1,
+#if HAVE_MAP_DEVZERO
+    .devzero = -1,
+#endif
     .pipefd = {-1, -1},
     .user = NULL,
     .uid = 0,
@@ -2322,6 +2328,10 @@ static void cleanup_and_exit(int stage, int return_code)
             munmap(g_shm, g_shm_size);
             //intentional fallthrough
         case 1:
+#if HAVE_MAP_DEVZERO
+            if (g.devzero != -1)
+                close(g.devzero);
+#endif
             gnutls_global_deinit();
             //intentional fallthrough
         case 0:
@@ -2667,7 +2677,7 @@ int main(int argc, char **argv)
     };
     FILE *f;
     long n;
-    int fd = -1, lfd = -1, rc, one = 1;
+    int fd = -1, rc, one = 1;
     pid_t pid;
     str_t *str;
     char host[NI_MAXHOST];
@@ -3115,15 +3125,17 @@ int main(int argc, char **argv)
 
             if (dup2(fd, STDIN_FILENO) == -1) {
                 err("dup2(STDIN_FILENO) failed");
+                close(fd);
                 cleanup_and_exit(0, EXIT_FAILURE);
             }
 
             if (dup2(fd, STDOUT_FILENO) == -1) {
                 err("dup2(STDOUT_FILENO) failed");
+                close(fd);
                 cleanup_and_exit(0, EXIT_FAILURE);
             }
 
-            if (fd > STDERR_FILENO && close(fd) == -1) {
+            if (close(fd) == -1) {
                 err("close failed");
                 cleanup_and_exit(0, EXIT_FAILURE);
             }
@@ -3179,8 +3191,21 @@ int main(int argc, char **argv)
     noticex("control interface listening to unix://%s", g.socket);
 
     g_shm_size = sizeof(struct shm) + (g.max_auths - 1)*sizeof(auth_t);
+#if HAVE_MAP_DEVZERO
+    g.devzero = open("/dev/zero", O_RDWR);
+    if (g.devzero == -1) {
+        err("open(\"/dev/zero\") failed");
+        cleanup_and_exit(1, EXIT_FAILURE);
+    }
+    g_shm = (struct shm *)mmap(NULL, g_shm_size, PROT_READ | PROT_WRITE,
+            MAP_SHARED, g.devzero, 0);
+#elif HAVE_MAP_ANON
+#ifndef MAP_ANONYMOUS
+#define MAP_ANONYMOUS MAP_ANON
+#endif
     g_shm = (struct shm *)mmap(NULL, g_shm_size, PROT_READ | PROT_WRITE,
             MAP_ANONYMOUS|MAP_SHARED, -1, 0);
+#endif
     if (g_shm == MAP_FAILED) {
         err("mmap failed");
         cleanup_and_exit(1, EXIT_FAILURE);
@@ -3280,51 +3305,51 @@ int main(int argc, char **argv)
                 continue;
             }
 
-            lfd = socket(a->ai_family, a->ai_socktype, 0);
-            if (lfd == -1) {
+            fd = socket(a->ai_family, a->ai_socktype, 0);
+            if (fd == -1) {
                 warn("failed to create socket for %s:%s", host, port);
                 continue;
             }
 #ifdef IPV6_V6ONLY
-            if ((a->ai_family == AF_INET6 && setsockopt(lfd, IPPROTO_IPV6,
+            if ((a->ai_family == AF_INET6 && setsockopt(fd, IPPROTO_IPV6,
                             IPV6_V6ONLY, &one, sizeof(one)))) {
                 warn("failed to set IPV6_V6ONLY for %s:%s", host, port);
-                close(lfd);
+                close(fd);
                 continue;
             }
 #endif
-            if (setsockopt(lfd, SOL_SOCKET, SO_REUSEADDR, &one, sizeof(one))) {
+            if (setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &one, sizeof(one))) {
                 warn("failed to set SO_REUSEADDR for %s:%s", host, port);
-                close(lfd);
+                close(fd);
                 continue;
             }
 
-            if (bind(lfd, a->ai_addr, a->ai_addrlen)) {
+            if (bind(fd, a->ai_addr, a->ai_addrlen)) {
                 warn("failed to bind to %s:%s", host, port);
-                close(lfd);
+                close(fd);
                 continue;
             }
 
-            if (listen(lfd, SOMAXCONN)) {
+            if (listen(fd, SOMAXCONN)) {
                 warn("failed to listen to %s:%s", host, port);
-                close(lfd);
+                close(fd);
                 continue;
             }
 
-            if (set_nonblocking(lfd)) {
+            if (set_nonblocking(fd)) {
                 warn("failed to set O_NONBLOCK on %s:%s", host, port);
-                close(lfd);
+                close(fd);
                 continue;
             }
 
             listener_t *l = calloc(1, sizeof(*l));
             if (!l) {
                 warn("calloc failed for %s:%s", host, port);
-                close(lfd);
+                close(fd);
                 continue;
             }
 
-            ev_io_init(&l->io, cb_client_accept, lfd, EV_READ);
+            ev_io_init(&l->io, cb_client_accept, fd, EV_READ);
             ev_set_priority(&l->io, +1);
             ev_io_start(EV_DEFAULT_ &l->io);
 
@@ -3397,7 +3422,7 @@ int main(int argc, char **argv)
             }
             close(g.pipefd[1]);
             g.pipefd[1] = -1;
-            if (dup2(fd, STDERR_FILENO) == -1) {
+            if (dup2(STDOUT_FILENO, STDERR_FILENO) == -1) {
                 err("dup2(STDERR_FILENO) failed");
                 cleanup_and_exit(4, EXIT_FAILURE);
             }
