@@ -21,8 +21,7 @@
 #ifndef __JSON_H__
 #define __JSON_H__
 
-typedef enum
-{
+typedef enum {
     JSON_UNDEFINED = 0,
     JSON_OBJECT = 1,
     JSON_ARRAY = 2,
@@ -32,21 +31,18 @@ typedef enum
 
 struct json_value;
 
-typedef struct json_object
-{
+typedef struct json_object {
     size_t size;
     struct json_value *names;
     struct json_value *values;
 } json_object_t;
 
-typedef struct json_array
-{
+typedef struct json_array {
     size_t size;
     struct json_value *values;
 } json_array_t;
 
-typedef struct json_value
-{
+typedef struct json_value {
     json_type_t type;
     union
     {

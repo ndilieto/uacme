@@ -22,8 +22,7 @@
 #define __CURLWRAP_H__
 #include <curl/curl.h>
 
-typedef struct
-{
+typedef struct {
     char *body;
     size_t body_len;
     char *headers;

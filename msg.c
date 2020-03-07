@@ -30,7 +30,8 @@ int g_loglevel = 0;
 void msg(int level, const char *format, ...)
 {
     va_list ap;
-    if (level > g_loglevel) return;
+    if (level > g_loglevel)
+        return;
     va_start(ap, format);
     vwarnx(format, ap);
     va_end(ap);
