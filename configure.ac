@@ -21,7 +21,7 @@ AC_CONFIG_SRCDIR([uacme.c])
 AC_CONFIG_MACRO_DIR([build-aux/m4])
 AC_CONFIG_AUX_DIR([build-aux])
 AM_INIT_AUTOMAKE([subdir-objects])
-AM_MAINTAINER_MODE([enable])
+AM_MAINTAINER_MODE([disable])
 AM_SILENT_RULES([yes])
 AX_IS_RELEASE([git-directory])
 AX_CHECK_ENABLE_DEBUG([yes])
@@ -301,18 +301,31 @@ else
     OPT_UALPN=no
 fi
 AC_ARG_WITH(ualpn,
-[AS_HELP_STRING([--with-ualpn], [enable ualpn]),
-AS_HELP_STRING([--without-ualpn], [disable ualpn])],
-OPT_UALPN=$withval)
-
-if test "x$OPT_UALPN" != "xno" -a "x$OPT_GNUTLS" = "xno"; then
-    AC_MSG_ERROR([ualpn requires GnuTLS])
-fi
+[AS_HELP_STRING([--with-ualpn], [enable ualpn (requires GnuTLS)])
+AS_HELP_STRING([--without-ualpn], [disable ualpn])], OPT_UALPN=$withval)
 
 if test "x$OPT_UALPN" != "xno"; then
+    if test "x$USE_GNUTLS" != "xyes"; then
+        AC_MSG_ERROR([ualpn requires GnuTLS])
+    fi
     AM_PROG_AR
+    AC_CHECK_HEADERS([sys/mman.h], [], AC_MSG_ERROR([ualpn requires sys/mman.h]))
+    AC_CHECK_FUNCS([mmap],[], AC_MSG_ERROR([ualpn requires mmap]))
+    AC_MSG_CHECKING([if mmap(MAP_ANON|MAP_SHARED) works])
+    AC_RUN_IFELSE([AC_LANG_SOURCE([#include <sys/mman.h>
+                     int main() {return MAP_FAILED == mmap(0, 4096,
+                        PROT_READ|PROT_WRITE, MAP_ANON|MAP_SHARED, -1, 0);}])],
+        AC_MSG_RESULT([yes]),
+        AC_MSG_RESULT([no])
+        AC_MSG_ERROR([ualpn requires mmap(MAP_ANON|MAP_SHARED)]),
+        AC_COMPILE_IFELSE([AC_LANG_SOURCE([#include <sys/mman.h>
+                         int main() {return MAP_FAILED == mmap(0, 4096,
+                            PROT_READ|PROT_WRITE, MAP_ANON|MAP_SHARED, -1, 0);}])],
+            AC_MSG_RESULT([yes]),
+            AC_MSG_RESULT([no])
+            AC_MSG_ERROR([ualpn requires mmap(MAP_ANON|MAP_SHARED)])))
     AC_CHECK_FUNCS([open_memstream], [],
-                   AC_MSG_ERROR([open_memstream not found]))
+                   AC_MSG_ERROR([ualpn requires open_memstream]))
     AC_ARG_ENABLE(splice, AS_HELP_STRING([--disable-splice], [disable splice]))
     if test "x$enable_splice" != "xno"; then
         AC_CHECK_FUNCS([splice])
