@@ -167,7 +167,6 @@ not only uacme (chech the example ualpn.sh hook script) but also other ACME
 clients.
 
 To get started with ualpn:
-```
 * move your real HTTPS server to port 4443 and also enable it to accept
 the PROXY protocol:
   * for nginx: https://docs.nginx.com/nginx/admin-guide/load-balancer/using-proxy-protocol
