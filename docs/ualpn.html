@@ -1,0 +1,1195 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<meta name="generator" content="AsciiDoc 8.6.9">
+<title>UALPN(1)</title>
+<style type="text/css">
+/* Shared CSS for AsciiDoc xhtml11 and html5 backends */
+
+/* Default font. */
+body {
+  font-family: Georgia,serif;
+}
+
+/* Title font. */
+h1, h2, h3, h4, h5, h6,
+div.title, caption.title,
+thead, p.table.header,
+#toctitle,
+#author, #revnumber, #revdate, #revremark,
+#footer {
+  font-family: Arial,Helvetica,sans-serif;
+}
+
+body {
+  margin: 1em 5% 1em 5%;
+}
+
+a {
+  color: blue;
+  text-decoration: underline;
+}
+a:visited {
+  color: fuchsia;
+}
+
+em {
+  font-style: italic;
+  color: navy;
+}
+
+strong {
+  font-weight: bold;
+  color: #083194;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  color: #527bbd;
+  margin-top: 1.2em;
+  margin-bottom: 0.5em;
+  line-height: 1.3;
+}
+
+h1, h2, h3 {
+  border-bottom: 2px solid silver;
+}
+h2 {
+  padding-top: 0.5em;
+}
+h3 {
+  float: left;
+}
+h3 + * {
+  clear: left;
+}
+h5 {
+  font-size: 1.0em;
+}
+
+div.sectionbody {
+  margin-left: 0;
+}
+
+hr {
+  border: 1px solid silver;
+}
+
+p {
+  margin-top: 0.5em;
+  margin-bottom: 0.5em;
+}
+
+ul, ol, li > p {
+  margin-top: 0;
+}
+ul > li     { color: #aaa; }
+ul > li > * { color: black; }
+
+.monospaced, code, pre {
+  font-family: "Courier New", Courier, monospace;
+  font-size: inherit;
+  color: navy;
+  padding: 0;
+  margin: 0;
+}
+pre {
+  white-space: pre-wrap;
+}
+
+#author {
+  color: #527bbd;
+  font-weight: bold;
+  font-size: 1.1em;
+}
+#email {
+}
+#revnumber, #revdate, #revremark {
+}
+
+#footer {
+  font-size: small;
+  border-top: 2px solid silver;
+  padding-top: 0.5em;
+  margin-top: 4.0em;
+}
+#footer-text {
+  float: left;
+  padding-bottom: 0.5em;
+}
+#footer-badges {
+  float: right;
+  padding-bottom: 0.5em;
+}
+
+#preamble {
+  margin-top: 1.5em;
+  margin-bottom: 1.5em;
+}
+div.imageblock, div.exampleblock, div.verseblock,
+div.quoteblock, div.literalblock, div.listingblock, div.sidebarblock,
+div.admonitionblock {
+  margin-top: 1.0em;
+  margin-bottom: 1.5em;
+}
+div.admonitionblock {
+  margin-top: 2.0em;
+  margin-bottom: 2.0em;
+  margin-right: 10%;
+  color: #606060;
+}
+
+div.content { /* Block element content. */
+  padding: 0;
+}
+
+/* Block element titles. */
+div.title, caption.title {
+  color: #527bbd;
+  font-weight: bold;
+  text-align: left;
+  margin-top: 1.0em;
+  margin-bottom: 0.5em;
+}
+div.title + * {
+  margin-top: 0;
+}
+
+td div.title:first-child {
+  margin-top: 0.0em;
+}
+div.content div.title:first-child {
+  margin-top: 0.0em;
+}
+div.content + div.title {
+  margin-top: 0.0em;
+}
+
+div.sidebarblock > div.content {
+  background: #ffffee;
+  border: 1px solid #dddddd;
+  border-left: 4px solid #f0f0f0;
+  padding: 0.5em;
+}
+
+div.listingblock > div.content {
+  border: 1px solid #dddddd;
+  border-left: 5px solid #f0f0f0;
+  background: #f8f8f8;
+  padding: 0.5em;
+}
+
+div.quoteblock, div.verseblock {
+  padding-left: 1.0em;
+  margin-left: 1.0em;
+  margin-right: 10%;
+  border-left: 5px solid #f0f0f0;
+  color: #888;
+}
+
+div.quoteblock > div.attribution {
+  padding-top: 0.5em;
+  text-align: right;
+}
+
+div.verseblock > pre.content {
+  font-family: inherit;
+  font-size: inherit;
+}
+div.verseblock > div.attribution {
+  padding-top: 0.75em;
+  text-align: left;
+}
+/* DEPRECATED: Pre version 8.2.7 verse style literal block. */
+div.verseblock + div.attribution {
+  text-align: left;
+}
+
+div.admonitionblock .icon {
+  vertical-align: top;
+  font-size: 1.1em;
+  font-weight: bold;
+  text-decoration: underline;
+  color: #527bbd;
+  padding-right: 0.5em;
+}
+div.admonitionblock td.content {
+  padding-left: 0.5em;
+  border-left: 3px solid #dddddd;
+}
+
+div.exampleblock > div.content {
+  border-left: 3px solid #dddddd;
+  padding-left: 0.5em;
+}
+
+div.imageblock div.content { padding-left: 0; }
+span.image img { border-style: none; vertical-align: text-bottom; }
+a.image:visited { color: white; }
+
+dl {
+  margin-top: 0.8em;
+  margin-bottom: 0.8em;
+}
+dt {
+  margin-top: 0.5em;
+  margin-bottom: 0;
+  font-style: normal;
+  color: navy;
+}
+dd > *:first-child {
+  margin-top: 0.1em;
+}
+
+ul, ol {
+    list-style-position: outside;
+}
+ol.arabic {
+  list-style-type: decimal;
+}
+ol.loweralpha {
+  list-style-type: lower-alpha;
+}
+ol.upperalpha {
+  list-style-type: upper-alpha;
+}
+ol.lowerroman {
+  list-style-type: lower-roman;
+}
+ol.upperroman {
+  list-style-type: upper-roman;
+}
+
+div.compact ul, div.compact ol,
+div.compact p, div.compact p,
+div.compact div, div.compact div {
+  margin-top: 0.1em;
+  margin-bottom: 0.1em;
+}
+
+tfoot {
+  font-weight: bold;
+}
+td > div.verse {
+  white-space: pre;
+}
+
+div.hdlist {
+  margin-top: 0.8em;
+  margin-bottom: 0.8em;
+}
+div.hdlist tr {
+  padding-bottom: 15px;
+}
+dt.hdlist1.strong, td.hdlist1.strong {
+  font-weight: bold;
+}
+td.hdlist1 {
+  vertical-align: top;
+  font-style: normal;
+  padding-right: 0.8em;
+  color: navy;
+}
+td.hdlist2 {
+  vertical-align: top;
+}
+div.hdlist.compact tr {
+  margin: 0;
+  padding-bottom: 0;
+}
+
+.comment {
+  background: yellow;
+}
+
+.footnote, .footnoteref {
+  font-size: 0.8em;
+}
+
+span.footnote, span.footnoteref {
+  vertical-align: super;
+}
+
+#footnotes {
+  margin: 20px 0 20px 0;
+  padding: 7px 0 0 0;
+}
+
+#footnotes div.footnote {
+  margin: 0 0 5px 0;
+}
+
+#footnotes hr {
+  border: none;
+  border-top: 1px solid silver;
+  height: 1px;
+  text-align: left;
+  margin-left: 0;
+  width: 20%;
+  min-width: 100px;
+}
+
+div.colist td {
+  padding-right: 0.5em;
+  padding-bottom: 0.3em;
+  vertical-align: top;
+}
+div.colist td img {
+  margin-top: 0.3em;
+}
+
+@media print {
+  #footer-badges { display: none; }
+}
+
+#toc {
+  margin-bottom: 2.5em;
+}
+
+#toctitle {
+  color: #527bbd;
+  font-size: 1.1em;
+  font-weight: bold;
+  margin-top: 1.0em;
+  margin-bottom: 0.1em;
+}
+
+div.toclevel0, div.toclevel1, div.toclevel2, div.toclevel3, div.toclevel4 {
+  margin-top: 0;
+  margin-bottom: 0;
+}
+div.toclevel2 {
+  margin-left: 2em;
+  font-size: 0.9em;
+}
+div.toclevel3 {
+  margin-left: 4em;
+  font-size: 0.9em;
+}
+div.toclevel4 {
+  margin-left: 6em;
+  font-size: 0.9em;
+}
+
+span.aqua { color: aqua; }
+span.black { color: black; }
+span.blue { color: blue; }
+span.fuchsia { color: fuchsia; }
+span.gray { color: gray; }
+span.green { color: green; }
+span.lime { color: lime; }
+span.maroon { color: maroon; }
+span.navy { color: navy; }
+span.olive { color: olive; }
+span.purple { color: purple; }
+span.red { color: red; }
+span.silver { color: silver; }
+span.teal { color: teal; }
+span.white { color: white; }
+span.yellow { color: yellow; }
+
+span.aqua-background { background: aqua; }
+span.black-background { background: black; }
+span.blue-background { background: blue; }
+span.fuchsia-background { background: fuchsia; }
+span.gray-background { background: gray; }
+span.green-background { background: green; }
+span.lime-background { background: lime; }
+span.maroon-background { background: maroon; }
+span.navy-background { background: navy; }
+span.olive-background { background: olive; }
+span.purple-background { background: purple; }
+span.red-background { background: red; }
+span.silver-background { background: silver; }
+span.teal-background { background: teal; }
+span.white-background { background: white; }
+span.yellow-background { background: yellow; }
+
+span.big { font-size: 2em; }
+span.small { font-size: 0.6em; }
+
+span.underline { text-decoration: underline; }
+span.overline { text-decoration: overline; }
+span.line-through { text-decoration: line-through; }
+
+div.unbreakable { page-break-inside: avoid; }
+
+
+/*
+ * xhtml11 specific
+ *
+ * */
+
+div.tableblock {
+  margin-top: 1.0em;
+  margin-bottom: 1.5em;
+}
+div.tableblock > table {
+  border: 3px solid #527bbd;
+}
+thead, p.table.header {
+  font-weight: bold;
+  color: #527bbd;
+}
+p.table {
+  margin-top: 0;
+}
+/* Because the table frame attribute is overriden by CSS in most browsers. */
+div.tableblock > table[frame="void"] {
+  border-style: none;
+}
+div.tableblock > table[frame="hsides"] {
+  border-left-style: none;
+  border-right-style: none;
+}
+div.tableblock > table[frame="vsides"] {
+  border-top-style: none;
+  border-bottom-style: none;
+}
+
+
+/*
+ * html5 specific
+ *
+ * */
+
+table.tableblock {
+  margin-top: 1.0em;
+  margin-bottom: 1.5em;
+}
+thead, p.tableblock.header {
+  font-weight: bold;
+  color: #527bbd;
+}
+p.tableblock {
+  margin-top: 0;
+}
+table.tableblock {
+  border-width: 3px;
+  border-spacing: 0px;
+  border-style: solid;
+  border-color: #527bbd;
+  border-collapse: collapse;
+}
+th.tableblock, td.tableblock {
+  border-width: 1px;
+  padding: 4px;
+  border-style: solid;
+  border-color: #527bbd;
+}
+
+table.tableblock.frame-topbot {
+  border-left-style: hidden;
+  border-right-style: hidden;
+}
+table.tableblock.frame-sides {
+  border-top-style: hidden;
+  border-bottom-style: hidden;
+}
+table.tableblock.frame-none {
+  border-style: hidden;
+}
+
+th.tableblock.halign-left, td.tableblock.halign-left {
+  text-align: left;
+}
+th.tableblock.halign-center, td.tableblock.halign-center {
+  text-align: center;
+}
+th.tableblock.halign-right, td.tableblock.halign-right {
+  text-align: right;
+}
+
+th.tableblock.valign-top, td.tableblock.valign-top {
+  vertical-align: top;
+}
+th.tableblock.valign-middle, td.tableblock.valign-middle {
+  vertical-align: middle;
+}
+th.tableblock.valign-bottom, td.tableblock.valign-bottom {
+  vertical-align: bottom;
+}
+
+
+/*
+ * manpage specific
+ *
+ * */
+
+body.manpage h1 {
+  padding-top: 0.5em;
+  padding-bottom: 0.5em;
+  border-top: 2px solid silver;
+  border-bottom: 2px solid silver;
+}
+body.manpage h2 {
+  border-style: none;
+}
+body.manpage div.sectionbody {
+  margin-left: 3em;
+}
+
+@media print {
+  body.manpage div#toc { display: none; }
+}
+
+
+</style>
+<script type="text/javascript">
+/*<![CDATA[*/
+var asciidoc = {  // Namespace.
+
+/////////////////////////////////////////////////////////////////////
+// Table Of Contents generator
+/////////////////////////////////////////////////////////////////////
+
+/* Author: Mihai Bazon, September 2002
+ * http://students.infoiasi.ro/~mishoo
+ *
+ * Table Of Content generator
+ * Version: 0.4
+ *
+ * Feel free to use this script under the terms of the GNU General Public
+ * License, as long as you do not remove or alter this notice.
+ */
+
+ /* modified by Troy D. Hanson, September 2006. License: GPL */
+ /* modified by Stuart Rackham, 2006, 2009. License: GPL */
+
+// toclevels = 1..4.
+toc: function (toclevels) {
+
+  function getText(el) {
+    var text = "";
+    for (var i = el.firstChild; i != null; i = i.nextSibling) {
+      if (i.nodeType == 3 /* Node.TEXT_NODE */) // IE doesn't speak constants.
+        text += i.data;
+      else if (i.firstChild != null)
+        text += getText(i);
+    }
+    return text;
+  }
+
+  function TocEntry(el, text, toclevel) {
+    this.element = el;
+    this.text = text;
+    this.toclevel = toclevel;
+  }
+
+  function tocEntries(el, toclevels) {
+    var result = new Array;
+    var re = new RegExp('[hH]([1-'+(toclevels+1)+'])');
+    // Function that scans the DOM tree for header elements (the DOM2
+    // nodeIterator API would be a better technique but not supported by all
+    // browsers).
+    var iterate = function (el) {
+      for (var i = el.firstChild; i != null; i = i.nextSibling) {
+        if (i.nodeType == 1 /* Node.ELEMENT_NODE */) {
+          var mo = re.exec(i.tagName);
+          if (mo && (i.getAttribute("class") || i.getAttribute("className")) != "float") {
+            result[result.length] = new TocEntry(i, getText(i), mo[1]-1);
+          }
+          iterate(i);
+        }
+      }
+    }
+    iterate(el);
+    return result;
+  }
+
+  var toc = document.getElementById("toc");
+  if (!toc) {
+    return;
+  }
+
+  // Delete existing TOC entries in case we're reloading the TOC.
+  var tocEntriesToRemove = [];
+  var i;
+  for (i = 0; i < toc.childNodes.length; i++) {
+    var entry = toc.childNodes[i];
+    if (entry.nodeName.toLowerCase() == 'div'
+     && entry.getAttribute("class")
+     && entry.getAttribute("class").match(/^toclevel/))
+      tocEntriesToRemove.push(entry);
+  }
+  for (i = 0; i < tocEntriesToRemove.length; i++) {
+    toc.removeChild(tocEntriesToRemove[i]);
+  }
+
+  // Rebuild TOC entries.
+  var entries = tocEntries(document.getElementById("content"), toclevels);
+  for (var i = 0; i < entries.length; ++i) {
+    var entry = entries[i];
+    if (entry.element.id == "")
+      entry.element.id = "_toc_" + i;
+    var a = document.createElement("a");
+    a.href = "#" + entry.element.id;
+    a.appendChild(document.createTextNode(entry.text));
+    var div = document.createElement("div");
+    div.appendChild(a);
+    div.className = "toclevel" + entry.toclevel;
+    toc.appendChild(div);
+  }
+  if (entries.length == 0)
+    toc.parentNode.removeChild(toc);
+},
+
+
+/////////////////////////////////////////////////////////////////////
+// Footnotes generator
+/////////////////////////////////////////////////////////////////////
+
+/* Based on footnote generation code from:
+ * http://www.brandspankingnew.net/archive/2005/07/format_footnote.html
+ */
+
+footnotes: function () {
+  // Delete existing footnote entries in case we're reloading the footnodes.
+  var i;
+  var noteholder = document.getElementById("footnotes");
+  if (!noteholder) {
+    return;
+  }
+  var entriesToRemove = [];
+  for (i = 0; i < noteholder.childNodes.length; i++) {
+    var entry = noteholder.childNodes[i];
+    if (entry.nodeName.toLowerCase() == 'div' && entry.getAttribute("class") == "footnote")
+      entriesToRemove.push(entry);
+  }
+  for (i = 0; i < entriesToRemove.length; i++) {
+    noteholder.removeChild(entriesToRemove[i]);
+  }
+
+  // Rebuild footnote entries.
+  var cont = document.getElementById("content");
+  var spans = cont.getElementsByTagName("span");
+  var refs = {};
+  var n = 0;
+  for (i=0; i<spans.length; i++) {
+    if (spans[i].className == "footnote") {
+      n++;
+      var note = spans[i].getAttribute("data-note");
+      if (!note) {
+        // Use [\s\S] in place of . so multi-line matches work.
+        // Because JavaScript has no s (dotall) regex flag.
+        note = spans[i].innerHTML.match(/\s*\[([\s\S]*)]\s*/)[1];
+        spans[i].innerHTML =
+          "[<a id='_footnoteref_" + n + "' href='#_footnote_" + n +
+          "' title='View footnote' class='footnote'>" + n + "</a>]";
+        spans[i].setAttribute("data-note", note);
+      }
+      noteholder.innerHTML +=
+        "<div class='footnote' id='_footnote_" + n + "'>" +
+        "<a href='#_footnoteref_" + n + "' title='Return to text'>" +
+        n + "</a>. " + note + "</div>";
+      var id =spans[i].getAttribute("id");
+      if (id != null) refs["#"+id] = n;
+    }
+  }
+  if (n == 0)
+    noteholder.parentNode.removeChild(noteholder);
+  else {
+    // Process footnoterefs.
+    for (i=0; i<spans.length; i++) {
+      if (spans[i].className == "footnoteref") {
+        var href = spans[i].getElementsByTagName("a")[0].getAttribute("href");
+        href = href.match(/#.*/)[0];  // Because IE return full URL.
+        n = refs[href];
+        spans[i].innerHTML =
+          "[<a href='#_footnote_" + n +
+          "' title='View footnote' class='footnote'>" + n + "</a>]";
+      }
+    }
+  }
+},
+
+install: function(toclevels) {
+  var timerId;
+
+  function reinstall() {
+    asciidoc.footnotes();
+    if (toclevels) {
+      asciidoc.toc(toclevels);
+    }
+  }
+
+  function reinstallAndRemoveTimer() {
+    clearInterval(timerId);
+    reinstall();
+  }
+
+  timerId = setInterval(reinstall, 500);
+  if (document.addEventListener)
+    document.addEventListener("DOMContentLoaded", reinstallAndRemoveTimer, false);
+  else
+    window.onload = reinstallAndRemoveTimer;
+}
+
+}
+asciidoc.install();
+/*]]>*/
+</script>
+</head>
+<body class="manpage">
+<div id="header">
+<h1>
+UALPN(1) Manual Page
+</h1>
+<h2>NAME</h2>
+<div class="sectionbody">
+<p>ualpn -
+   lightweight proxying ACMEv2 tls-alpn-01 responder
+</p>
+</div>
+</div>
+<div id="content">
+<div class="sect1">
+<h2 id="_synopsis">SYNOPSIS</h2>
+<div class="sectionbody">
+<div class="paragraph"><p><strong>ualpn</strong> [<strong>-?</strong>|<strong>--help</strong>]  [<strong>-V</strong>|<strong>--version</strong>] [<strong>-4</strong>|<strong>--ipv4</strong>] [<strong>-6</strong>|<strong>--ipv6</strong>]
+    [<strong>-b</strong>|<strong>--bind</strong> <em>address</em>[@<em>port</em>]] [<strong>-c</strong>|<strong>--connect</strong> <em>address</em>[@<em>port</em>]]
+    [<strong>-d</strong>|<strong>--daemon</strong>] [<strong>-l</strong>|<strong>--logfile</strong> <em>file</em>] [<strong>-m</strong>|<strong>--max-auths</strong> <em>N</em>]
+    [<strong>-n</strong>|<strong>--num-workers</strong> <em>N</em>] [<strong>-p</strong>|<strong>--proxy</strong> <em>N</em>] [<strong>-P</strong>|<strong>--pidfile</strong> <em>file</em>]
+    [<strong>-r</strong>|<strong>--chroot dir] [</strong>-s*|<strong>--sock path</strong>] [<strong>-S</strong>|<strong>--sock-mode</strong> <em>mode</em>]
+    [<strong>-t</strong>|<strong>--terminate</strong>] [<strong>-u</strong>|<strong>--user</strong> <em>user</em><span class="monospaced">[:</span><em>group</em>]] [<strong>-v</strong>|<strong>--verbose</strong> &#8230;]</p></div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_description">DESCRIPTION</h2>
+<div class="sectionbody">
+<div class="paragraph"><p><strong>ualpn</strong> is a lightweight proxying ACMEv2 tls-alpn-01 challenge responder
+compliant with RFC8737 (<a href="https://tools.ietf.org/html/RFC8737">https://tools.ietf.org/html/RFC8737</a>) and RFC8738
+(<a href="https://tools.ietf.org/html/RFC8737">https://tools.ietf.org/html/RFC8737</a>).</p></div>
+<div class="paragraph"><p>Depending on how it is invoked, <strong>ualpn</strong> runs in either client or server mode.
+In client mode <strong>ualpn</strong> connects to a running server mode instance of itself
+through a unix domain socket, in order to add or remove ACMEv2 authorizations.
+See CLIENT MODE below.</p></div>
+<div class="paragraph"><p>In server mode <strong>ualpn</strong> listens for incoming connections (by default on port 443,
+which is mandatory for tls-alpn-01 challenges). It then handles any such
+connection in one of two different ways:</p></div>
+<div class="ulist"><ul>
+<li>
+<p>
+if the connection begins with a "ClientHello" TLS handshake packet including a
+"acme-tls/1" RFC7301 Application Level Protocol Negotiation extension <strong>and</strong> a
+RFC6066 Server Name Indication extension matching an identifier for which it has
+an authorization, <strong>ualpn</strong> performs the tls-alpn-01 handshake and closes the
+connection;
+</p>
+</li>
+<li>
+<p>
+otherwise <strong>ualpn</strong> transparently proxies the connection to one of the backend
+servers it is configured with. By default <strong>ualpn</strong> adds PROXY v1 headers
+(<a href="http://www.haproxy.org/download/1.8/doc/proxy-protocol.txt">http://www.haproxy.org/download/1.8/doc/proxy-protocol.txt</a>) in order to
+safely transport connection information such as the client&#8217;s address to the
+backend. The PROXY protocol is currently supported by apache, nginx and several
+other server programs.
+</p>
+</li>
+</ul></div>
+<div class="paragraph"><p>The event-driven implementation is based on libev (<a href="http://libev.schmorp.de">http://libev.schmorp.de</a>)
+and considerably reduces the cost of context switches and memory usage. In
+addition on systems such as Linux supporting the <span class="monospaced">splice()</span> system call,
+<strong>ualpn</strong> is able to move network data without copying it to/from kernel/user
+address space.</p></div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_options">OPTIONS</h2>
+<div class="sectionbody">
+<div class="dlist"><dl>
+<dt class="hdlist1">
+<strong>-4, --ipv4</strong>
+</dt>
+<dd>
+<p>
+    Only listen to IPv4 connections
+</p>
+</dd>
+<dt class="hdlist1">
+<strong>-6, --ipv6</strong>
+</dt>
+<dd>
+<p>
+    Only listen to IPv6 connections
+</p>
+</dd>
+<dt class="hdlist1">
+<strong>-b, --bind</strong> <em>address</em>[@<em>port</em>]
+</dt>
+<dd>
+<p>
+    Enable server mode and listen to <em>address</em>. The address must be
+    specified in numeric format using the standard IPv4 or IPv6 notation).
+    Optionally, a port number can be given (default is 443). This flag can be
+    specified multiple times to listen to multiple IP addresses. If this flag
+    is not specified and server mode was enabled by some other option,
+    <strong>ualpn</strong> listens to the wildcard interface; otherwise it runs in client
+    mode (see CLIENT MODE below).
+</p>
+</dd>
+<dt class="hdlist1">
+<strong>-c, --connect</strong> <em>address</em>[@<em>port</em>]
+</dt>
+<dd>
+<p>
+    Enable server mode and add a new backend. The backend address must be
+    specified in numeric format using the standard IPv4 or IPv6 notation).
+    Optionally, a port number can be given (default is 443). This flag can be
+    specified multiple times to add multiple backends. This flag must be
+    specified at least once in server mode.
+</p>
+</dd>
+<dt class="hdlist1">
+<strong>-d, --daemon</strong>
+</dt>
+<dd>
+<p>
+    Enable server mode and fork in the background
+</p>
+</dd>
+<dt class="hdlist1">
+<strong>-l, --logfile</strong> <em>file</em>
+</dt>
+<dd>
+<p>
+    Log to <em>file</em>. By default <strong>ualpn</strong> logs to <strong>syslog</strong> if <strong>-d, --daemon</strong>
+    was specified or <strong>stderr</strong> otherwise. See also <strong>-v, --verbose</strong>
+</p>
+</dd>
+<dt class="hdlist1">
+<strong>-m, --max-auths</strong> <em>N</em>
+</dt>
+<dd>
+<p>
+    Enable server mode and allow managing ACMEv2 tls-alpn-01 challenges for
+    up to <em>N</em> different identifiers (default 100)
+</p>
+</dd>
+<dt class="hdlist1">
+<strong>-n, --num-workers</strong> <em>N</em>
+</dt>
+<dd>
+<p>
+    Enable server mode and spawn <em>N</em> worker processes (default 2) to
+    handle connections. Note that worker processes are single threaded but
+    thanks to the event based implementation each can handle several
+    (potentially thousands) connections concurrently.
+</p>
+</dd>
+<dt class="hdlist1">
+<strong>-p, --proxy</strong> <em>N</em>
+</dt>
+<dd>
+<p>
+    Enable server mode and disable (0) or specify (1, 2) the PROXY header
+    version (default 1). The backend server needs to be configured accordingly:
+</p>
+<div class="ulist"><ul>
+<li>
+<p>
+nginx: <a href="https://docs.nginx.com/nginx/admin-guide/load-balancer/using-proxy-protocol">https://docs.nginx.com/nginx/admin-guide/load-balancer/using-proxy-protocol</a>
+</p>
+</li>
+<li>
+<p>
+apache: <a href="https://httpd.apache.org/docs/2.4/mod/mod_remoteip.html">https://httpd.apache.org/docs/2.4/mod/mod_remoteip.html</a>
+</p>
+</li>
+</ul></div>
+</dd>
+<dt class="hdlist1">
+<strong>-P, --pidfile</strong> <em>file</em>
+</dt>
+<dd>
+<p>
+    Specify pidfile location (default /var/run/ualpn.pid)
+</p>
+</dd>
+<dt class="hdlist1">
+<strong>-r, --chroot</strong> <em>dir</em>
+</dt>
+<dd>
+<p>
+    Enable server mode and specify a directory to <em>chroot</em> to. If logging to
+    syslog it is necessary to ensure that a syslogd(8) socket is available
+    at /dev/log in the chroot directory, otherwise <strong>ualpn</strong> will not produce
+    any log output.
+</p>
+</dd>
+<dt class="hdlist1">
+<strong>-s, --sock</strong> <em>path</em>
+</dt>
+<dd>
+<p>
+    Specify unix socket path (default /var/run/ualpn.sock)
+</p>
+</dd>
+<dt class="hdlist1">
+<strong>-S, --sock-mode</strong> <em>mode</em>
+</dt>
+<dd>
+<p>
+    Enable server mode and specify socket access permissions (default 644)
+</p>
+</dd>
+<dt class="hdlist1">
+<strong>-t, --terminate</strong>
+</dt>
+<dd>
+<p>
+    Try to terminate a running <strong>ualpn</strong> server. This is achieved by looking
+    up the process id stored by the server in the pidfile (see <strong>-P, --pidfile</strong>)
+    and signalling it to terminate.
+</p>
+</dd>
+<dt class="hdlist1">
+<strong>-u, --user</strong> <em>user</em><span class="monospaced">[:</span><em>group</em><span class="monospaced">]</span>
+</dt>
+<dd>
+<p>
+    Enable server mode and drop user (and optionally group) privileges to those
+    of <em>user</em> after binding the sockets. Also affects the ownership of the unix
+    socket, pidfile and logfile (if any).
+</p>
+</dd>
+<dt class="hdlist1">
+<strong>-v, --verbose</strong>
+</dt>
+<dd>
+<p>
+    By default <strong>ualpn</strong> only produces logs upon errors or warnings.
+    When this option is specified <strong>ualpn</strong> also logs notice messages.
+    This option can be specified more than once to increase verbosity and
+    include information (twice) or debug (three times) messages.
+</p>
+</dd>
+<dt class="hdlist1">
+<strong>-V, --version</strong>
+</dt>
+<dd>
+<p>
+    Print program version on stderr and exit.
+</p>
+</dd>
+<dt class="hdlist1">
+<strong>-?, --help</strong>
+</dt>
+<dd>
+<p>
+    Print a brief usage text on stderr and exit.
+</p>
+</dd>
+</dl></div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_client_mode">CLIENT MODE</h2>
+<div class="sectionbody">
+<div class="paragraph"><p>In client mode <strong>ualpn</strong> pipes stdin/stdout to/from the unix socket of the
+running server instance of itself. The protocol is ASCII text based,
+case sensitive, line oriented, with two commands:</p></div>
+<div class="dlist"><dl>
+<dt class="hdlist1">
+<strong>auth</strong> <em>identifier</em> <em>authorization</em>
+</dt>
+<dd>
+<p>
+    The <strong>auth</strong> command instructs the running <strong>ualpn</strong> server to handle ACMEv2
+    tls-alpn-01 challenges for <em>identifier</em>, which can be a string representing
+    either a domain (type <span class="monospaced">dns</span> according to RFC8555 section 9.7.8) or an IP
+    address (type <span class="monospaced">ip</span> according to RFC8738 section 6).
+    <em>authorization</em> must contain the base64url encoding of the SHA-256 digest
+    of the key authorization computed according to RFC8737 section 3 (note the
+    <strong>uacme</strong> software executes hook scripts with the correct <em>authorization</em>
+    passed as the 5th argument).
+    Upon successful invocation of the <strong>auth</strong> command <strong>ualpn</strong> generates a self
+    signed certificate as required by the tls-alpn-01 challenge, and will
+    then use it to perform tls-alpn-01 handshakes for the given <em>identifier</em>.
+</p>
+</dd>
+<dt class="hdlist1">
+<strong>unauth</strong> <em>identifier</em>
+</dt>
+<dd>
+<p>
+    The <strong>unauth</strong> command instructs the running <strong>ualpn</strong> server to no longer
+    handle ACMEv2 tls-alpn-01 challenges for <em>identifier</em>.
+</p>
+</dd>
+</dl></div>
+<div class="paragraph"><p><strong>ualpn</strong> responds to both commands with a line beginning with either "OK" or
+"ERR", followed by a space and additional error information.</p></div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_examples">EXAMPLES</h2>
+<div class="sectionbody">
+<div class="dlist"><dl>
+<dt class="hdlist1">
+<span class="monospaced">ualpn -vv -d -u nobody:nogroup -c 127.0.0.1@4443 -S 666</span>
+</dt>
+<dd>
+<p>
+    start <strong>ualpn</strong> as a daemon, binding to the default port 443 on the
+    wildcard interface. Proxy connections to port 4443 on 127.0.0.1
+    After opening the sockets, drop the user privileges and run as
+    nobody:nogroup. Allow anyone on the local host to access the unix
+    socket. Also increase the verbosity to include notice and
+    information messages.
+</p>
+</dd>
+<dt class="hdlist1">
+<span class="monospaced">echo "auth www.example.com DEi0apzMOdMT2DAro57oIvn-wEzPiYcAYDh2Cvjra3I" | ualpn</span>
+</dt>
+<dd>
+<p>
+    Instruct the running <strong>ualpn</strong> server to handle ACMEv2 tls-alpn-01 challenges
+    for www.example.com with the given key authorization.
+</p>
+</dd>
+<dt class="hdlist1">
+<span class="monospaced">echo "unauth www.example.com" | ualpn</span>
+</dt>
+<dd>
+<p>
+    Instruct the running <strong>ualpn</strong> server to no longer handle ACMEv2 tls-alpn-01
+    challenges for www.example.com
+</p>
+</dd>
+</dl></div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_exit_status">EXIT STATUS</h2>
+<div class="sectionbody">
+<div class="dlist"><dl>
+<dt class="hdlist1">
+<strong>0</strong>
+</dt>
+<dd>
+<p>
+    Success
+</p>
+</dd>
+<dt class="hdlist1">
+<strong>1</strong>
+</dt>
+<dd>
+<p>
+    Failure (syntax or usage error; configuration error;
+    processing failure; unexpected error).
+</p>
+</dd>
+</dl></div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_example_uacme_hook_script">EXAMPLE UACME HOOK SCRIPT</h2>
+<div class="sectionbody">
+<div class="paragraph"><p>The <em>ualpn.sh</em> hook script included in the distribution can be used
+to automate the certificate issuance with <strong>uacme</strong>, provided <strong>ualpn</strong>
+is listening on port 443 of the webserver for the domain being validated</p></div>
+<div class="literalblock">
+<div class="content monospaced">
+<pre>#!/bin/sh
+ARGS=5
+E_BADARGS=85</pre>
+</div></div>
+<div class="literalblock">
+<div class="content monospaced">
+<pre>if test $# -ne "$ARGS"
+then
+    echo "Usage: $(basename "$0") method type ident token auth" 1&gt;&amp;2
+    exit $E_BADARGS
+fi</pre>
+</div></div>
+<div class="literalblock">
+<div class="content monospaced">
+<pre>METHOD=$1
+TYPE=$2
+IDENT=$3
+TOKEN=$4
+AUTH=$5</pre>
+</div></div>
+<div class="literalblock">
+<div class="content monospaced">
+<pre>if [ "$TYPE" != "tls-alpn-01" ]; then
+    exit 1
+fi</pre>
+</div></div>
+<div class="literalblock">
+<div class="content monospaced">
+<pre>case "$METHOD" in
+    "begin")
+        UALPN_OUT=$(echo "auth $IDENT $AUTH" | ualpn)
+        if [ "x$UALPN_OUT" = "xOK" ]; then
+            exit 0
+        else
+            exit 1
+        fi
+        ;;
+    "done"|"failed")
+        UALPN_OUT=$(echo "unauth $IDENT" | ualpn)
+        if [ "x$UALPN_OUT" = "xOK" ]; then
+            exit 0
+        else
+            exit 1
+        fi
+        ;;
+    *)
+        echo "$0: invalid method" 1&gt;&amp;2
+        exit 1
+esac</pre>
+</div></div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_bugs">BUGS</h2>
+<div class="sectionbody">
+<div class="paragraph"><p>If you believe you have found a bug, please create a new issue
+at <a href="https://github.com/ndilieto/uacme/issues">https://github.com/ndilieto/uacme/issues</a> with any applicable
+information.</p></div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_see_also">SEE ALSO</h2>
+<div class="sectionbody">
+<div class="paragraph"><p><strong>uacme</strong>(1)</p></div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_author">AUTHOR</h2>
+<div class="sectionbody">
+<div class="paragraph"><p><strong>ualpn</strong> was written by Nicola Di Lieto</p></div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_copyright">COPYRIGHT</h2>
+<div class="sectionbody">
+<div class="paragraph"><p>Copyright &#169; 2019,2020 Nicola Di Lieto &lt;<a href="mailto:nicola.dilieto@gmail.com">nicola.dilieto@gmail.com</a>&gt;</p></div>
+<div class="paragraph"><p>This file is part of <strong>uacme</strong>.</p></div>
+<div class="paragraph"><p><strong>uacme</strong> is free software: you can redistribute it and/or modify it
+under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.</p></div>
+<div class="paragraph"><p><strong>uacme</strong> is distributed in the hope that it will be useful, but
+WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+General Public License for more details.</p></div>
+<div class="paragraph"><p>You should have received a copy of the GNU General Public License
+along with this program.  If not, see <a href="http://www.gnu.org/licenses/">http://www.gnu.org/licenses/</a>.</p></div>
+</div>
+</div>
+</div>
+<div id="footnotes"><hr></div>
+<div id="footer">
+<div id="footer-text">
+Version 1.1-beta<br>
+Last updated
+ 2020-03-08 11:46:36 CET
+</div>
+</div>
+</body>
+</html>

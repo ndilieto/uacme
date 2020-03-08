@@ -6,4 +6,10 @@ config.log
 config.status
 autom4te.cache
 uacme
+ualpn
 *.o
+config.h
+config.h.in~
+libev.a
+libev/.dirstamp
+stamp-h1
