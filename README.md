@@ -14,7 +14,7 @@ certificate revocation.
 
 ## Features
 * **Written in C** - It runs on any unix machine, including Linux, BSD, ...
-* **Minimal dependencies** - Other than the standard C library, uacme 
+* **Minimal dependencies** - Other than the standard C library, **uacme** 
 depends only on libcurl and one of GnuTLS, OpenSSL or mbedTLS. It does
 all the network communications and crypto without spawning external
 processes.  Particularly when using mbedTLS, it is small enough to run
@@ -35,7 +35,7 @@ with all tokens and information required to complete any challenge type
 and cleaning up the challenge environment to the user or hook. An example
 shell script to handle http-01 challenges is provided.
 * **tls-alpn-01 challenge support** - The distrubution also includes
-ualpn, a lightweight proxying tls-alpn-01 challenge responder compliant
+**ualpn**, a lightweight proxying tls-alpn-01 challenge responder compliant
 with [RFC8737](https://tools.ietf.org/html/rfc8737) and
 [RFC8738](https://tools.ietf.org/html/rfc8738).
 * **Can run as a cron job** - to renew certificates automatically 
@@ -70,7 +70,7 @@ Pre-built packages are available for several distributions:
 
 ## Getting started
 
-Once you have obtained uacme (see Installation above) the next step is to use
+Once you have obtained **uacme** (see Installation above) the next step is
 ```
 uacme -v -c /path/to/uacme.d new
 ```
@@ -83,7 +83,7 @@ You can then issue a certificate for your domain by doing
 ```
 uacme -v -c /path/to/uacme.d issue www.your.domain.com
 ```
-If everything goes well uacme will ask you to set up a challenge, for example
+If everything goes well **uacme** will ask you to set up a challenge, for example
 ```
 uacme: challenge=http-01 ident=www.your.domain.com token=kZjqYgAss_sl4XXDfFq-jeQV1_lqsE76v2BoCGegFk4
 key_auth=kZjqYgAss_sl4XXDfFq-jeQV1_lqsE76v2BoCGegFk4.2evcXalKLhAybRuxxE-HkSUihdzQ7ZDAKA9EZYrTXwU
@@ -99,18 +99,18 @@ authorization:
 kZjqYgAss_sl4XXDfFq-jeQV1_lqsE76v2BoCGegFk4.2evcXalKLhAybRuxxE-HkSUihdzQ7ZDAKA9EZYrTXwU
 ```
 After setting up the web server you can then type 'y' followed by a newline on
-uacme's input. This will notify the ACME server that it can proceed with the
-challenge verification.  If the procedure was successful uacme will save the
+**uacme**'s input. This will notify the ACME server that it can proceed with the
+challenge verification.  If the procedure was successful **uacme** will save the
 certificate and the key at:
 ```
 /path/to/uacme.d/www.your.domain.com/cert.pem
 /path/to/uacme.d/private/www.your.domain.com/key.pemt
 ```
 Note other types of challenges are possible. If you type anything other than
-'y', uacme will skip the challenge and propose a different one. The easiest
+'y', **uacme** will skip the challenge and propose a different one. The easiest
 is http-01 but any other type can be dealt with. Keep in mind that challenge
 types may be served in random order by the server. Do not make any assumptions
-and read uacme's output carefully.
+and read **uacme**'s output carefully.
 
 ## Automating updates
 Use the -h flag:
@@ -129,13 +129,13 @@ Once everything works correctly you can also set up cron, for example
 ```
 6 15 * * * /usr/bin/uacme -c /path/to/uacme.d -h /usr/share/uacme/uacme.sh issue www.your.domain.com 
 ```
-The cron job will automatically update the certificate when needed. 
-Note the absence of -v flag, this makes uacme only produce output upon errors.
+The cron job will automatically update the certificate when needed.  Note the
+absence of -v flag, this makes **uacme** only produce output upon errors.
 
 Note also that you will need to restart or reload any service that uses the
 certificate, to make sure it uses the renewed one. This is system and
 installation dependent. I normally put the necessary instructions in another
-script (for example /usr/share/uacme/reload.sh) that is executed when uacme
+script (for example /usr/share/uacme/reload.sh) that is executed when **uacme**
 returns 0 (indicating the certificate has been reissued).
 ```
 6 15 * * * /usr/bin/uacme -c /path/to/uacme.d -h /usr/share/uacme/uacme.sh issue www.your.domain.com && /usr/share/uacme/reload.sh
@@ -147,31 +147,31 @@ for an advanced example with dns-01 challenge management.
 
 ## tls-alpn-01 challenge support
 
-ualpn is a lightweight proxying tls-alpn-01 challenge responder, designed
+**ualpn** is a lightweight proxying tls-alpn-01 challenge responder, designed
 to handle incoming HTTPS connections on port 443. Most of the time it just
 transparently proxies connections to the real web server (which can be on
 either another machine, or a different TCP port on the same machine). When a
-tls-alpn-01 challenge handshake comes in, ualpn handles it on the fly
+tls-alpn-01 challenge handshake comes in, **ualpn** handles it on the fly
 instead of proxying it to the webserver.
 
 The event-driven implementation is based on [libev](http://libev.schmorp.de)
 and considerably reduces the cost of context switches and memory usage. In
 addition on systems such as linux supporting the splice() system call,
-ualpn is able to move network data without copying it to/from kernel/user
+**ualpn** is able to move network data without copying it to/from kernel/user
 address space.
 
-ualpn also listens to a UNIX domain socket so that it can be fed the
+**ualpn** also listens to a UNIX domain socket so that it can be fed the
 necessary tls-alpn-01 key authorizations for the domains being validated
-by the ACME server. ualpn was designed to be easy to integrate with
-not only uacme (chech the example ualpn.sh hook script) but also other ACME
-clients.
+by the ACME server. **ualpn** was designed to be easy to integrate with
+not only **uacme** (chech the example ualpn.sh hook script) but also other
+ACME clients.
 
-To get started with ualpn:
+To get started with **ualpn**:
 * move your real HTTPS server to port 4443 and also enable it to accept
 the PROXY protocol:
   * for nginx: https://docs.nginx.com/nginx/admin-guide/load-balancer/using-proxy-protocol
   * for apache: https://httpd.apache.org/docs/2.4/mod/mod_remoteip.html
-* launch ualpn as a daemon and check the logs (by default in syslog)
+* launch **ualpn** as a daemon and check the logs (by default in syslog)
 ```
 sudo ualpn -v -d -u nobody:nogroup -c 127.0.0.1@4443 -S 666
 ```
