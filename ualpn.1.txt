@@ -24,7 +24,8 @@ SYNOPSIS
 DESCRIPTION
 -----------
 *ualpn* is a lightweight proxying ACMEv2 tls-alpn-01 challenge responder
-compliant with RFC8737 (<https://tools.ietf.org/html/RFC8737>).
+compliant with RFC8737 (<https://tools.ietf.org/html/RFC8737>) and RFC8738
+(<https://tools.ietf.org/html/RFC8737>).
 
 Depending on how it is invoked, *ualpn* runs in either client or server mode.
 In client mode *ualpn* connects to a running server mode instance of itself
@@ -49,7 +50,7 @@ other server programs.
 
 The event-driven implementation is based on libev (<http://libev.schmorp.de>)
 and considerably reduces the cost of context switches and memory usage. In
-addition on systems (such as linux) supporting the `splice()` system call,
+addition on systems such as Linux supporting the `splice()` system call,
 *ualpn* is able to move network data without copying it to/from kernel/user
 address space.
 
@@ -256,7 +257,7 @@ information.
 
 SEE ALSO
 --------
-*uacme*(2)
+*uacme*(1)
 
 
 AUTHOR

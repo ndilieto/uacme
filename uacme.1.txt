@@ -251,7 +251,7 @@ information.
 
 SEE ALSO
 --------
-*ualpn*(2)
+*ualpn*(1)
 
 AUTHOR
 ------

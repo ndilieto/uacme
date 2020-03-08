@@ -2,12 +2,12 @@
 .\"     Title: ualpn
 .\"    Author: [see the "AUTHOR" section]
 .\" Generator: DocBook XSL Stylesheets v1.79.1 <http://docbook.sf.net/>
-.\"      Date: 03/07/2020
+.\"      Date: 03/08/2020
 .\"    Manual: User Commands
-.\"    Source: ualpn 1.0.22
+.\"    Source: ualpn 1.1-beta
 .\"  Language: English
 .\"
-.TH "UALPN" "1" "03/07/2020" "ualpn 1\&.0\&.22" "User Commands"
+.TH "UALPN" "1" "03/08/2020" "ualpn 1\&.1\-beta" "User Commands"
 .\" -----------------------------------------------------------------
 .\" * Define some portability stuff
 .\" -----------------------------------------------------------------
@@ -34,7 +34,7 @@ ualpn \- lightweight proxying ACMEv2 tls\-alpn\-01 responder
 \fBualpn\fR [\fB\-?\fR|\fB\-\-help\fR] [\fB\-V\fR|\fB\-\-version\fR] [\fB\-4\fR|\fB\-\-ipv4\fR] [\fB\-6\fR|\fB\-\-ipv6\fR] [\fB\-b\fR|\fB\-\-bind\fR \fIaddress\fR[@\fIport\fR]] [\fB\-c\fR|\fB\-\-connect\fR \fIaddress\fR[@\fIport\fR]] [\fB\-d\fR|\fB\-\-daemon\fR] [\fB\-l\fR|\fB\-\-logfile\fR \fIfile\fR] [\fB\-m\fR|\fB\-\-max\-auths\fR \fIN\fR] [\fB\-n\fR|\fB\-\-num\-workers\fR \fIN\fR] [\fB\-p\fR|\fB\-\-proxy\fR \fIN\fR] [\fB\-P\fR|\fB\-\-pidfile\fR \fIfile\fR] [\fB\-r\fR|\fB\-\-chroot dir] [\fR\-s*|\fB\-\-sock path\fR] [\fB\-S\fR|\fB\-\-sock\-mode\fR \fImode\fR] [\fB\-t\fR|\fB\-\-terminate\fR] [\fB\-u\fR|\fB\-\-user\fR \fIuser\fR[:\fIgroup\fR]] [\fB\-v\fR|\fB\-\-verbose\fR \&...]
 .SH "DESCRIPTION"
 .sp
-\fBualpn\fR is a lightweight proxying ACMEv2 tls\-alpn\-01 challenge responder compliant with RFC8737 (https://tools\&.ietf\&.org/html/RFC8737)\&.
+\fBualpn\fR is a lightweight proxying ACMEv2 tls\-alpn\-01 challenge responder compliant with RFC8737 (https://tools\&.ietf\&.org/html/RFC8737) and RFC8738 (https://tools\&.ietf\&.org/html/RFC8737)\&.
 .sp
 Depending on how it is invoked, \fBualpn\fR runs in either client or server mode\&. In client mode \fBualpn\fR connects to a running server mode instance of itself through a unix domain socket, in order to add or remove ACMEv2 authorizations\&. See CLIENT MODE below\&.
 .sp
@@ -70,7 +70,7 @@ transparently proxies the connection to one of the backend servers it is configu
 adds PROXY v1 headers (http://www\&.haproxy\&.org/download/1\&.8/doc/proxy\-protocol\&.txt) in order to safely transport connection information such as the client\(cqs address to the backend\&. The PROXY protocol is currently supported by apache, nginx and several other server programs\&.
 .RE
 .sp
-The event\-driven implementation is based on libev (http://libev\&.schmorp\&.de) and considerably reduces the cost of context switches and memory usage\&. In addition on systems (such as linux) supporting the splice() system call, \fBualpn\fR is able to move network data without copying it to/from kernel/user address space\&.
+The event\-driven implementation is based on libev (http://libev\&.schmorp\&.de) and considerably reduces the cost of context switches and memory usage\&. In addition on systems such as Linux supporting the splice() system call, \fBualpn\fR is able to move network data without copying it to/from kernel/user address space\&.
 .SH "OPTIONS"
 .PP
 \fB\-4, \-\-ipv4\fR
@@ -379,7 +379,7 @@ esac
 If you believe you have found a bug, please create a new issue at https://github\&.com/ndilieto/uacme/issues with any applicable information\&.
 .SH "SEE ALSO"
 .sp
-\fBuacme\fR(2)
+\fBuacme\fR(1)
 .SH "AUTHOR"
 .sp
 \fBualpn\fR was written by Nicola Di Lieto

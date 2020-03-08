@@ -23,7 +23,7 @@ bin_PROGRAMS = uacme
 if ENABLE_UALPN
 bin_PROGRAMS += ualpn
 
-ualpn_SOURCES = ualpn.c base64.c base64.h log.c log.h
+ualpn_SOURCES = ualpn.c base64.c base64.h log.c log.h sglib.h
 ualpn_CPPFLAGS = -DRUNSTATEDIR="\"${runstatedir}\""
 		 -DSYSCONFDIR="\"${sysconfdir}\""
 ualpn_CFLAGS = $(WCFLAGS)
@@ -64,40 +64,36 @@ endif
 
 if ENABLE_DOCS
 dist_man1_MANS = uacme.1
-dist_html_DATA = uacme.1.html
+dist_html_DATA = docs/uacme.html
 
 if ENABLE_UALPN
 dist_man1_MANS += ualpn.1
-dist_html_DATA += ualpn.1.html
+dist_html_DATA += docs/ualpn.html
 
 ualpn.1: ualpn.1.txt $(top_srcdir)/.version Makefile
-	$(AM_V_GEN)$(A2X) -L -d manpage -f manpage -a revision=$(VERSION) \
+	$(AM_V_GEN)$(A2X) -L -d manpage -f manpage \
+	    -a revision=$(VERSION) \
 	    -a sysconfdir="${sysconfdir}" \
 	    -a runstatedir="${runstatedir}" $<
 
-ualpn.1.html: ualpn.1.txt $(top_srcdir)/.version Makefile
-	$(AM_V_GEN)$(ASCIIDOC) -d manpage -b html5 -a revision=$(VERSION) \
+docs/ualpn.html: ualpn.1.txt $(top_srcdir)/.version Makefile
+	$(AM_V_GEN)$(ASCIIDOC) -d manpage -b html5 -o $@ \
+	    -a revision=$(VERSION) \
 	    -a sysconfdir="${sysconfdir}" \
 	    -a runstatedir="${runstatedir}" $<
-
-$(top_srcdir)/docs/ualpn.html: ualpn.1.html
-	mkdir -p docs
-	cp ualpn.1.html $@
 endif
 
 uacme.1: uacme.1.txt $(top_srcdir)/.version Makefile
-	$(AM_V_GEN)$(A2X) -L -d manpage -f manpage -a revision=$(VERSION) \
+	$(AM_V_GEN)$(A2X) -L -d manpage -f manpage \
+	    -a revision=$(VERSION) \
 	    -a sysconfdir="${sysconfdir}" \
 	    -a runstatedir="${runstatedir}" $<
 
-uacme.1.html: uacme.1.txt $(top_srcdir)/.version Makefile
-	$(AM_V_GEN)$(ASCIIDOC) -d manpage -b html5 -a revision=$(VERSION) \
+docs/uacme.html: uacme.1.txt $(top_srcdir)/.version Makefile
+	$(AM_V_GEN)$(ASCIIDOC) -d manpage -b html5 -o $@ \
+	    -a revision=$(VERSION) \
 	    -a sysconfdir="${sysconfdir}" \
 	    -a runstatedir="${runstatedir}" $<
-
-$(top_srcdir)/docs/index.html: uacme.1.html
-	mkdir -p docs
-	cp uacme.1.html $@
 endif
 
 .PHONY: valgrind
@@ -107,5 +103,8 @@ valgrind: uacme
 	    $(builddir)/uacme $(VALGRIND_UACME_ARGS)
 
 EXTRA_DIST = GNUmakefile build-aux/git-version-gen uacme.sh uacme.1.txt \
-	     uacme.1 uacme.1.html ualpn.1.txt ualpn.1 ualpn.1.html
+	     uacme.1 docs/uacme.html ualpn.1.txt ualpn.1 docs/ualpn.html \
+	     libev/ev_epoll.c libev/ev_iouring.c libev/ev_kqueue.c \
+	     libev/ev_linuxaio.c libev/ev_poll.c libev/ev_port.c \
+	     libev/ev_select.c libev/ev_vars.h libev/ev_wrap.h
 CLEANFILES = valgrind.log

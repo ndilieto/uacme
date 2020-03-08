@@ -113,7 +113,7 @@ bin_PROGRAMS = uacme$(EXEEXT) $(am__EXEEXT_1)
 @ENABLE_READFILE_TRUE@am__append_4 = read-file.c read-file.h
 @ENABLE_UALPN_TRUE@am__append_5 = ualpn.sh
 @ENABLE_DOCS_TRUE@@ENABLE_UALPN_TRUE@am__append_6 = ualpn.1
-@ENABLE_DOCS_TRUE@@ENABLE_UALPN_TRUE@am__append_7 = ualpn.1.html
+@ENABLE_DOCS_TRUE@@ENABLE_UALPN_TRUE@am__append_7 = docs/ualpn.html
 subdir = .
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
 am__aclocal_m4_deps =  \
@@ -158,7 +158,7 @@ uacme_OBJECTS = $(am_uacme_OBJECTS)
 uacme_LDADD = $(LDADD)
 uacme_LINK = $(CCLD) $(uacme_CFLAGS) $(CFLAGS) $(uacme_LDFLAGS) \
 	$(LDFLAGS) -o $@
-am__ualpn_SOURCES_DIST = ualpn.c base64.c base64.h log.c log.h \
+am__ualpn_SOURCES_DIST = ualpn.c base64.c base64.h log.c log.h sglib.h \
 	libev/ev.h
 am__objects_2 =
 @ENABLE_UALPN_TRUE@am_ualpn_OBJECTS = ualpn-ualpn.$(OBJEXT) \
@@ -240,7 +240,7 @@ am__can_run_installinfo = \
 man1dir = $(mandir)/man1
 NROFF = nroff
 MANS = $(dist_man1_MANS)
-am__dist_html_DATA_DIST = uacme.1.html ualpn.1.html
+am__dist_html_DATA_DIST = docs/uacme.html docs/ualpn.html
 DATA = $(dist_html_DATA)
 am__tagged_files = $(HEADERS) $(SOURCES) $(TAGS_FILES) \
 	$(LISP)config.h.in
@@ -398,7 +398,7 @@ top_srcdir = @top_srcdir@
 ACLOCAL_AMFLAGS = -I build-aux/m4
 ARFLAGS = cr
 @ENABLE_UALPN_TRUE@ualpn_SOURCES = ualpn.c base64.c base64.h log.c \
-@ENABLE_UALPN_TRUE@	log.h $(am__append_2)
+@ENABLE_UALPN_TRUE@	log.h sglib.h $(am__append_2)
 @ENABLE_UALPN_TRUE@ualpn_CPPFLAGS =  \
 @ENABLE_UALPN_TRUE@	-DRUNSTATEDIR="\"${runstatedir}\"" \
 @ENABLE_UALPN_TRUE@	$(am__append_3)
@@ -417,9 +417,12 @@ uacme_LDFLAGS = $(CURL_LDFLAGS)
 BUILT_SOURCES = $(top_srcdir)/.version
 dist_pkgdata_SCRIPTS = uacme.sh $(am__append_5)
 @ENABLE_DOCS_TRUE@dist_man1_MANS = uacme.1 $(am__append_6)
-@ENABLE_DOCS_TRUE@dist_html_DATA = uacme.1.html $(am__append_7)
+@ENABLE_DOCS_TRUE@dist_html_DATA = docs/uacme.html $(am__append_7)
 EXTRA_DIST = GNUmakefile build-aux/git-version-gen uacme.sh uacme.1.txt \
-	     uacme.1 uacme.1.html ualpn.1.txt ualpn.1 ualpn.1.html
+	     uacme.1 docs/uacme.html ualpn.1.txt ualpn.1 docs/ualpn.html \
+	     libev/ev_epoll.c libev/ev_iouring.c libev/ev_kqueue.c \
+	     libev/ev_linuxaio.c libev/ev_poll.c libev/ev_port.c \
+	     libev/ev_select.c libev/ev_vars.h libev/ev_wrap.h
 
 CLEANFILES = valgrind.log
 all: $(BUILT_SOURCES) config.h
@@ -1192,32 +1195,28 @@ dist-hook:
 	echo $(VERSION) > $(distdir)/.tarball-version
 
 @ENABLE_DOCS_TRUE@@ENABLE_UALPN_TRUE@ualpn.1: ualpn.1.txt $(top_srcdir)/.version Makefile
-@ENABLE_DOCS_TRUE@@ENABLE_UALPN_TRUE@	$(AM_V_GEN)$(A2X) -L -d manpage -f manpage -a revision=$(VERSION) \
+@ENABLE_DOCS_TRUE@@ENABLE_UALPN_TRUE@	$(AM_V_GEN)$(A2X) -L -d manpage -f manpage \
+@ENABLE_DOCS_TRUE@@ENABLE_UALPN_TRUE@	    -a revision=$(VERSION) \
 @ENABLE_DOCS_TRUE@@ENABLE_UALPN_TRUE@	    -a sysconfdir="${sysconfdir}" \
 @ENABLE_DOCS_TRUE@@ENABLE_UALPN_TRUE@	    -a runstatedir="${runstatedir}" $<
 
-@ENABLE_DOCS_TRUE@@ENABLE_UALPN_TRUE@ualpn.1.html: ualpn.1.txt $(top_srcdir)/.version Makefile
-@ENABLE_DOCS_TRUE@@ENABLE_UALPN_TRUE@	$(AM_V_GEN)$(ASCIIDOC) -d manpage -b html5 -a revision=$(VERSION) \
+@ENABLE_DOCS_TRUE@@ENABLE_UALPN_TRUE@docs/ualpn.html: ualpn.1.txt $(top_srcdir)/.version Makefile
+@ENABLE_DOCS_TRUE@@ENABLE_UALPN_TRUE@	$(AM_V_GEN)$(ASCIIDOC) -d manpage -b html5 -o $@ \
+@ENABLE_DOCS_TRUE@@ENABLE_UALPN_TRUE@	    -a revision=$(VERSION) \
 @ENABLE_DOCS_TRUE@@ENABLE_UALPN_TRUE@	    -a sysconfdir="${sysconfdir}" \
 @ENABLE_DOCS_TRUE@@ENABLE_UALPN_TRUE@	    -a runstatedir="${runstatedir}" $<
-
-@ENABLE_DOCS_TRUE@@ENABLE_UALPN_TRUE@$(top_srcdir)/docs/ualpn.html: ualpn.1.html
-@ENABLE_DOCS_TRUE@@ENABLE_UALPN_TRUE@	mkdir -p docs
-@ENABLE_DOCS_TRUE@@ENABLE_UALPN_TRUE@	cp ualpn.1.html $@
 
 @ENABLE_DOCS_TRUE@uacme.1: uacme.1.txt $(top_srcdir)/.version Makefile
-@ENABLE_DOCS_TRUE@	$(AM_V_GEN)$(A2X) -L -d manpage -f manpage -a revision=$(VERSION) \
+@ENABLE_DOCS_TRUE@	$(AM_V_GEN)$(A2X) -L -d manpage -f manpage \
+@ENABLE_DOCS_TRUE@	    -a revision=$(VERSION) \
 @ENABLE_DOCS_TRUE@	    -a sysconfdir="${sysconfdir}" \
 @ENABLE_DOCS_TRUE@	    -a runstatedir="${runstatedir}" $<
 
-@ENABLE_DOCS_TRUE@uacme.1.html: uacme.1.txt $(top_srcdir)/.version Makefile
-@ENABLE_DOCS_TRUE@	$(AM_V_GEN)$(ASCIIDOC) -d manpage -b html5 -a revision=$(VERSION) \
+@ENABLE_DOCS_TRUE@docs/uacme.html: uacme.1.txt $(top_srcdir)/.version Makefile
+@ENABLE_DOCS_TRUE@	$(AM_V_GEN)$(ASCIIDOC) -d manpage -b html5 -o $@ \
+@ENABLE_DOCS_TRUE@	    -a revision=$(VERSION) \
 @ENABLE_DOCS_TRUE@	    -a sysconfdir="${sysconfdir}" \
 @ENABLE_DOCS_TRUE@	    -a runstatedir="${runstatedir}" $<
-
-@ENABLE_DOCS_TRUE@$(top_srcdir)/docs/index.html: uacme.1.html
-@ENABLE_DOCS_TRUE@	mkdir -p docs
-@ENABLE_DOCS_TRUE@	cp uacme.1.html $@
 
 .PHONY: valgrind
 valgrind: uacme
