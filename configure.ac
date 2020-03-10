@@ -94,11 +94,10 @@ if test "x$OPT_LIBCURL" = "xyes"; then
         AC_MSG_RESULT([no])
         AC_MSG_ERROR([libcurl not found])
     else
-        CURL_ADDLIB=`$PKGCONFIG --libs-only-l libcurl`
-        CURL_ADDLDFLAGS=`$PKGCONFIG --libs-only-L libcurl`
-        CURL_ADDCPPFLAGS=`$PKGCONFIG --cflags-only-I libcurl`
-        CURL_LDFLAGS=`$PKGCONFIG --libs libcurl`
-        CURL_CFLAGS=`$PKGCONFIG --cflags libcurl`
+        CURL_LDADD=`$PKGCONFIG --libs-only-l libcurl`
+        CURL_LDFLAGS=`$PKGCONFIG --libs-only-L --libs-only-other libcurl`
+        CURL_CPPFLAGS=`$PKGCONFIG --cflags-only-I libcurl`
+        CURL_CFLAGS=`$PKGCONFIG --cflags-only-other libcurl`
         version=`$PKGCONFIG --modversion libcurl`
         AC_MSG_RESULT([found $version])
         AC_MSG_CHECKING([for libcurl https support])
@@ -110,26 +109,30 @@ if test "x$OPT_LIBCURL" = "xyes"; then
         AC_MSG_RESULT([yes])
     fi
 else
-    CURL_ADDLIB=-lcurl
-    CURL_ADDLDFLAGS=-L$OPT_LIBCURL/lib$libsuff
-    CURL_ADDCPPFLAGS=-I$OPT_LIBCURL/include
-    CURL_LDFLAGS=$CURL_ADDLDFLAGS $CURL_ADDLIB
-    CURL_CFLAGS=$CURL_ADDCPPFLAGS
+    CURL_LDADD=-lcurl
+    CURL_LDFLAGS=-L$OPT_LIBCURL/lib$libsuff
+    CURL_CPPFLAGS=-I$OPT_LIBCURL/include
+    CURL_CFLAGS=
 fi
+AC_SUBST(CURL_LDADD)
 AC_SUBST(CURL_LDFLAGS)
+AC_SUBST(CURL_CPPFLAGS)
 AC_SUBST(CURL_CFLAGS)
 
 LIBS_ORIG=$LIBS
 LDFLAGS_ORIG=$LDFLAGS
 CPPFLAGS_ORIG=$CPPFLAGS
-LIBS="$CURL_ADDLIB $LIBS"
-LDFLAGS="$LDFLAGS $CURL_ADDLDFLAGS"
-CPPFLAGS="$CPPFLAGS $CURL_ADDCPPFLAGS"
+CFLAGS_ORIG=$CFLAGS
+LIBS="$CURL_LDADD $LIBS"
+LDFLAGS="$LDFLAGS $CURL_LDFLAGS"
+CPPFLAGS="$CPPFLAGS $CURL_CPPFLAGS"
+CFLAGS="$CFLAGS $CURL_CFLAGS"
 AC_CHECK_LIB(curl, curl_global_init, [CURL_ENABLED=1],
              [AC_MSG_ERROR([libcurl check failed])])
 LIBS=$LIBS_ORIG
 LDFLAGS=$FLAGS_ORIG
 CPPFLAGS=$CPPFLAGS_ORIG
+CFLAGS=$CFLAGS_ORIG
 
 OPT_MBEDTLS=no
 AC_ARG_WITH(mbedtls,
@@ -375,10 +378,10 @@ if test "x$OPT_UALPN" != "xno"; then
                    [AC_MSG_NOTICE([libev not found, using included copy])
                     with_included_libev=yes
                     m4_include([libev/libev.m4])])
-    UALPN_LDFLAGS=$LIBS
+    UALPN_LDADD=$LIBS
     LIBS=$LIBS_ORIG
 fi
-AC_SUBST(UALPN_LDFLAGS)
+AC_SUBST(UALPN_LDADD)
 AM_CONDITIONAL(ENABLE_UALPN, test "x$OPT_UALPN" = "xyes")
 AM_CONDITIONAL(ENABLE_LIBEV, test "x$with_included_libev" = "xyes")
 

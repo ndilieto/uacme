@@ -110,10 +110,11 @@ bin_PROGRAMS = uacme$(EXEEXT) $(am__EXEEXT_1)
 @ENABLE_UALPN_TRUE@am__append_1 = ualpn
 @ENABLE_LIBEV_TRUE@@ENABLE_UALPN_TRUE@am__append_2 = libev/ev.h
 @ENABLE_LIBEV_TRUE@@ENABLE_UALPN_TRUE@am__append_3 = -Ilibev
-@ENABLE_READFILE_TRUE@am__append_4 = read-file.c read-file.h
-@ENABLE_UALPN_TRUE@am__append_5 = ualpn.sh
-@ENABLE_DOCS_TRUE@@ENABLE_UALPN_TRUE@am__append_6 = ualpn.1
-@ENABLE_DOCS_TRUE@@ENABLE_UALPN_TRUE@am__append_7 = docs/ualpn.html
+@ENABLE_LIBEV_TRUE@@ENABLE_UALPN_TRUE@am__append_4 = libev.a
+@ENABLE_READFILE_TRUE@am__append_5 = read-file.c read-file.h
+@ENABLE_UALPN_TRUE@am__append_6 = ualpn.sh
+@ENABLE_DOCS_TRUE@@ENABLE_UALPN_TRUE@am__append_7 = ualpn.1
+@ENABLE_DOCS_TRUE@@ENABLE_UALPN_TRUE@am__append_8 = docs/ualpn.html
 subdir = .
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
 am__aclocal_m4_deps =  \
@@ -155,7 +156,8 @@ am_uacme_OBJECTS = uacme-uacme.$(OBJEXT) uacme-base64.$(OBJEXT) \
 	uacme-crypto.$(OBJEXT) uacme-curlwrap.$(OBJEXT) \
 	uacme-json.$(OBJEXT) uacme-msg.$(OBJEXT) $(am__objects_1)
 uacme_OBJECTS = $(am_uacme_OBJECTS)
-uacme_LDADD = $(LDADD)
+am__DEPENDENCIES_1 =
+uacme_DEPENDENCIES = $(am__DEPENDENCIES_1)
 uacme_LINK = $(CCLD) $(uacme_CFLAGS) $(CFLAGS) $(uacme_LDFLAGS) \
 	$(LDFLAGS) -o $@
 am__ualpn_SOURCES_DIST = ualpn.c base64.c base64.h log.c log.h sglib.h \
@@ -165,8 +167,9 @@ am__objects_2 =
 @ENABLE_UALPN_TRUE@	ualpn-base64.$(OBJEXT) ualpn-log.$(OBJEXT) \
 @ENABLE_UALPN_TRUE@	$(am__objects_2)
 ualpn_OBJECTS = $(am_ualpn_OBJECTS)
-@ENABLE_LIBEV_TRUE@@ENABLE_UALPN_TRUE@ualpn_DEPENDENCIES = libev.a
-ualpn_LINK = $(CCLD) $(ualpn_CFLAGS) $(CFLAGS) $(ualpn_LDFLAGS) \
+@ENABLE_UALPN_TRUE@ualpn_DEPENDENCIES = $(am__DEPENDENCIES_1) \
+@ENABLE_UALPN_TRUE@	$(am__append_4)
+ualpn_LINK = $(CCLD) $(ualpn_CFLAGS) $(CFLAGS) $(AM_LDFLAGS) \
 	$(LDFLAGS) -o $@
 am__dist_pkgdata_SCRIPTS_DIST = uacme.sh ualpn.sh
 am__vpath_adj_setup = srcdirstrip=`echo "$(srcdir)" | sed 's|.|.|g'`;
@@ -305,6 +308,8 @@ CFLAGS = @CFLAGS@
 CPP = @CPP@
 CPPFLAGS = @CPPFLAGS@
 CURL_CFLAGS = @CURL_CFLAGS@
+CURL_CPPFLAGS = @CURL_CPPFLAGS@
+CURL_LDADD = @CURL_LDADD@
 CURL_LDFLAGS = @CURL_LDFLAGS@
 CYGPATH_W = @CYGPATH_W@
 DEFS = @DEFS@
@@ -344,7 +349,7 @@ SED = @SED@
 SET_MAKE = @SET_MAKE@
 SHELL = @SHELL@
 STRIP = @STRIP@
-UALPN_LDFLAGS = @UALPN_LDFLAGS@
+UALPN_LDADD = @UALPN_LDADD@
 USE_GNUTLS = @USE_GNUTLS@
 USE_LIBTASN1 = @USE_LIBTASN1@
 USE_MBEDTLS = @USE_MBEDTLS@
@@ -403,21 +408,22 @@ ARFLAGS = cr
 @ENABLE_UALPN_TRUE@	-DRUNSTATEDIR="\"${runstatedir}\"" \
 @ENABLE_UALPN_TRUE@	$(am__append_3)
 @ENABLE_UALPN_TRUE@ualpn_CFLAGS = $(WCFLAGS)
-@ENABLE_UALPN_TRUE@ualpn_LDFLAGS = $(UALPN_LDFLAGS)
-@ENABLE_LIBEV_TRUE@@ENABLE_UALPN_TRUE@ualpn_LDADD = libev.a
+@ENABLE_UALPN_TRUE@ualpn_LDADD = $(UALPN_LDADD) $(am__append_4)
 @ENABLE_LIBEV_TRUE@@ENABLE_UALPN_TRUE@noinst_LIBRARIES = libev.a
 @ENABLE_LIBEV_TRUE@@ENABLE_UALPN_TRUE@libev_a_SOURCES = libev/ev.c
 uacme_SOURCES = uacme.c base64.c base64.h crypto.c crypto.h curlwrap.c \
-	curlwrap.h json.c json.h jsmn.h msg.c msg.h $(am__append_4)
+	curlwrap.h json.c json.h jsmn.h msg.c msg.h $(am__append_5)
 uacme_CPPFLAGS = -DRUNSTATEDIR="\"${runstatedir}\"" \
-		 -DSYSCONFDIR="\"${sysconfdir}\""
+		 -DSYSCONFDIR="\"${sysconfdir}\"" \
+		 $(CURL_CPPFLAGS)
 
 uacme_CFLAGS = $(CURL_CFLAGS) $(WCFLAGS)
 uacme_LDFLAGS = $(CURL_LDFLAGS)
+uacme_LDADD = $(CURL_LDADD)
 BUILT_SOURCES = $(top_srcdir)/.version
-dist_pkgdata_SCRIPTS = uacme.sh $(am__append_5)
-@ENABLE_DOCS_TRUE@dist_man1_MANS = uacme.1 $(am__append_6)
-@ENABLE_DOCS_TRUE@dist_html_DATA = docs/uacme.html $(am__append_7)
+dist_pkgdata_SCRIPTS = uacme.sh $(am__append_6)
+@ENABLE_DOCS_TRUE@dist_man1_MANS = uacme.1 $(am__append_7)
+@ENABLE_DOCS_TRUE@dist_html_DATA = docs/uacme.html $(am__append_8)
 EXTRA_DIST = GNUmakefile build-aux/git-version-gen uacme.sh uacme.1.txt \
 	     uacme.1 docs/uacme.html ualpn.1.txt ualpn.1 docs/ualpn.html \
 	     libev/ev_epoll.c libev/ev_iouring.c libev/ev_kqueue.c \

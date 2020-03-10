@@ -27,11 +27,11 @@ ualpn_SOURCES = ualpn.c base64.c base64.h log.c log.h sglib.h
 ualpn_CPPFLAGS = -DRUNSTATEDIR="\"${runstatedir}\""
 		 -DSYSCONFDIR="\"${sysconfdir}\""
 ualpn_CFLAGS = $(WCFLAGS)
-ualpn_LDFLAGS = $(UALPN_LDFLAGS)
+ualpn_LDADD = $(UALPN_LDADD)
 if ENABLE_LIBEV
 ualpn_SOURCES += libev/ev.h
 ualpn_CPPFLAGS += -Ilibev
-ualpn_LDADD = libev.a
+ualpn_LDADD += libev.a
 
 noinst_LIBRARIES = libev.a
 libev_a_SOURCES = libev/ev.c
@@ -42,9 +42,11 @@ uacme_SOURCES = uacme.c base64.c base64.h crypto.c crypto.h \
 		curlwrap.c curlwrap.h json.c json.h jsmn.h \
 		msg.c msg.h
 uacme_CPPFLAGS = -DRUNSTATEDIR="\"${runstatedir}\"" \
-		 -DSYSCONFDIR="\"${sysconfdir}\""
+		 -DSYSCONFDIR="\"${sysconfdir}\"" \
+		 $(CURL_CPPFLAGS)
 uacme_CFLAGS = $(CURL_CFLAGS) $(WCFLAGS)
 uacme_LDFLAGS = $(CURL_LDFLAGS)
+uacme_LDADD = $(CURL_LDADD)
 
 if ENABLE_READFILE
 uacme_SOURCES += read-file.c read-file.h
