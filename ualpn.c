@@ -812,7 +812,7 @@ static void controller_handle_cmd(controller_t *c, char *line, ev_tstamp ts)
             sglib_auth_t_add(&g_shm->auths, a);
             g.auths_touched = true;
         }
-        strncpy(a->auth, auth, sizeof(a->auth));
+        strncpy(a->auth, auth, sizeof(a->auth)-1);
         memcpy(a->key, key.data, key.size);
         a->key_size = key.size;
         memcpy(a->crt, crt.data, crt.size);
@@ -1997,7 +1997,7 @@ static int client_new(EV_P_ int fd, addr_t *addr)
             .addr = { .v4 = { {INADDR_NONE}, {INADDR_NONE}, 0, 0 } }
         }
     };
-    ssize_t proxy_len = 16;
+    ssize_t proxy_len = 0;
     int one = 1;
     int rc;
 
@@ -2043,15 +2043,15 @@ static int client_new(EV_P_ int fd, addr_t *addr)
     c->loop = EV_A;
 #endif
 
-    proxy_len = 0;
     if (addr[0].addr.sa.sa_family == AF_INET &&
             addr[1].addr.sa.sa_family == AF_INET) {
         if (g.proxy == 1) {
-            snprintf(proxy.buf, sizeof(proxy.buf), "PROXY TCP4 %s %s %s %s\r\n",
+            snprintf(proxy.buf, sizeof(proxy.buf),
+                    "PROXY TCP4 %.15s %.15s %.5s %.5s\r\n",
                     c->rhost_f, c->lhost_f, c->rserv_f, c->lserv_f);
             proxy_len = strlen(proxy.buf);
         } else if (g.proxy == 2) {
-            proxy_len += 12;
+            proxy_len = 16 + 12;
             proxy.v2.fam = 0x11;
             proxy.v2.len = htons(12);
             proxy.v2.addr.v4.src_addr = addr[0].addr.v4.sin_addr;
@@ -2062,11 +2062,12 @@ static int client_new(EV_P_ int fd, addr_t *addr)
     } else if (addr[0].addr.sa.sa_family == AF_INET6 &&
                 addr[1].addr.sa.sa_family == AF_INET6) {
         if (g.proxy == 1) {
-            snprintf(proxy.buf, sizeof(proxy.buf), "PROXY TCP6 %s %s %s %s\r\n",
+            snprintf(proxy.buf, sizeof(proxy.buf),
+                    "PROXY TCP6 %.39s %.39s %.5s %.5s\r\n",
                     c->rhost_f, c->lhost_f, c->rserv_f, c->lserv_f);
             proxy_len = strlen(proxy.buf);
         } else if (g.proxy == 2) {
-            proxy_len += 36;
+            proxy_len = 16 + 36;
             proxy.v2.fam = 0x21;
             proxy.v2.len = htons(36);
             proxy.v2.addr.v6.src_addr = addr[0].addr.v6.sin6_addr;
@@ -2341,7 +2342,12 @@ static void cleanup_and_exit(int stage, int return_code)
                     unlink(g.socket);
             }
             if (g.daemon && g.pipefd[1] != -1) {
-                write(g.pipefd[1], "ERR", 3);
+                for (int i = 0; i < 3; i++) {
+                    if (write(g.pipefd[1], "ERR", 3) == 3)
+                        break;
+                    else
+                        sleep(1);
+                }
                 close(g.pipefd[1]);
             }
             if (g.logfile && g.logfile != stderr)
@@ -2923,6 +2929,7 @@ int main(int argc, char **argv)
                 fprintf(stderr, "%s: version %s\n", basename(argv[0]),
                         PACKAGE_VERSION);
                 cleanup_and_exit(0, EXIT_FAILURE);
+                break;
 
             default:
                 usage();
