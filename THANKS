@@ -6,6 +6,12 @@ Thanks are due to the following
 * The authors of libsodium <https://libsodium.org>
     for the base64 encoding/decoding routines.
 
+* Marc Alexander Lehmann <libev@schmorp.de>
+    for libev <http://libev.schmorp.de>
+
+* Marian Vittek
+    for SGLIB <http://www.xref-tech.com/sglib)
+
 * The authors of libcurl <https://curl.haxx.se/libcurl>
 
 * The authors of GnuTLS <https://gnutls.org>
