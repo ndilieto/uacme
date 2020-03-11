@@ -1,3 +1,12 @@
+uacme (1.1-1) unstable; urgency=medium
+
+  * New upstream release
+  - updated Standards-Version to 4.5
+  - update debian/copyright
+  - added libev-dev to build dependencies
+
+ -- Nicola Di Lieto <nicola.dilieto@gmail.com>  Wed, 11 Mar 2020 01:15:41 +0100
+
 uacme (1.0.22-1) unstable; urgency=medium
 
   * New upstream release (1.0.22)
