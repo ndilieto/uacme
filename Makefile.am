@@ -72,26 +72,26 @@ if ENABLE_UALPN
 dist_man1_MANS += ualpn.1
 dist_html_DATA += docs/ualpn.html
 
-ualpn.1: ualpn.1.txt $(top_srcdir)/.version Makefile
+ualpn.1: ualpn.1.txt $(top_srcdir)/.version
 	$(AM_V_GEN)$(A2X) -L -d manpage -f manpage \
 	    -a revision=$(VERSION) \
 	    -a sysconfdir="${sysconfdir}" \
 	    -a runstatedir="${runstatedir}" $<
 
-docs/ualpn.html: ualpn.1.txt $(top_srcdir)/.version Makefile
+docs/ualpn.html: ualpn.1.txt $(top_srcdir)/.version
 	$(AM_V_GEN)$(ASCIIDOC) -d manpage -b html5 -o $@ \
 	    -a revision=$(VERSION) \
 	    -a sysconfdir="${sysconfdir}" \
 	    -a runstatedir="${runstatedir}" $<
 endif
 
-uacme.1: uacme.1.txt $(top_srcdir)/.version Makefile
+uacme.1: uacme.1.txt $(top_srcdir)/.version
 	$(AM_V_GEN)$(A2X) -L -d manpage -f manpage \
 	    -a revision=$(VERSION) \
 	    -a sysconfdir="${sysconfdir}" \
 	    -a runstatedir="${runstatedir}" $<
 
-docs/uacme.html: uacme.1.txt $(top_srcdir)/.version Makefile
+docs/uacme.html: uacme.1.txt $(top_srcdir)/.version
 	$(AM_V_GEN)$(ASCIIDOC) -d manpage -b html5 -o $@ \
 	    -a revision=$(VERSION) \
 	    -a sysconfdir="${sysconfdir}" \

@@ -1200,25 +1200,25 @@ $(top_srcdir)/.version:
 dist-hook:
 	echo $(VERSION) > $(distdir)/.tarball-version
 
-@ENABLE_DOCS_TRUE@@ENABLE_UALPN_TRUE@ualpn.1: ualpn.1.txt $(top_srcdir)/.version Makefile
+@ENABLE_DOCS_TRUE@@ENABLE_UALPN_TRUE@ualpn.1: ualpn.1.txt $(top_srcdir)/.version
 @ENABLE_DOCS_TRUE@@ENABLE_UALPN_TRUE@	$(AM_V_GEN)$(A2X) -L -d manpage -f manpage \
 @ENABLE_DOCS_TRUE@@ENABLE_UALPN_TRUE@	    -a revision=$(VERSION) \
 @ENABLE_DOCS_TRUE@@ENABLE_UALPN_TRUE@	    -a sysconfdir="${sysconfdir}" \
 @ENABLE_DOCS_TRUE@@ENABLE_UALPN_TRUE@	    -a runstatedir="${runstatedir}" $<
 
-@ENABLE_DOCS_TRUE@@ENABLE_UALPN_TRUE@docs/ualpn.html: ualpn.1.txt $(top_srcdir)/.version Makefile
+@ENABLE_DOCS_TRUE@@ENABLE_UALPN_TRUE@docs/ualpn.html: ualpn.1.txt $(top_srcdir)/.version
 @ENABLE_DOCS_TRUE@@ENABLE_UALPN_TRUE@	$(AM_V_GEN)$(ASCIIDOC) -d manpage -b html5 -o $@ \
 @ENABLE_DOCS_TRUE@@ENABLE_UALPN_TRUE@	    -a revision=$(VERSION) \
 @ENABLE_DOCS_TRUE@@ENABLE_UALPN_TRUE@	    -a sysconfdir="${sysconfdir}" \
 @ENABLE_DOCS_TRUE@@ENABLE_UALPN_TRUE@	    -a runstatedir="${runstatedir}" $<
 
-@ENABLE_DOCS_TRUE@uacme.1: uacme.1.txt $(top_srcdir)/.version Makefile
+@ENABLE_DOCS_TRUE@uacme.1: uacme.1.txt $(top_srcdir)/.version
 @ENABLE_DOCS_TRUE@	$(AM_V_GEN)$(A2X) -L -d manpage -f manpage \
 @ENABLE_DOCS_TRUE@	    -a revision=$(VERSION) \
 @ENABLE_DOCS_TRUE@	    -a sysconfdir="${sysconfdir}" \
 @ENABLE_DOCS_TRUE@	    -a runstatedir="${runstatedir}" $<
 
-@ENABLE_DOCS_TRUE@docs/uacme.html: uacme.1.txt $(top_srcdir)/.version Makefile
+@ENABLE_DOCS_TRUE@docs/uacme.html: uacme.1.txt $(top_srcdir)/.version
 @ENABLE_DOCS_TRUE@	$(AM_V_GEN)$(ASCIIDOC) -d manpage -b html5 -o $@ \
 @ENABLE_DOCS_TRUE@	    -a revision=$(VERSION) \
 @ENABLE_DOCS_TRUE@	    -a sysconfdir="${sysconfdir}" \
