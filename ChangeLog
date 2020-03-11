@@ -1,3 +1,8 @@
+2020-03-11 Nicola Di Lieto <nicola.dilieto@gmail.com>
+	* Release 1.1
+	- added IP identifier support (RFC8738)
+	- added tls-alpn-01 (RFC8737) challenge responder (ualpn)
+
 2020-02-01 Nicola Di Lieto <nicola.dilieto@gmail.com>
 	* Release 1.0.22
 	- relax account status check (compatibility with buypass.no)

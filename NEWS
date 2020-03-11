@@ -1,6 +1,11 @@
 uacme NEWS
 Copyright (C) 2019,2020 Nicola Di Lieto <nicola.dilieto@gmail.com>
 
+## [1.1] - 2020-03-11
+### Added
+- IP identifier support (RFC8738)
+- tls-alpn-01 (RFC8737) challenge responder (ualpn)
+
 ## [1.0.22] - 2020-02-01
 ### Changed
 - relax account status check (compatibility with buypass.no)
