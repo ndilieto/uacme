@@ -3,7 +3,8 @@ Copyright (C) 2019,2020 Nicola Di Lieto <nicola.dilieto@gmail.com>
 
 uacme is a client for the RFC8555 ACMEv2 protocol. Additional
 information can be found at <https://github.com/ndilieto/uacme>
-and the manual page at <https://ndilieto.github.io/uacme/>
+and the manual pages at <https://ndilieto.github.io/uacme/uacme.html>
+and <https://ndilieto.github.io/uacme/ualpn.html>
 
 
 README
@@ -39,7 +40,7 @@ mbedTLS
 DOCUMENTATION
 -------------
 See the documentation in the manual page included in the distribution
-(uacme.1 or uacme.1.html)
+(uacme.1 or uacme.1.html and ualpn.1 or ualpn.1.html)
 
 
 LICENSING
