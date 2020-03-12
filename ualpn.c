@@ -105,7 +105,7 @@ typedef struct addr {
         struct sockaddr_un un;
     } addr;
     socklen_t len;
-} addr_t;
+} uaddr_t;
 
 typedef struct client {
     unsigned int id;
@@ -1667,7 +1667,7 @@ static void cb_client_rxf(EV_P_ ev_io *w, int revents)
                 break;
         }
 #else
-        ssize_t s = buf_readv(c->fd_f, &c->buf_f2b) {
+        ssize_t s = buf_readv(c->fd_f, &c->buf_f2b);
         switch (s) {
             case 0:
                 client_done(EV_A_ c, DRAIN_FRONTEND);
@@ -1792,7 +1792,7 @@ static void cb_client_timer(EV_P_ ev_timer *w, int revents)
 static void cb_client_accept(EV_P_ ev_io *w, int revents)
 {
     int fd, rc;
-    addr_t addr[2];
+    uaddr_t addr[2];
     char rhost[MAXHOST];
     char rserv[MAXSERV];
     char lhost[MAXHOST];
@@ -1965,7 +1965,7 @@ static void cb_cleanup(EV_P_ ev_cleanup *w, int revents)
     }
 }
 
-static int client_new(EV_P_ int fd, addr_t *addr)
+static int client_new(EV_P_ int fd, uaddr_t *addr)
 {
     union {
         char buf[108];
@@ -2194,7 +2194,7 @@ static void cb_worker_ping(EV_P_ ev_io *w, int revents)
 static void cb_worker_io(EV_P_ ev_io *w, int revents)
 {
     worker_t *worker = (worker_t *)(((uint8_t *)w) - offsetof(worker_t, io));
-    addr_t addr[2];
+    uaddr_t addr[2];
     int fd;
     struct msghdr msg;
     struct cmsghdr *cmsg;
