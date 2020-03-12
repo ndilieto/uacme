@@ -1,6 +1,11 @@
 uacme NEWS
 Copyright (C) 2019,2020 Nicola Di Lieto <nicola.dilieto@gmail.com>
 
+## [1.1.1] - 2020-03-12
+### Changed
+- fix typo breaking build without HAVE_SPLICE
+- fix addr_t name collision on s390x
+
 ## [1.1] - 2020-03-11
 ### Added
 - IP identifier support (RFC8738)
