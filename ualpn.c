@@ -89,6 +89,10 @@ typedef struct auth {
 SGLIB_DEFINE_RBTREE_PROTOTYPES(auth_t, left, right, rb, ACME_AUTH_CMP)
 SGLIB_DEFINE_RBTREE_FUNCTIONS(auth_t, left, right, rb, ACME_AUTH_CMP)
 
+#ifndef PIPE_BUF
+#define PIPE_BUF 2048
+#endif
+
 typedef struct buffer {
     uint8_t data[2*PIPE_BUF];
     size_t rp;

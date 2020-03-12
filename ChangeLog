@@ -1,4 +1,9 @@
 2020-03-12 Nicola Di Lieto <nicola.dilieto@gmail.com>
+	* Release 1.1.2
+	- fix configure.ac typo affecting LDFLAGS
+	- fix missing PIPE_BUF when building on hurd-386
+
+2020-03-12 Nicola Di Lieto <nicola.dilieto@gmail.com>
 	* Release 1.1.1
 	- fix typo breaking build without HAVE_SPLICE
 	- fix addr_t name collision on s390x
