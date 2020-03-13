@@ -25,7 +25,7 @@ DESCRIPTION
 -----------
 *ualpn* is a lightweight proxying ACMEv2 tls-alpn-01 challenge responder
 compliant with RFC8737 (<https://tools.ietf.org/html/RFC8737>) and RFC8738
-(<https://tools.ietf.org/html/RFC8737>).
+(<https://tools.ietf.org/html/RFC8738>).
 
 Depending on how it is invoked, *ualpn* runs in either client or server mode.
 In client mode *ualpn* connects to a running server mode instance of itself
