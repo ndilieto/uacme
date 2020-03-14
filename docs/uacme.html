@@ -748,9 +748,9 @@ UACME(1) Manual Page
 <div class="sectionbody">
 <div class="paragraph"><p><strong>uacme</strong> [<strong>-a</strong>|<strong>--acme-url</strong> <em>URL</em>] [<strong>-b</strong>|<strong>--bits</strong> <em>BITS</em>]
     [<strong>-c</strong>|<strong>--confdir</strong> <em>DIR</em>] [<strong>-d</strong>|<strong>--days</strong> <em>DAYS</em>] [<strong>-f</strong>|<strong>--force</strong>]
-    [<strong>-h</strong>|<strong>--hook</strong> <em>PROGRAM</em>] [<strong>-m</strong>|<strong>--must-staple</strong>] [<strong>-n</strong>|<strong>--never</strong>]
-    [<strong>-s</strong>|<strong>--staging</strong>] [<strong>-t</strong>|<strong>--type</strong> <strong>RSA</strong>|<strong>EC</strong>] [<strong>-v</strong>|<strong>--verbose</strong> &#8230;]
-    [<strong>-V</strong>|<strong>--version</strong>] [<strong>-y</strong>|<strong>--yes</strong>] [<strong>-?</strong>|<strong>--help</strong>]
+    [<strong>-h</strong>|<strong>--hook</strong> <em>PROGRAM</em>] [<strong>-m</strong>|<strong>--must-staple</strong>] [<strong>-n</strong>|<strong>--never-create</strong>]
+    [<strong>-o</strong>|<strong>--no-ocsp</strong>] [<strong>-s</strong>|<strong>--staging</strong>] [<strong>-t</strong>|<strong>--type</strong> <strong>RSA</strong>|<strong>EC</strong>]
+    [<strong>-v</strong>|<strong>--verbose</strong> &#8230;] [<strong>-V</strong>|<strong>--version</strong>] [<strong>-y</strong>|<strong>--yes</strong>] [<strong>-?</strong>|<strong>--help</strong>]
     <strong>new</strong> [<em>EMAIL</em>] | <strong>update</strong> [<em>EMAIL</em>] | <strong>deactivate</strong> | <strong>newkey</strong> |
     <strong>issue</strong> <em>IDENTIFIER</em> [<em>ALTNAME</em> &#8230;]] | <strong>revoke</strong> <em>CERTFILE</em></p></div>
 </div>
@@ -852,7 +852,7 @@ certificate for <em>IDENTIFIER</em>
 <dd>
 <p>
     Do not reissue certificates that are still valid for longer
-    than <em>DAYS</em> (default 30).
+    than <em>DAYS</em> (default 30). See also <strong>-o, --no-ocsp</strong>.
 </p>
 </dd>
 <dt class="hdlist1">
@@ -966,6 +966,19 @@ The key authorization (for <strong>dns-01</strong> and <strong>tls-alpn-01</stro
     By default <strong>uacme</strong> creates directories/keys if they do not exist.
     When this option is specified <strong>uacme</strong> never does so and instead
     exits with an error if anything required is missing.
+</p>
+</dd>
+<dt class="hdlist1">
+<strong>-o, --no-ocsp</strong>
+</dt>
+<dd>
+<p>
+    When this flag is <strong>not</strong> specified and the certificate has an
+    Authority Information Access extension with an OCSP server location
+    according to <a href="https://tools.ietf.org/html/rfc5280#section-4.2.2.1">https://tools.ietf.org/html/rfc5280#section-4.2.2.1</a>
+    <strong>uacme</strong> makes an OCSP request to the server; if the certificate is
+    reported as revoked <strong>uacme</strong> forces reissuance regardless of the
+    expiration date. See also <strong>-d, --days</strong>.
 </p>
 </dd>
 <dt class="hdlist1">
@@ -1086,11 +1099,12 @@ The key authorization (for <strong>dns-01</strong> and <strong>tls-alpn-01</stro
     Issue a certificate for <em>IDENTIFIER</em> with zero or more <em>ALTNAMEs</em>.
     If a certificate is already available at <em>CONFDIR/IDENTIFIER/cert.pem</em>
     for the specified <em>IDENTIFIER</em> and <em>ALTNAMEs</em> and is still valid for
-    longer than <em>DAYS</em> no action is taken unless <strong>-f, --force</strong> is
-    specified. The new certificate is saved to <em>CONFDIR/IDENTIFIER/cert.pem</em>.
-    If the certificate file already exists it is hardlinked to
-    <em>CONFDIR/IDENTIFIER/cert-TIMESTAMP.pem</em> before overwriting.
-    The private key for the certificate is loaded from
+    longer than <em>DAYS</em> no action is taken unless <strong>-f, --force</strong> is specified
+    or <strong>-o, --no-ocsp</strong> is <strong>not</strong> specified and the certificate is reported
+    as revoked by the OCSP server.  The new certificate is saved to
+    <em>CONFDIR/IDENTIFIER/cert.pem</em>.  If the certificate file already exists
+    it is hardlinked to <em>CONFDIR/IDENTIFIER/cert-TIMESTAMP.pem</em> before
+    overwriting.  The private key for the certificate is loaded from
     <em>CONFDIR/private/IDENTIFIER/key.pem</em>. If no such file exists,
     a new key is generated unless <strong>-n, --never-create</strong> is specified.
     Wildcard IDENTIFIERs or ALTNAMEs are dealt with correctly, as long as
@@ -1252,7 +1266,7 @@ along with this program.  If not, see <a href="http://www.gnu.org/licenses/">htt
 <div id="footer-text">
 Version 1.1.2<br>
 Last updated
- 2020-03-12 08:04:09 CET
+ 2020-03-14 21:17:54 CET
 </div>
 </div>
 </body>

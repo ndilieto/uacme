@@ -34,6 +34,7 @@
 
 #include "base64.h"
 #include "crypto.h"
+#include "curlwrap.h"
 #include "msg.h"
 #if !defined(USE_OPENSSL)
 #include "read-file.h"
@@ -41,6 +42,7 @@
 
 #if defined(USE_GNUTLS)
 #include <gnutls/crypto.h>
+#include <gnutls/ocsp.h>
 #if HAVE_GNUTLS_X509_CRQ_SET_TLSFEATURES
 #include <gnutls/x509-ext.h>
 #endif
@@ -2331,25 +2333,27 @@ out:
 }
 
 #if defined(USE_GNUTLS)
-static gnutls_x509_crt_t cert_load(const char *format, ...)
-{
-    gnutls_x509_crt_t crt = NULL;
+static int cert_load(gnutls_x509_crt_t *crt, unsigned int crt_size,
+        const char *format, ...)
 #elif defined(USE_OPENSSL)
-static X509 *cert_load(const char *format, ...)
-{
-    X509 *crt = NULL;
+static int cert_load(X509 **crt, unsigned int crt_size,
+        const char *format, ...)
 #elif defined(USE_MBEDTLS)
-static mbedtls_x509_crt *cert_load(const char *format, ...)
-{
-    mbedtls_x509_crt *crt = NULL;
+static int cert_load(mbedtls_x509_crt **crt, const char *format, ...)
 #endif
+{
     char *certfile = NULL;
 #if !defined(USE_OPENSSL)
     void *certdata = NULL;
     size_t certsize = 0;
-    int r;
 #endif
+    int r;
     va_list ap;
+
+#if !defined(USE_MBEDTLS)
+    if (crt_size < 1)
+        return 0;
+#endif
 
     va_start(ap, format);
     if (vasprintf(&certfile, format, ap) < 0)
@@ -2369,9 +2373,13 @@ static mbedtls_x509_crt *cert_load(const char *format, ...)
             warn("cert_load: failed to open %s", certfile);
         goto out;
     }
-    crt = PEM_read_X509(f, NULL, NULL, NULL);
+    for (r = 0; r < (int)crt_size; r++) {
+        crt[r] = PEM_read_X509(f, NULL, NULL, NULL);
+        if (!crt[r])
+            break;
+    }
     fclose(f);
-    if (!crt) {
+    if (r == 0) {
         openssl_error("cert_load");
         warnx("cert_load: failed to load %s", certfile);
         goto out;
@@ -2388,62 +2396,283 @@ static mbedtls_x509_crt *cert_load(const char *format, ...)
 #endif
 #if defined(USE_GNUTLS)
     gnutls_datum_t data = {certdata, certsize};
-    r = gnutls_x509_crt_init(&crt);
-    if (r != GNUTLS_E_SUCCESS) {
-        warnx("cert_load: gnutls_x509_crt_init: %s", gnutls_strerror(r));
-        gnutls_x509_crt_deinit(crt);
-        crt = NULL;
-        goto out;
-    }
-
-    r = gnutls_x509_crt_import(crt, &data, GNUTLS_X509_FMT_PEM);
-    if (r != GNUTLS_E_SUCCESS) {
-        warnx("cert_load: gnutls_x509_crt_import: %s", gnutls_strerror(r));
-        gnutls_x509_crt_deinit(crt);
-        crt = NULL;
+    r = gnutls_x509_crt_list_import(crt, &crt_size, &data, GNUTLS_X509_FMT_PEM,
+            GNUTLS_X509_CRT_LIST_FAIL_IF_UNSORTED);
+    if (r < 0) {
+        warnx("cert_load: gnutls_x509_crt_list_import: %s", gnutls_strerror(r));
         goto out;
     }
 #elif defined(USE_MBEDTLS)
-    crt = calloc(1, sizeof(*crt));
-    if (!crt) {
+    *crt = calloc(1, sizeof(**crt));
+    if (!*crt) {
         warn("cert_load: calloc failed");
         goto out;
     }
-    mbedtls_x509_crt_init(crt);
-    r = mbedtls_x509_crt_parse(crt, certdata, certsize+1);
+    mbedtls_x509_crt_init(*crt);
+    r = mbedtls_x509_crt_parse(*crt, certdata, certsize+1);
     if (r < 0) {
         warnx("cert_load: mbedtls_x509_crt_parse failed: %s",
                 _mbedtls_strerror(r));
-        mbedtls_x509_crt_free(crt);
-        free(crt);
-        crt = NULL;
+        mbedtls_x509_crt_free(*crt);
+        free(*crt);
+        r = 0;
         goto out;
     }
     if (r > 0) {
         warnx("cert_load: failed to parse %d certificates", r);
-        mbedtls_x509_crt_free(crt);
-        free(crt);
-        crt = NULL;
+        mbedtls_x509_crt_free(*crt);
+        free(*crt);
+        r = 0;
         goto out;
     }
+    for (mbedtls_x509_crt *c = *crt; c; c = c->next)
+        r++;
 #endif
 out:
 #if !defined(USE_OPENSSL)
     free(certdata);
 #endif
     free(certfile);
-    return crt;
+    return r;
 }
 
-bool cert_valid(const char *certdir, const char * const *names, int validity)
+#if defined(USE_GNUTLS)
+static bool ocsp_check(gnutls_x509_crt_t *crt)
+{
+    bool result = true;
+    char *ocsp_uri = NULL;
+    gnutls_ocsp_req_t req = NULL;
+    gnutls_ocsp_resp_t rsp = NULL;
+    gnutls_datum_t nreq = {NULL, 0};
+    gnutls_datum_t nrsp = {NULL, 0};
+    gnutls_datum_t req_data = {NULL, 0};
+    gnutls_datum_t d = {NULL, 0};
+    curldata_t *cd = NULL;
+    int rc;
+
+    if (!crt[0] || !crt[1])
+        goto out;
+
+    for (unsigned int seq = 0; true; seq++) {
+        d.data = NULL;
+        d.size = 0;
+        rc = gnutls_x509_crt_get_authority_info_access(crt[0], seq,
+                GNUTLS_IA_OCSP_URI, &d, NULL);
+        if (rc == GNUTLS_E_UNKNOWN_ALGORITHM)
+            continue;
+        else if (rc == GNUTLS_E_REQUESTED_DATA_NOT_AVAILABLE)
+            break;
+        else if (rc != GNUTLS_E_SUCCESS) {
+            warnx("ocsp_check: unable to retrieve OCSP URI: %s",
+                    gnutls_strerror(rc));
+            break;
+        }
+        ocsp_uri = calloc(1, d.size+1);
+        if (!ocsp_uri) {
+            warn("ocsp_check: calloc failed");
+            gnutls_free(d.data);
+            break;
+        }
+        memcpy(ocsp_uri, d.data, d.size);
+        gnutls_free(d.data);
+        break;
+    }
+    if (!ocsp_uri)
+        goto out;
+
+    rc = gnutls_ocsp_req_init(&req);
+    if (rc != GNUTLS_E_SUCCESS) {
+        warnx("ocsp_check: gnutls_ocsp_req_init failed: %s",
+                gnutls_strerror(rc));
+        goto out;
+    }
+
+    rc = gnutls_ocsp_req_add_cert(req, GNUTLS_DIG_SHA1, crt[1], crt[0]);
+    if (rc != GNUTLS_E_SUCCESS) {
+        warnx("ocsp_check: gnutls_ocsp_req_add_cert failed: %s",
+                gnutls_strerror(rc));
+        goto out;
+    }
+
+    rc = gnutls_ocsp_req_randomize_nonce(req);
+    if (rc != GNUTLS_E_SUCCESS) {
+        warnx("ocsp_check: gnutls_ocsp_req_randomize failed: %s",
+                gnutls_strerror(rc));
+        goto out;
+    }
+
+    rc = gnutls_ocsp_req_export(req, &req_data);
+    if (rc != GNUTLS_E_SUCCESS) {
+        warnx("ocsp_check: gnutls_ocsp_req_export failed: %s",
+                gnutls_strerror(rc));
+        goto out;
+    }
+
+    d.data = NULL;
+    d.size = 0;
+    rc = gnutls_ocsp_req_print(req, GNUTLS_OCSP_PRINT_FULL, &d);
+    if (rc != GNUTLS_E_SUCCESS) {
+        warnx("ocsp_check: gnutls_ocsp_req_print failed: %s",
+                gnutls_strerror(rc));
+        gnutls_free(d.data);
+        goto out;
+    }
+    msg(2, "%.*s", d.size, d.data);
+    gnutls_free(d.data);
+
+    msg(1, "querying OCSP server at %s", ocsp_uri);
+    cd = curl_post(ocsp_uri, req_data.data, req_data.size,
+            "Content-Type: application/ocsp-request", NULL);
+    if (!cd) {
+        warnx("ocsp_check: curl_post(\"%s\") failed", ocsp_uri);
+        goto out;
+    }
+    if (cd->headers)
+        msg(3, "ocsp_check: HTTP headers:\n%s", cd->headers);
+
+    rc = gnutls_ocsp_resp_init(&rsp);
+    if (rc != GNUTLS_E_SUCCESS) {
+        warnx("ocsp_check: gnutls_ocsp_resp_init failed: %s",
+                gnutls_strerror(rc));
+        goto out;
+    }
+
+    d.data = (unsigned char *)cd->body;
+    d.size = cd->body_len;
+    rc = gnutls_ocsp_resp_import(rsp, &d);
+    if (rc != GNUTLS_E_SUCCESS) {
+        warnx("ocsp_check: gnutls_ocsp_resp_import failed: %s",
+                gnutls_strerror(rc));
+        goto out;
+    }
+
+    d.data = NULL;
+    d.size = 0;
+    rc = gnutls_ocsp_resp_print(rsp, GNUTLS_OCSP_PRINT_COMPACT, &d);
+    if (rc != GNUTLS_E_SUCCESS) {
+        warnx("ocsp_check: gnutls_ocsp_resp_print failed: %s",
+                gnutls_strerror(rc));
+        gnutls_free(d.data);
+        goto out;
+    }
+    msg(2, "%.*s", d.size, d.data);
+    gnutls_free(d.data);
+
+    rc = gnutls_ocsp_resp_get_status(rsp);
+    if (rc != GNUTLS_OCSP_RESP_SUCCESSFUL) {
+        if (rc < 0)
+            warnx("ocsp_check: gnutls_ocsp_resp_get_status failed: %s",
+                    gnutls_strerror(rc));
+        else
+            warnx("OCSP response was unsuccessful (%d)", rc);
+        goto out;
+    }
+
+    unsigned int verify;
+    rc = gnutls_ocsp_resp_verify_direct(rsp, crt[1], &verify, 0);
+    if (rc != GNUTLS_E_SUCCESS) {
+        warnx("ocsp_check: gnutls_ocsp_resp_verify_direct failed: %s",
+                gnutls_strerror(rc));
+        goto out;
+    }
+
+    if (verify != 0) {
+        warnx("warning: failed to verify OCSP response (%d)", verify);
+        goto out;
+    }
+
+    rc = gnutls_ocsp_resp_check_crt(rsp, 0, crt[0]);
+    if (rc != GNUTLS_E_SUCCESS) {
+        warnx("ocsp_check: gnutls_ocsp_resp_check_crt failed: %s",
+                gnutls_strerror(rc));
+        goto out;
+    }
+
+    rc = gnutls_ocsp_req_get_nonce(req, NULL, &nreq);
+    if (rc != GNUTLS_E_SUCCESS) {
+        warnx("ocsp_check: gnutls_ocsp_req_get_nonce failed: %s",
+                gnutls_strerror(rc));
+        goto out;
+    }
+
+    rc = gnutls_ocsp_resp_get_nonce(rsp, NULL, &nrsp);
+    if (rc != GNUTLS_E_SUCCESS) {
+        if (rc != GNUTLS_E_REQUESTED_DATA_NOT_AVAILABLE) {
+            warnx("ocsp_check: gnutls_ocsp_rsp_get_nonce failed: %s",
+                    gnutls_strerror(rc));
+            goto out;
+        } else
+            msg(1, "OCSP response has no nonce");
+    } else if (nreq.size != nrsp.size ||
+            memcmp(nreq.data, nrsp.data, nreq.size)) {
+        warnx("warning: OCSP response nonce mismatch");
+        goto out;
+    }
+
+    unsigned int cert_status;
+    rc = gnutls_ocsp_resp_get_single(rsp, 0, NULL, NULL, NULL, NULL,
+            &cert_status, NULL, NULL, NULL, NULL);
+    if (rc != GNUTLS_E_SUCCESS) {
+        warnx("ocsp_check: gnutls_ocsp_rsp_get_single failed: %s",
+                gnutls_strerror(rc));
+        goto out;
+    }
+
+    switch (cert_status) {
+        case GNUTLS_OCSP_CERT_GOOD:
+            msg(1, "OCSP certificate status is GOOD");
+            break;
+
+        case GNUTLS_OCSP_CERT_REVOKED:
+            warnx("OCSP certificate status is REVOKED");
+            result = false;
+            break;
+
+        case GNUTLS_OCSP_CERT_UNKNOWN:
+        default:
+            msg(1, "OCSP certificate status is UNKNOWN");
+            break;
+    }
+
+out:
+    if (req)
+        gnutls_ocsp_req_deinit(req);
+    if (rsp)
+        gnutls_ocsp_resp_deinit(rsp);
+    gnutls_free(req_data.data);
+    gnutls_free(nreq.data);
+    gnutls_free(nrsp.data);
+    curldata_free(cd);
+    free(ocsp_uri);
+    return result;
+}
+#elif defined(USE_OPENSSL)
+static bool ocsp_check(X509 **crt)
+{
+    (void) crt;
+    warnx("OCSP check not implemented yet when built with OpenSSL");
+    return true;
+}
+#elif defined(USE_MBEDTLS)
+static bool ocsp_check(mbedtls_x509_crt *crt)
+{
+    (void) crt;
+    warnx("OCSP check not implemented yet when built with mbedTLS");
+    return true;
+}
+#endif
+
+bool cert_valid(const char *certdir, const char * const *names, int validity,
+        bool status_check)
 {
     bool valid = false;
 #if defined(USE_GNUTLS)
-    gnutls_x509_crt_t crt = cert_load("%s/cert.pem", certdir);
-    if (!crt)
+    gnutls_x509_crt_t crt[2] = {NULL, NULL};
+    int ncrt = cert_load(crt, 2, "%s/cert.pem", certdir);
+    if (ncrt <= 0)
         goto out;
 
-    time_t expiration = gnutls_x509_crt_get_expiration_time(crt);
+    time_t expiration = gnutls_x509_crt_get_expiration_time(crt[0]);
     if (expiration == (time_t)-1) {
         warnx("cert_valid: gnutls_x509_crt_get_expiration_time failed");
         goto out;
@@ -2457,26 +2686,37 @@ bool cert_valid(const char *certdir, const char * const *names, int validity)
     }
 
     while (names && *names) {
-        if (!gnutls_x509_crt_check_hostname2(crt, *names,
+        if (!gnutls_x509_crt_check_hostname2(crt[0], *names,
                     GNUTLS_VERIFY_DO_NOT_ALLOW_WILDCARDS)) {
             msg(1, "%s/cert.pem does not include %s", certdir, *names);
             goto out;
         }
         names++;
     }
+
     valid = true;
+    if (status_check) {
+        if (ncrt < 2)
+            warn("no issuer certificate in %s/cert.pem, skipping OCSP check",
+                    certdir);
+        else
+            valid = ocsp_check(crt);
+    }
 out:
-    if (crt)
-        gnutls_x509_crt_deinit(crt);
+    for (int i = 0; i < ncrt; i++)
+        if (crt[i])
+            gnutls_x509_crt_deinit(crt[i]);
 #elif defined(USE_OPENSSL)
     GENERAL_NAMES* san = NULL;
-    X509 *crt = cert_load("%s/cert.pem", certdir);
-    if (!crt)
+    X509 *crt[2] = {NULL, NULL};
+    int ncrt = cert_load(crt, 2, "%s/cert.pem", certdir);
+    if (ncrt <= 0)
         goto out;
     int days_left, sec;
-    const ASN1_TIME *tm = X509_get0_notAfter(crt);
+    const ASN1_TIME *tm = X509_get0_notAfter(crt[0]);
     if (!tm || !ASN1_TIME_diff(&days_left, &sec, NULL, tm)) {
-        warnx("cert_valid: invalid expiration time format in %s/cert.pem", certdir);
+        warnx("cert_valid: invalid expiration time format in %s/cert.pem",
+                certdir);
         goto out;
     }
     msg(1, "%s/cert.pem expires in %d days", certdir, days_left);
@@ -2485,7 +2725,7 @@ out:
         goto out;
     }
 
-    san = X509_get_ext_d2i(crt, NID_subject_alt_name, NULL, NULL);
+    san = X509_get_ext_d2i(crt[0], NID_subject_alt_name, NULL, NULL);
     if (!san) {
         openssl_error("cert_valid");
         goto out;
@@ -2515,14 +2755,23 @@ out:
     }
 
     valid = true;
+    if (status_check) {
+        if (ncrt < 2)
+            warn("no issuer certificate in %s/cert.pem, skipping OCSP check",
+                    certdir);
+        else
+            valid = ocsp_check(crt);
+    }
 out:
-    if (crt)
-        X509_free(crt);
+    for (int i = 0; i < ncrt; i++)
+        if (crt[i])
+            X509_free(crt[i]);
     if (san)
         GENERAL_NAMES_free(san);
 #elif defined(USE_MBEDTLS)
-    mbedtls_x509_crt *crt = cert_load("%s/cert.pem", certdir);
-    if (!crt)
+    mbedtls_x509_crt *crt = NULL;
+    int ncrt = cert_load(&crt, "%s/cert.pem", certdir);
+    if (ncrt < 1)
         goto out;
 
     struct tm texp = {
@@ -2569,8 +2818,15 @@ out:
         }
         names++;
     }
-    valid = true;
 
+    valid = true;
+    if (status_check) {
+        if (ncrt < 2)
+            warn("no issuer certificate in %s/cert.pem, skipping OCSP check",
+                    certdir);
+        else
+            valid = ocsp_check(crt);
+    }
 out:
     if (crt) {
         mbedtls_x509_crt_free(crt);
@@ -2587,8 +2843,8 @@ char *cert_der_base64url(const char *certfile)
     size_t certsize = 0;
     int r;
 #if defined(USE_GNUTLS)
-    gnutls_x509_crt_t crt = cert_load(certfile);
-    if (!crt) {
+    gnutls_x509_crt_t crt = NULL;
+    if (cert_load(&crt, 1, certfile) <= 0) {
         warnx("cert_der_base64url: cert_load failed");
         goto out;
     }
@@ -2606,8 +2862,8 @@ char *cert_der_base64url(const char *certfile)
     if (!certdata)
         goto out;
 #elif defined(USE_OPENSSL)
-    X509 *crt = cert_load(certfile);
-    if (!crt) {
+    X509 *crt = NULL;
+    if (cert_load(&crt, 1, certfile) <= 0) {
         warnx("cert_der_base64url: cert_load failed");
         goto out;
     }

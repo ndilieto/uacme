@@ -209,7 +209,8 @@ int acme_post(acme_t *a, const char *url, const char *format, ...)
                     url, payload, protected, jws);
         else if (g_loglevel > 1)
             warnx("acme_post: url=%s payload=%s", url, payload);
-        curldata_t *c = curl_post(url, jws);
+        curldata_t *c = curl_post(url, jws, strlen(jws),
+                "Content-Type: application/jose+json", NULL);
         if (!c) {
             warnx("acme_post: curl_post failed");
             goto out;
@@ -1135,7 +1136,7 @@ void usage(const char *progname)
     fprintf(stderr,
         "usage: %s [-a|--acme-url URL] [-b|--bits BITS] [-c|--confdir DIR]\n"
         "\t[-d|--days DAYS] [-f|--force] [-h|--hook PROGRAM] [-m|--must-staple]\n"
-        "\t[-n|--never-create] [-s|--staging] [-t|--type RSA | EC]\n"
+        "\t[-n|--never-create] [-o|--no-ocsp] [-s|--staging] [-t|--type RSA | EC]\n"
         "\t[-v|--verbose ...] [-V|--version] [-y|--yes] [-?|--help]\n"
         "\tnew [EMAIL] | update [EMAIL] | deactivate | newkey |\n"
         "\tissue IDENTIFIER [ALTNAME ...]] | revoke CERTFILE\n", progname);
@@ -1154,6 +1155,7 @@ int main(int argc, char **argv)
         {"hook",         required_argument, NULL, 'h'},
         {"must-staple",  no_argument,       NULL, 'm'},
         {"never-create", no_argument,       NULL, 'n'},
+        {"no-ocsp",      no_argument,       NULL, 'o'},
         {"staging",      no_argument,       NULL, 's'},
         {"type",         required_argument, NULL, 't'},
         {"verbose",      no_argument,       NULL, 'v'},
@@ -1170,6 +1172,7 @@ int main(int argc, char **argv)
     bool staging = false;
     bool custom_directory = false;
     bool status_req = false;
+    bool status_check = true;
     int days = 30;
     int bits = 0;
     keytype_t type = PK_RSA;
@@ -1207,7 +1210,7 @@ int main(int argc, char **argv)
     while (1) {
         char *endptr;
         int option_index;
-        int c = getopt_long(argc, argv, "a:b:c:d:f?h:mnst:vVy",
+        int c = getopt_long(argc, argv, "a:b:c:d:f?h:mnost:vVy",
                 options, &option_index);
         if (c == -1) break;
         switch (c) {
@@ -1254,6 +1257,10 @@ int main(int argc, char **argv)
 
             case 'n':
                 never = true;
+                break;
+
+            case 'o':
+                status_check = false;
                 break;
 
             case 'v':
@@ -1456,7 +1463,7 @@ int main(int argc, char **argv)
             goto out;
 
         msg(1, "checking existence and expiration of %s/cert.pem", a.certdir);
-        if (cert_valid(a.certdir, a.names, days)) {
+        if (cert_valid(a.certdir, a.names, days, status_check)) {
             if (force)
                 msg(1, "forcing reissue of %s/cert.pem", a.certdir);
             else {
