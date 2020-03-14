@@ -17,7 +17,7 @@ SYNOPSIS
     [*-b*|*--bind* 'address'[@'port']] [*-c*|*--connect* 'address'[@'port']]
     [*-d*|*--daemon*] [*-l*|*--logfile* 'file'] [*-m*|*--max-auths* 'N']
     [*-n*|*--num-workers* 'N'] [*-p*|*--proxy* 'N'] [*-P*|*--pidfile* 'file']
-    [*-r*|*--chroot dir] [*-s*|*--sock path*] [*-S*|*--sock-mode* 'mode']
+    [*-r*|*--chroot dir*] [*-s*|*--sock path*] [*-S*|*--sock-mode* 'mode']
     [*-t*|*--terminate*] [*-u*|*--user* 'user'`[:`'group']] [*-v*|*--verbose* ...]
 
 
