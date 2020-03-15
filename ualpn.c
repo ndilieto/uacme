@@ -1173,9 +1173,10 @@ static int tls_post_client_hello_func(gnutls_session_t s)
 {
     client_t *c = (client_t *)gnutls_session_get_ptr(s);
 
-    char name[0x100];
-    size_t name_len = sizeof(name);
     unsigned int type;
+    char name[0x100];
+    size_t name_len = sizeof(name)-1;
+    memset(name, 0, name_len);
 
     int rc = gnutls_server_name_get(c->tls, name, &name_len, &type, 0);
     if (rc != GNUTLS_E_SUCCESS)
@@ -1186,7 +1187,7 @@ static int tls_post_client_hello_func(gnutls_session_t s)
     if (rc != GNUTLS_E_SUCCESS)
         return rc;
 
-    if (strcmp((const char *)protocol.data, "acme-tls/1"))
+    if (strncmp((const char *)protocol.data, "acme-tls/1", protocol.size))
         return GNUTLS_E_APPLICATION_ERROR_MAX;
 
     auth_t *auth = get_auth(name);
