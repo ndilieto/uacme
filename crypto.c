@@ -2347,6 +2347,7 @@ static int cert_load(mbedtls_x509_crt **crt, const char *format, ...)
     void *certdata = NULL;
     size_t certsize = 0;
 #endif
+    int ret = 0;
     int r;
     va_list ap;
 
@@ -2384,6 +2385,7 @@ static int cert_load(mbedtls_x509_crt **crt, const char *format, ...)
         warnx("cert_load: failed to load %s", certfile);
         goto out;
     }
+    ret = r;
 #else
     certdata = read_file(certfile, &certsize);
     if (!certdata) {
@@ -2402,6 +2404,7 @@ static int cert_load(mbedtls_x509_crt **crt, const char *format, ...)
         warnx("cert_load: gnutls_x509_crt_list_import: %s", gnutls_strerror(r));
         goto out;
     }
+    ret = r;
 #elif defined(USE_MBEDTLS)
     *crt = calloc(1, sizeof(**crt));
     if (!*crt) {
@@ -2415,25 +2418,23 @@ static int cert_load(mbedtls_x509_crt **crt, const char *format, ...)
                 _mbedtls_strerror(r));
         mbedtls_x509_crt_free(*crt);
         free(*crt);
-        r = 0;
         goto out;
     }
     if (r > 0) {
         warnx("cert_load: failed to parse %d certificates", r);
         mbedtls_x509_crt_free(*crt);
         free(*crt);
-        r = 0;
         goto out;
     }
     for (mbedtls_x509_crt *c = *crt; c; c = c->next)
-        r++;
+        ret++;
 #endif
 out:
 #if !defined(USE_OPENSSL)
     free(certdata);
 #endif
     free(certfile);
-    return r;
+    return ret;
 }
 
 #if defined(USE_GNUTLS)
