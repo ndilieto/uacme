@@ -51,11 +51,13 @@
 #endif
 #elif defined(USE_OPENSSL)
 #include <openssl/asn1.h>
+#include <openssl/bio.h>
 #include <openssl/bn.h>
 #include <openssl/crypto.h>
 #include <openssl/engine.h>
 #include <openssl/err.h>
 #include <openssl/evp.h>
+#include <openssl/ocsp.h>
 #include <openssl/opensslv.h>
 #include <openssl/pem.h>
 #include <openssl/rsa.h>
@@ -2518,7 +2520,7 @@ static bool ocsp_check(gnutls_x509_crt_t *crt)
         gnutls_free(d.data);
         goto out;
     }
-    msg(2, "%.*s", d.size, d.data);
+    msg(2, "ocsp_check: %.*s", d.size, d.data);
     gnutls_free(d.data);
 
     msg(1, "querying OCSP server at %s", ocsp_uri);
@@ -2549,25 +2551,15 @@ static bool ocsp_check(gnutls_x509_crt_t *crt)
 
     d.data = NULL;
     d.size = 0;
-    rc = gnutls_ocsp_resp_print(rsp, GNUTLS_OCSP_PRINT_COMPACT, &d);
+    rc = gnutls_ocsp_resp_print(rsp, GNUTLS_OCSP_PRINT_FULL, &d);
     if (rc != GNUTLS_E_SUCCESS) {
         warnx("ocsp_check: gnutls_ocsp_resp_print failed: %s",
                 gnutls_strerror(rc));
         gnutls_free(d.data);
         goto out;
     }
-    msg(2, "%.*s", d.size, d.data);
+    msg(2, "ocsp_check: %.*s", d.size, d.data);
     gnutls_free(d.data);
-
-    rc = gnutls_ocsp_resp_get_status(rsp);
-    if (rc != GNUTLS_OCSP_RESP_SUCCESSFUL) {
-        if (rc < 0)
-            warnx("ocsp_check: gnutls_ocsp_resp_get_status failed: %s",
-                    gnutls_strerror(rc));
-        else
-            warnx("OCSP response was unsuccessful (%d)", rc);
-        goto out;
-    }
 
     unsigned int verify;
     rc = gnutls_ocsp_resp_verify_direct(rsp, crt[1], &verify, 0);
@@ -2579,6 +2571,16 @@ static bool ocsp_check(gnutls_x509_crt_t *crt)
 
     if (verify != 0) {
         warnx("warning: failed to verify OCSP response (%d)", verify);
+        goto out;
+    }
+
+    rc = gnutls_ocsp_resp_get_status(rsp);
+    if (rc != GNUTLS_OCSP_RESP_SUCCESSFUL) {
+        if (rc < 0)
+            warnx("ocsp_check: gnutls_ocsp_resp_get_status failed: %s",
+                    gnutls_strerror(rc));
+        else
+            warnx("OCSP response was unsuccessful (%d)", rc);
         goto out;
     }
 
@@ -2650,9 +2652,202 @@ out:
 #elif defined(USE_OPENSSL)
 static bool ocsp_check(X509 **crt)
 {
-    (void) crt;
-    warnx("OCSP check not implemented yet when built with OpenSSL");
-    return true;
+    bool result = true;
+    char *ocsp_uri = NULL;
+    OCSP_REQUEST *req = NULL;
+    unsigned char *reqdata = NULL;
+    int reqsize = 0;
+    OCSP_RESPONSE *rsp = NULL;
+    OCSP_BASICRESP *brsp = NULL;
+    OCSP_CERTID *id = NULL;
+    STACK_OF(OCSP_CERTID) *ids = NULL;
+    STACK_OF(OPENSSL_STRING) *ocsp_uris = NULL;
+    STACK_OF(X509) *issuers = NULL;
+    curldata_t *cd = NULL;
+    int rc;
+
+    if (!crt[0] || !crt[1])
+        goto out;
+
+    ocsp_uris = X509_get1_ocsp(crt[0]);
+    if (!ocsp_uris) {
+        openssl_error("ocsp_check");
+        goto out;
+    }
+    for (int j = 0; !ocsp_uri && j < sk_OPENSSL_STRING_num(ocsp_uris); j++) {
+        char *uri = sk_OPENSSL_STRING_value(ocsp_uris, j);
+        if (uri && strlen(uri)) {
+            ocsp_uri = strdup(uri);
+            if (!ocsp_uri) {
+                warn("ocsp_check: strdup failed");
+                goto out;
+            }
+        }
+    }
+    if (!ocsp_uri)
+        goto out;
+
+    req = OCSP_REQUEST_new();
+    if (!req) {
+        openssl_error("ocsp_check");
+        goto out;
+    }
+
+    ids = sk_OCSP_CERTID_new_null();
+    if (!ids) {
+        openssl_error("ocsp_check");
+        goto out;
+    }
+
+    id = OCSP_cert_to_id(EVP_sha1(), crt[0], crt[1]);
+    if (!id || !sk_OCSP_CERTID_push(ids, id)) {
+        openssl_error("ocsp_check");
+        goto out;
+    }
+
+    if (!OCSP_request_add0_id(req, id)) {
+        openssl_error("ocsp_check");
+        goto out;
+    }
+
+    if (!OCSP_request_add1_nonce(req, NULL, -1)) {
+        openssl_error("ocsp_check");
+        goto out;
+    }
+
+    rc = i2d_OCSP_REQUEST(req, NULL);
+    if (rc < 0) {
+        openssl_error("ocsp_check");
+        goto out;
+    }
+    reqsize = rc;
+    reqdata = calloc(1, reqsize);
+    if (!reqdata) {
+        warn("ocsp_check: calloc failed");
+        goto out;
+    }
+    unsigned char *tmp = reqdata;
+    if (i2d_OCSP_REQUEST(req, &tmp) != reqsize) {
+        openssl_error("ocsp_check");
+        goto out;
+    }
+
+    if (g_loglevel > 2) {
+        BIO *out = BIO_new(BIO_s_mem());
+        if (out) {
+            if (OCSP_REQUEST_print(out, req, 0)) {
+                char *data = NULL;
+                int size = BIO_get_mem_data(out, &data);
+                warnx("ocsp_check: %.*s", size, data);
+            }
+            BIO_free(out);
+        }
+    }
+
+    msg(1, "querying OCSP server at %s", ocsp_uri);
+    cd = curl_post(ocsp_uri, reqdata, reqsize,
+            "Content-Type: application/ocsp-request", NULL);
+    if (!cd) {
+        warnx("ocsp_check: curl_post(\"%s\") failed", ocsp_uri);
+        goto out;
+    }
+    if (cd->headers)
+        msg(3, "ocsp_check: HTTP headers:\n%s", cd->headers);
+
+    const unsigned char *tmp2 = (const unsigned char *)cd->body;
+    rsp = d2i_OCSP_RESPONSE(NULL, &tmp2, cd->body_len);
+    if (!rsp) {
+        openssl_error("ocsp_check");
+        goto out;
+    }
+
+    if (g_loglevel > 2) {
+        BIO *out = BIO_new(BIO_s_mem());
+        if (out) {
+            if (OCSP_RESPONSE_print(out, rsp, 0)) {
+                char *data = NULL;
+                int size = BIO_get_mem_data(out, &data);
+                warnx("ocsp_check: %.*s", size, data);
+            }
+            BIO_free(out);
+        }
+    }
+
+    rc = OCSP_response_status(rsp);
+    if (rc != OCSP_RESPONSE_STATUS_SUCCESSFUL) {
+        if (rc < 0)
+            openssl_error("ocsp_check");
+        else
+            warnx("OCSP response was unsuccessful (%d)", rc);
+        goto out;
+    }
+
+    brsp = OCSP_response_get1_basic(rsp);
+    if (!brsp) {
+        openssl_error("ocsp_check");
+        goto out;
+    }
+
+    rc = OCSP_check_nonce(req, brsp);
+    if (rc < 0)
+        msg(1, "OCSP response has no nonce");
+    else if (rc == 0) {
+        warnx("ocsp_check: OCSP_check_nonce failed");
+        goto out;
+    }
+
+    issuers = sk_X509_new_null();
+    if (!issuers) {
+        openssl_error("ocsp_check");
+        goto out;
+    }
+    sk_X509_push(issuers, crt[1]);
+
+    if (OCSP_basic_verify(brsp, issuers, NULL, OCSP_TRUSTOTHER) <= 0) {
+        openssl_error("ocsp_check");
+        goto out;
+    }
+
+    int cert_status;
+    if (!OCSP_resp_find_status(brsp, id, &cert_status, NULL, NULL, NULL, NULL)) {
+        openssl_error("ocsp_check");
+        goto out;
+    }
+
+    switch (cert_status) {
+        case V_OCSP_CERTSTATUS_GOOD:
+            msg(1, "OCSP certificate status is GOOD");
+            break;
+
+        case V_OCSP_CERTSTATUS_REVOKED:
+            warnx("OCSP certificate status is REVOKED");
+            result = false;
+            break;
+
+        case V_OCSP_CERTSTATUS_UNKNOWN:
+        default:
+            msg(1, "OCSP certificate status is UNKNOWN");
+            break;
+    }
+
+out:
+    free(ocsp_uri);
+    free(reqdata);
+    if (cd)
+        curldata_free(cd);
+    if (req)
+        OCSP_REQUEST_free(req);
+    if (rsp)
+        OCSP_RESPONSE_free(rsp);
+    if (brsp)
+        OCSP_BASICRESP_free(brsp);
+    if (ids)
+        sk_OCSP_CERTID_free(ids);
+    if (ocsp_uris)
+        X509_email_free(ocsp_uris);
+    if (issuers)
+        sk_X509_free(issuers);
+    return result;
 }
 #elif defined(USE_MBEDTLS)
 static bool ocsp_check(mbedtls_x509_crt *crt)
