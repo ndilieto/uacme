@@ -65,6 +65,7 @@ Pre-built packages are available for several distributions:
 
 * https://packages.debian.org/bullseye/uacme
 * https://packages.ubuntu.com/eoan/uacme
+* https://software.opensuse.org/package/uacme
 * https://pkgs.alpinelinux.org/packages?name=uacme
 * https://github.com/openwrt/packages/tree/master/net/uacme
 
