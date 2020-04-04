@@ -748,10 +748,10 @@ static void controller_handle_cmd(controller_t *c, char *line, ev_tstamp ts)
         memset(arpa, 0, sizeof(arpa));
         if (ai->ai_family == AF_INET) {
             struct sockaddr_in *ain = (struct sockaddr_in *)ai->ai_addr;
-            uint32_t addr = ain->sin_addr.s_addr;
+            uint32_t addr = ntohl(ain->sin_addr.s_addr);
             snprintf(arpa, sizeof(arpa), "%d.%d.%d.%d.in-addr.arpa",
-                    (addr >> 24) & 0xFF, (addr >> 16) & 0xFF,
-                    (addr >> 8) & 0xFF, addr & 0xFF);
+                    addr & 0xFF, (addr >> 8) & 0xFF,
+                    (addr >> 16) & 0xFF, (addr >> 24) & 0xFF);
         } else if (ai->ai_family == AF_INET6) {
             struct sockaddr_in6 *ain6 = (struct sockaddr_in6 *)ai->ai_addr;
             unsigned char *addr = ain6->sin6_addr.s6_addr;
