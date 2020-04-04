@@ -2853,7 +2853,7 @@ out:
 static bool ocsp_check(mbedtls_x509_crt *crt)
 {
     (void) crt;
-    warnx("OCSP check not implemented yet when built with mbedTLS");
+    msg(1, "OCSP check not implemented when built with mbedTLS");
     return true;
 }
 #endif
