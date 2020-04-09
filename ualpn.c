@@ -580,13 +580,18 @@ int auth_crt(const char *ident, const uint8_t *id, size_t id_len,
         struct sockaddr_in *addr = (struct sockaddr_in *)ai->ai_addr;
         rc = gnutls_x509_crt_set_subject_alt_name(c, GNUTLS_SAN_IPADDRESS,
                 &addr->sin_addr, sizeof(addr->sin_addr), GNUTLS_FSAN_APPEND);
+        freeaddrinfo(ai);
     } else if (rc == 0 && ai->ai_family == AF_INET6) {
         struct sockaddr_in6 *addr = (struct sockaddr_in6 *)ai->ai_addr;
         rc = gnutls_x509_crt_set_subject_alt_name(c, GNUTLS_SAN_IPADDRESS,
                 &addr->sin6_addr, sizeof(addr->sin6_addr), GNUTLS_FSAN_APPEND);
-    } else
+        freeaddrinfo(ai);
+    } else {
+        if (rc == 0)
+            freeaddrinfo(ai);
         rc = gnutls_x509_crt_set_subject_alt_name(c, GNUTLS_SAN_DNSNAME,
                 ident, strlen(ident), GNUTLS_FSAN_APPEND);
+    }
 
     if (rc != GNUTLS_E_SUCCESS) {
         warnx("auth_crt: gnutls_x509_crt_set_subject_alt_name: %s",
@@ -1187,7 +1192,8 @@ static int tls_post_client_hello_func(gnutls_session_t s)
     if (rc != GNUTLS_E_SUCCESS)
         return rc;
 
-    if (strncmp((const char *)protocol.data, "acme-tls/1", protocol.size))
+    if (protocol.size != strlen("acme-tls/1") ||
+            memcmp("acme-tls/1", protocol.data, protocol.size))
         return GNUTLS_E_APPLICATION_ERROR_MAX;
 
     auth_t *auth = get_auth(name);
