@@ -619,6 +619,16 @@ int auth_crt(const char *ident, const uint8_t *id, size_t id_len,
         return rc;
     }
 
+    rc = gnutls_x509_crt_set_key_usage(c, GNUTLS_KEY_DIGITAL_SIGNATURE |
+                GNUTLS_KEY_KEY_CERT_SIGN);
+    if (rc != GNUTLS_E_SUCCESS) {
+        warnx("auth_crt: gnutls_x509_crt_set_key_usage: %s",
+                gnutls_strerror(rc));
+        gnutls_x509_privkey_deinit(k);
+        gnutls_x509_crt_deinit(c);
+        return rc;
+    }
+
     rc = gnutls_x509_crt_get_key_id(c, 0, keyid, &keyid_size);
     if (rc != GNUTLS_E_SUCCESS) {
         warnx("auth_crt: gnutls_x509_crt_get_key_id: %s", gnutls_strerror(rc));
