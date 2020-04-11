@@ -1608,6 +1608,8 @@ static void cb_client_rxf(EV_P_ ev_io *w, int revents)
     if ((revents & EV_READ) == 0)
         return;
 
+    c->timestamp = ev_now(EV_A);
+
     if (c->state == STATE_INIT) {
         uint8_t buf[3];
         ssize_t len = recv(c->fd_f, buf, sizeof(buf), MSG_PEEK);
@@ -1635,7 +1637,6 @@ static void cb_client_rxf(EV_P_ ev_io *w, int revents)
     }
 
     if (c->state == STATE_ACME_MAYBE || c->state == STATE_ACME) {
-        c->timestamp = ev_now(EV_A);
         int rc = gnutls_handshake(c->tls);
         if (c->state == STATE_CLOSING) {
             client_done(EV_A_ c, DRAIN_FRONTEND);
