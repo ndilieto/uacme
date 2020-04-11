@@ -152,6 +152,7 @@ typedef struct client {
         STATE_ACME,
         STATE_PROXY_INIT,
         STATE_PROXY,
+        STATE_CLOSING,
         STATE_DONE
     } state;
     gnutls_session_t tls;
@@ -1104,14 +1105,14 @@ static ssize_t tls_pull_func(gnutls_transport_ptr_t p, void *data, size_t size)
     ssize_t s = recv(c->fd_f, data, size,
             c->state == STATE_ACME ? 0 : MSG_PEEK);
     if (s == 0) {
-        client_done(EV_A_ c, DRAIN_FRONTEND);
+        c->state = STATE_CLOSING;
         return 0;
     } else if (s == -1) {
         gnutls_transport_set_errno(c->tls, errno);
         if (errno != EAGAIN && errno != EWOULDBLOCK) {
             warn("client %08x: frontend failed to read from %s:%s", c->id,
                     c->rhost_f, c->rserv_f);
-            client_done(EV_A_ c, DRAIN_FRONTEND);
+            c->state = STATE_CLOSING;
         } else if (c->fd_f != -1 && c->state != STATE_DONE)
             ev_io_start(EV_A_ &c->io_rxf);
         return -1;
@@ -1139,7 +1140,7 @@ static ssize_t tls_pull_func(gnutls_transport_ptr_t p, void *data, size_t size)
         if (sr != s) {
             warn("client %08x: frontend failed to buffer data from %s:%s",
                     c->id, c->rhost_f, c->rserv_f);
-            client_done(EV_A_ c, DRAIN_FRONTEND);
+            c->state = STATE_CLOSING;
             return 0;
         }
     }
@@ -1175,7 +1176,7 @@ static ssize_t tls_push_func(gnutls_transport_ptr_t p, const void *data,
         if (errno != EAGAIN && errno != EWOULDBLOCK) {
             warn("client %08x: frontend failed to buffer data from %s:%s",
                     c->id, c->rhost_f, c->rserv_f);
-            client_done(EV_A_ c, DRAIN_FRONTEND);
+            c->state = STATE_CLOSING;
             return -1;
         }
     }
@@ -1636,6 +1637,10 @@ static void cb_client_rxf(EV_P_ ev_io *w, int revents)
     if (c->state == STATE_ACME_MAYBE || c->state == STATE_ACME) {
         c->timestamp = ev_now(EV_A);
         int rc = gnutls_handshake(c->tls);
+        if (c->state == STATE_CLOSING) {
+            client_done(EV_A_ c, DRAIN_FRONTEND);
+            return;
+        }
         if (rc == GNUTLS_E_INTERRUPTED || rc == GNUTLS_E_AGAIN)
             return;
         if (c->state == STATE_ACME) {
@@ -1779,6 +1784,10 @@ static void cb_client_txf(EV_P_ ev_io *w, int revents)
 
     if (c->state == STATE_ACME) {
         int rc = gnutls_handshake(c->tls);
+        if (c->state == STATE_CLOSING) {
+            client_done(EV_A_ c, DRAIN_FRONTEND);
+            return;
+        }
         if (rc == GNUTLS_E_INTERRUPTED || rc == GNUTLS_E_AGAIN)
             return;
         if (rc == GNUTLS_E_SUCCESS)
@@ -1804,6 +1813,7 @@ static void cb_client_timer(EV_P_ ev_timer *w, int revents)
     if (after < 0.0) {
         infox("client %08x: closing due to activity timeout", c->id);
         client_done(EV_A_ c, DRAIN_BOTH);
+        return;
     } else {
         ev_timer_set(w, after, 0.0);
         ev_timer_start(EV_A_ w);
