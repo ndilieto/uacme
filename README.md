@@ -71,12 +71,12 @@ Pre-built packages are available for several distributions:
 
 ## Getting started
 
-Once you have obtained **uacme** (see Installation above) the next step is
+Once you have obtained **uacme** (see Installation above) the next step is creating
+an ACME account:
 ```
 uacme -v -c /path/to/uacme.d new
 ```
-to create an ACME account. This will create the configuration folder and
-account private key:
+The configuration directory and account private key should have been created:
 ```
 /path/to/uacme.d/private/key.pem
 ```
@@ -84,7 +84,7 @@ You can then issue a certificate for your domain by doing
 ```
 uacme -v -c /path/to/uacme.d issue www.your.domain.com
 ```
-If everything goes well **uacme** will ask you to set up a challenge, for example
+If everything goes well **uacme** asks you to set up a challenge, for example
 ```
 uacme: challenge=http-01 ident=www.your.domain.com token=kZjqYgAss_sl4XXDfFq-jeQV1_lqsE76v2BoCGegFk4
 key_auth=kZjqYgAss_sl4XXDfFq-jeQV1_lqsE76v2BoCGegFk4.2evcXalKLhAybRuxxE-HkSUihdzQ7ZDAKA9EZYrTXwU
@@ -100,15 +100,15 @@ authorization:
 kZjqYgAss_sl4XXDfFq-jeQV1_lqsE76v2BoCGegFk4.2evcXalKLhAybRuxxE-HkSUihdzQ7ZDAKA9EZYrTXwU
 ```
 After setting up the web server you can then type 'y' followed by a newline on
-**uacme**'s input. This will notify the ACME server that it can proceed with the
-challenge verification.  If the procedure was successful **uacme** will save the
+**uacme**'s input. This notifies the ACME server that it can proceed with the
+challenge verification.  If the procedure is successful **uacme** saves the
 certificate and the key at:
 ```
 /path/to/uacme.d/www.your.domain.com/cert.pem
-/path/to/uacme.d/private/www.your.domain.com/key.pemt
+/path/to/uacme.d/private/www.your.domain.com/key.pem
 ```
 Note other types of challenges are possible. If you type anything other than
-'y', **uacme** will skip the challenge and propose a different one. The easiest
+'y', **uacme** skips the challenge and proposes a different one. The easiest
 is http-01 but any other type can be dealt with. Keep in mind that challenge
 types may be served in random order by the server. Do not make any assumptions
 and read **uacme**'s output carefully.
@@ -164,14 +164,14 @@ address space.
 **ualpn** also listens to a UNIX domain socket so that it can be fed the
 necessary tls-alpn-01 key authorizations for the domains being validated
 by the ACME server. **ualpn** was designed to be easy to integrate with
-not only **uacme** (chech the example ualpn.sh hook script) but also other
+not only **uacme** (check the example ualpn.sh hook script) but also other
 ACME clients.
 
 To get started with **ualpn**:
 * move your real HTTPS server to port 4443 and also enable it to accept
 the PROXY protocol:
   * for nginx: https://docs.nginx.com/nginx/admin-guide/load-balancer/using-proxy-protocol
-  * for apache: https://httpd.apache.org/docs/2.4/mod/mod_remoteip.html
+  * for apache: https://httpd.apache.org/docs/2.4/mod/mod_remoteip.html#remoteipproxyprotocol
 * launch **ualpn** as a daemon and check the logs (by default in syslog)
 ```
 sudo ualpn -v -d -u nobody:nogroup -c 127.0.0.1@4443 -S 666
@@ -182,14 +182,13 @@ uacme -v -s -c /path/to/uacme.d -y new
 ```
 * try obtaining a certificate with tls-alpn-01 challenge
 ```
-uacme -v -s -c /path/to/uacme.d -h /usr/share/uacme/ualpn.sh issue www.example.com
+uacme -v -s -c /path/to/uacme.d -h /usr/share/uacme/ualpn.sh issue www.your.domain.com
 ```
 or, depending on your installation
 ```
-uacme -v -s -c /path/to/uacme.d -h /usr/local/share/uacme/ualpn.sh issue www.example.com
+uacme -v -s -c /path/to/uacme.d -h /usr/local/share/uacme/ualpn.sh issue www.your.domain.com
 ```
-Note: currently **ualpn** requires building with GnuTLS. Future mbedTLS/OpenSSL
-support is planned.
+Note: currently **ualpn** requires building with GnuTLS or OpenSSL. Future mbedTLS support is planned.
 
 ## Documentation
 
