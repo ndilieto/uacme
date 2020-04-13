@@ -1813,12 +1813,16 @@ static int tls_session_init(client_t *c, uint8_t *buf, size_t buf_len)
 #elif defined(USE_OPENSSL)
     c->ssl = SSL_new(g.ssl_ctx);
     if (!c->ssl || !SSL_set_ex_data(c->ssl, g.ssl_idx, c)) {
-        openssl_error("auth_crt");
+        char buf[32];
+        snprintf(buf, sizeof(buf), "client %08x:", c->id);
+        openssl_error(buf);
         return -1;
     }
     BIO *bio = BIO_new(BIO_s_ualpn());
     if (!bio || !BIO_set_ex_data(bio, g.bio_idx, c)) {
-        openssl_error("auth_crt");
+        char buf[32];
+        snprintf(buf, sizeof(buf), "client %08x:", c->id);
+        openssl_error(buf);
         return -1;
     }
     BIO_up_ref(bio);
@@ -3776,13 +3780,13 @@ int main(int argc, char **argv)
 #if defined(USE_GNUTLS)
     if (!gnutls_check_version("3.3.30"))
     {
-        warnx("GnuTLS version 3.3.30 or later is required");
+        errx("GnuTLS version 3.3.30 or later is required");
         cleanup_and_exit(0, EXIT_FAILURE);
     }
     gnutls_global_init();
 #elif defined(USE_OPENSSL)
     if (OpenSSL_version_num() < 0x1010100fL) {
-        warnx("OpenSSL version 1.1.1 or later is required");
+        errx("OpenSSL version 1.1.1 or later is required");
         cleanup_and_exit(0, EXIT_FAILURE);
     }
     g.ssl_ctx = SSL_CTX_new(TLS_server_method());
