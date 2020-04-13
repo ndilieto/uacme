@@ -1075,7 +1075,7 @@ static void controller_handle_cmd(controller_t *c, char *line, ev_tstamp ts)
             }
             a = g_shm->avail;
             SGLIB_DL_LIST_DELETE(auth_t, g_shm->avail, a, left, right);
-            strncpy(a->ident, arpa[0] ? arpa : ident, sizeof(a->ident));
+            strncpy(a->ident, arpa[0] ? arpa : ident, sizeof(a->ident) - 1);
             sglib_auth_t_add(&g_shm->auths, a);
             g.auths_touched = true;
         }
@@ -1491,8 +1491,8 @@ static int tls_post_client_hello_func(gnutls_session_t s)
         return rc;
     }
 
-    strncpy(c->auth, auth->auth, sizeof(c->auth));
-    strncpy(c->ident, auth->ident, sizeof(c->ident));
+    strncpy(c->auth, auth->auth, sizeof(c->auth) - 1);
+    strncpy(c->ident, auth->ident, sizeof(c->ident) - 1);
 
 #if HAVE_SPLICE
     c->n_f2b = 0;
@@ -1692,7 +1692,7 @@ static int ssl_client_hello_cb(SSL *s, int *al, void *arg)
         if (len + 3 > ext_len)
             return SSL_CLIENT_HELLO_RETRY;
         if (ext[0] == TLSEXT_NAMETYPE_host_name) {
-            memcpy(name, &ext[3], len < sizeof(name) ? len : sizeof(name));
+            memcpy(name, &ext[3], len < sizeof(name) ? len : sizeof(name) - 1);
             break;
         }
         ext_len -= len + 3;
@@ -1724,8 +1724,8 @@ static int ssl_client_hello_cb(SSL *s, int *al, void *arg)
         return SSL_CLIENT_HELLO_RETRY;
     }
 
-    strncpy(c->auth, auth->auth, sizeof(c->auth));
-    strncpy(c->ident, auth->ident, sizeof(c->ident));
+    strncpy(c->auth, auth->auth, sizeof(c->auth) - 1);
+    strncpy(c->ident, auth->ident, sizeof(c->ident) - 1);
 
     return SSL_CLIENT_HELLO_SUCCESS;
 }
