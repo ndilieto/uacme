@@ -772,7 +772,7 @@ int auth_crt(const char *ident, const uint8_t *id, size_t id_len,
     }
 
     bn = BN_new();
-    if (!bn || !BN_pseudo_rand(bn, 128, BN_RAND_TOP_ANY, BN_RAND_BOTTOM_ANY)) {
+    if (!bn || !BN_pseudo_rand(bn, 127, BN_RAND_TOP_ANY, BN_RAND_BOTTOM_ANY)) {
         openssl_error("auth_crt");
         goto out;
     }
