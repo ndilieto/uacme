@@ -526,7 +526,7 @@ int auth_crt(const char *ident, const uint8_t *id, size_t id_len,
     rc = gnutls_x509_privkey_init(&k);
     if (rc != GNUTLS_E_SUCCESS) {
         warnx("auth_crt: gnutls_x509_privkey_init: %s", gnutls_strerror(rc));
-        return rc;
+        return -1;
     }
 
     rc = gnutls_x509_privkey_generate(k, GNUTLS_PK_EC,
@@ -535,14 +535,14 @@ int auth_crt(const char *ident, const uint8_t *id, size_t id_len,
         warnx("auth_crt: gnutls_x509_privkey_generate: %s",
                 gnutls_strerror(rc));
         gnutls_x509_privkey_deinit(k);
-        return rc;
+        return -1;
     }
 
     rc = gnutls_x509_crt_init(&c);
     if (rc != GNUTLS_E_SUCCESS) {
         warnx("auth_crt: gnutls_x509_crt_init: %s", gnutls_strerror(rc));
         gnutls_x509_privkey_deinit(k);
-        return rc;
+        return -1;
     }
 
     rc = gnutls_x509_crt_set_version(c, 3);
@@ -551,7 +551,7 @@ int auth_crt(const char *ident, const uint8_t *id, size_t id_len,
                 gnutls_strerror(rc));
         gnutls_x509_privkey_deinit(k);
         gnutls_x509_crt_deinit(c);
-        return rc;
+        return -1;
     }
 
     rc = gnutls_x509_crt_set_dn_by_oid(c, GNUTLS_OID_X520_COMMON_NAME, 0,
@@ -561,7 +561,7 @@ int auth_crt(const char *ident, const uint8_t *id, size_t id_len,
                 gnutls_strerror(rc));
         gnutls_x509_privkey_deinit(k);
         gnutls_x509_crt_deinit(c);
-        return rc;
+        return -1;
     }
 
     rc = gnutls_x509_crt_set_issuer_dn_by_oid(c, GNUTLS_OID_X520_COMMON_NAME,
@@ -571,7 +571,7 @@ int auth_crt(const char *ident, const uint8_t *id, size_t id_len,
                 gnutls_strerror(rc));
         gnutls_x509_privkey_deinit(k);
         gnutls_x509_crt_deinit(c);
-        return rc;
+        return -1;
     }
 
     rc = gnutls_rnd(GNUTLS_RND_NONCE, serial, sizeof(serial));
@@ -580,7 +580,7 @@ int auth_crt(const char *ident, const uint8_t *id, size_t id_len,
         warnx("auth_crt: gnutls_rnd: %s", gnutls_strerror(rc));
         gnutls_x509_privkey_deinit(k);
         gnutls_x509_crt_deinit(c);
-        return rc;
+        return -1;
     }
 
     rc = gnutls_x509_crt_set_serial(c, serial, sizeof(serial));
@@ -589,7 +589,7 @@ int auth_crt(const char *ident, const uint8_t *id, size_t id_len,
                 gnutls_strerror(rc));
         gnutls_x509_privkey_deinit(k);
         gnutls_x509_crt_deinit(c);
-        return rc;
+        return -1;
     }
 
     rc = gnutls_x509_crt_set_activation_time(c, now - 30*24*60*60);
@@ -598,7 +598,7 @@ int auth_crt(const char *ident, const uint8_t *id, size_t id_len,
                 gnutls_strerror(rc));
         gnutls_x509_privkey_deinit(k);
         gnutls_x509_crt_deinit(c);
-        return rc;
+        return -1;
     }
 
     rc = gnutls_x509_crt_set_expiration_time(c, now + 30*24*60*60);
@@ -607,7 +607,7 @@ int auth_crt(const char *ident, const uint8_t *id, size_t id_len,
                 gnutls_strerror(rc));
         gnutls_x509_privkey_deinit(k);
         gnutls_x509_crt_deinit(c);
-        return rc;
+        return -1;
     }
 
     rc = gnutls_x509_crt_set_basic_constraints(c, 1, -1);
@@ -616,7 +616,7 @@ int auth_crt(const char *ident, const uint8_t *id, size_t id_len,
                 gnutls_strerror(rc));
         gnutls_x509_privkey_deinit(k);
         gnutls_x509_crt_deinit(c);
-        return rc;
+        return -1;
     }
 
     rc = parse_addr(ident, AI_NUMERICHOST | AI_NUMERICSERV, AF_UNSPEC, &ai);
@@ -642,7 +642,7 @@ int auth_crt(const char *ident, const uint8_t *id, size_t id_len,
                 gnutls_strerror(rc));
         gnutls_x509_privkey_deinit(k);
         gnutls_x509_crt_deinit(c);
-        return rc;
+        return -1;
     }
 
     rc = gnutls_x509_crt_set_extension_by_oid(c, "1.3.6.1.5.5.7.1.31",
@@ -652,7 +652,7 @@ int auth_crt(const char *ident, const uint8_t *id, size_t id_len,
                 gnutls_strerror(rc));
         gnutls_x509_privkey_deinit(k);
         gnutls_x509_crt_deinit(c);
-        return rc;
+        return -1;
     }
 
     rc = gnutls_x509_crt_set_key(c, k);
@@ -660,7 +660,7 @@ int auth_crt(const char *ident, const uint8_t *id, size_t id_len,
         warnx("auth_crt: gnutls_x509_crt_set_key: %s", gnutls_strerror(rc));
         gnutls_x509_privkey_deinit(k);
         gnutls_x509_crt_deinit(c);
-        return rc;
+        return -1;
     }
 
     rc = gnutls_x509_crt_set_key_usage(c, GNUTLS_KEY_DIGITAL_SIGNATURE |
@@ -670,7 +670,7 @@ int auth_crt(const char *ident, const uint8_t *id, size_t id_len,
                 gnutls_strerror(rc));
         gnutls_x509_privkey_deinit(k);
         gnutls_x509_crt_deinit(c);
-        return rc;
+        return -1;
     }
 
     rc = gnutls_x509_crt_get_key_id(c, 0, keyid, &keyid_size);
@@ -678,7 +678,7 @@ int auth_crt(const char *ident, const uint8_t *id, size_t id_len,
         warnx("auth_crt: gnutls_x509_crt_get_key_id: %s", gnutls_strerror(rc));
         gnutls_x509_privkey_deinit(k);
         gnutls_x509_crt_deinit(c);
-        return rc;
+        return -1;
     }
 
     rc = gnutls_x509_crt_set_subject_key_id(c, keyid, keyid_size);
@@ -687,7 +687,7 @@ int auth_crt(const char *ident, const uint8_t *id, size_t id_len,
                 gnutls_strerror(rc));
         gnutls_x509_privkey_deinit(k);
         gnutls_x509_crt_deinit(c);
-        return rc;
+        return -1;
     }
 
     rc = gnutls_x509_crt_set_authority_key_id(c, keyid, keyid_size);
@@ -696,7 +696,7 @@ int auth_crt(const char *ident, const uint8_t *id, size_t id_len,
                 gnutls_strerror(rc));
         gnutls_x509_privkey_deinit(k);
         gnutls_x509_crt_deinit(c);
-        return rc;
+        return -1;
     }
 
     rc = gnutls_x509_crt_sign2(c, c, k, GNUTLS_DIG_SHA256, 0);
@@ -704,7 +704,7 @@ int auth_crt(const char *ident, const uint8_t *id, size_t id_len,
         warnx("auth_crt: gnutls_x509_crt_sign2: %s", gnutls_strerror(rc));
         gnutls_x509_privkey_deinit(k);
         gnutls_x509_crt_deinit(c);
-        return rc;
+        return -1;
     }
 
     rc = gnutls_x509_privkey_export2(k, GNUTLS_X509_FMT_DER, key);
@@ -713,7 +713,7 @@ int auth_crt(const char *ident, const uint8_t *id, size_t id_len,
                 gnutls_strerror(rc));
         gnutls_x509_privkey_deinit(k);
         gnutls_x509_crt_deinit(c);
-        return rc;
+        return -1;
     }
 
     rc = gnutls_x509_crt_export2(c, GNUTLS_X509_FMT_DER, crt);
@@ -723,12 +723,12 @@ int auth_crt(const char *ident, const uint8_t *id, size_t id_len,
         gnutls_x509_privkey_deinit(k);
         gnutls_x509_crt_deinit(c);
         gnutls_free(key->data);
-        return rc;
+        return -1;
     }
 
     gnutls_x509_privkey_deinit(k);
     gnutls_x509_crt_deinit(c);
-    return GNUTLS_E_SUCCESS;
+    return 0;
 }
 #elif defined(USE_OPENSSL)
 int auth_crt(const char *ident, const uint8_t *id, size_t id_len,
