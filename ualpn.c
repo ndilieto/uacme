@@ -2918,6 +2918,7 @@ static void cb_child(EV_P_ ev_child *w, int revents)
     SGLIB_DL_LIST_DELETE(worker_t, g.workers, worker, prev, next);
     noticex("worker %ld terminated with status %d", (long)worker->pid,
             w->rstatus);
+    free(worker);
 }
 
 static void cleanup_and_exit(int stage, int return_code)
