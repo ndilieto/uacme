@@ -63,6 +63,19 @@
 #include <openssl/ssl.h>
 #include <openssl/x509.h>
 #include <openssl/x509v3.h>
+#elif defined(USE_MBEDTLS)
+#include <mbedtls/asn1write.h>
+#include <mbedtls/bignum.h>
+#include <mbedtls/ctr_drbg.h>
+#include <mbedtls/entropy.h>
+#include <mbedtls/error.h>
+#include <mbedtls/md.h>
+#include <mbedtls/oid.h>
+#include <mbedtls/pk.h>
+#include <mbedtls/ssl.h>
+#include <mbedtls/version.h>
+#include <mbedtls/x509.h>
+#include <mbedtls/x509_crt.h>
 #endif
 
 #include "sglib.h"
@@ -87,6 +100,16 @@ static void openssl_error(const char *prefix)
         warnx("%s: openssl %s", prefix, ERR_error_string(e, NULL));
         return;
     }
+}
+#elif defined(USE_MBEDTLS)
+#if MBEDTLS_VERSION_NUMBER < 0x02100000
+#error mbedTLS version 2.16 or later is required
+#endif
+static const char *_mbedtls_strerror(int code)
+{
+    static char buf[0x100];
+    mbedtls_strerror(code, buf, sizeof(buf));
+    return buf;
 }
 #endif
 
@@ -186,6 +209,11 @@ typedef struct client {
     gnutls_certificate_credentials_t cred;
 #elif defined(USE_OPENSSL)
     SSL *ssl;
+#elif defined(USE_MBEDTLS)
+    mbedtls_ssl_context ssl;
+    mbedtls_ssl_config cnf;
+    mbedtls_x509_crt crt;
+    mbedtls_pk_context key;
 #endif
     char ident[0x100];
     char auth[0x30];
@@ -267,6 +295,13 @@ static struct globs {
     BIO_METHOD *bio_meth;
     int ssl_idx;
     int bio_idx;
+#elif defined(USE_MBEDTLS)
+    unsigned char *crt;
+    unsigned char *key;
+    unsigned int crt_len;
+    unsigned int key_len;
+    mbedtls_entropy_context entropy;
+    mbedtls_ctr_drbg_context ctr_drbg;
 #endif
     ev_io controller;
     ev_cleanup cleanup;
@@ -310,6 +345,11 @@ static struct globs {
     .bio_meth = NULL,
     .ssl_idx = -1,
     .bio_idx = -1,
+#elif defined(USE_MBEDTLS)
+    .crt = NULL,
+    .key = NULL,
+    .crt_len = 0,
+    .key_len = 0
 #endif
 };
 
@@ -903,6 +943,317 @@ out:
     }
     return ret;
 }
+#elif defined(USE_MBEDTLS)
+int auth_crt(const char *ident, const uint8_t *id, size_t id_len,
+        unsigned char **crt, unsigned int *crt_len,
+        unsigned char **key, unsigned int *key_len)
+{
+    size_t buf_len = 0x400;
+    unsigned char *buf = NULL;
+    struct addrinfo *ai;
+    uaddr_t addr;
+    struct tm t;
+    time_t tnb = time(NULL) - 30*24*3600;
+    time_t tna = tnb + 60*24*3600;
+    char nb[MBEDTLS_X509_RFC5280_UTC_TIME_LEN] = "";
+    char na[MBEDTLS_X509_RFC5280_UTC_TIME_LEN] = "";
+    char *cn = NULL;
+    int ret = -1;
+    int rc;
+    mbedtls_x509write_cert c;
+    mbedtls_pk_context k;
+    mbedtls_mpi sn;
+
+    strftime(nb, sizeof(nb), "%Y%m%d%H%M%S", gmtime_r(&tnb, &t));
+    strftime(na, sizeof(na), "%Y%m%d%H%M%S", gmtime_r(&tna, &t));
+
+    mbedtls_x509write_crt_init(&c);
+    mbedtls_pk_init(&k);
+    mbedtls_mpi_init(&sn);
+
+    rc = mbedtls_mpi_fill_random(&sn, 16, mbedtls_ctr_drbg_random, &g.ctr_drbg);
+    if (rc) {
+        warnx("auth_crt: mbedtls_mpi_fill_random: %s", _mbedtls_strerror(rc));
+        goto out;
+    }
+
+    rc = mbedtls_mpi_set_bit(&sn, 127, 0);
+    if (rc) {
+        warnx("auth_crt: mbedtls_mpi_set_bit: %s", _mbedtls_strerror(rc));
+        goto out;
+    }
+
+    const mbedtls_pk_info_t *pki = mbedtls_pk_info_from_type(MBEDTLS_PK_ECKEY);
+    if (!pki) {
+        warnx("auth_crt: mbedtls_pk_info_from_type: %s", _mbedtls_strerror(rc));
+        goto out;
+    }
+
+    rc = mbedtls_pk_setup(&k, pki);
+    if (rc) {
+        warnx("auth_crt: mbedtls_pk_setup: %s", _mbedtls_strerror(rc));
+        goto out;
+    }
+
+    rc = mbedtls_ecp_gen_key(MBEDTLS_ECP_DP_SECP256R1, mbedtls_pk_ec(k),
+            mbedtls_ctr_drbg_random, &g.ctr_drbg);
+    if (rc) {
+        warnx("auth_crt: mbedtls_ecp_gen_key: %s", _mbedtls_strerror(rc));
+        goto out;
+    }
+
+    mbedtls_x509write_crt_set_version(&c, MBEDTLS_X509_CRT_VERSION_3);
+    mbedtls_x509write_crt_set_md_alg(&c, MBEDTLS_MD_SHA256);
+    mbedtls_x509write_crt_set_subject_key(&c, &k);
+    mbedtls_x509write_crt_set_issuer_key(&c, &k);
+    if (asprintf(&cn, "CN=%s", ident) < 0) {
+        warnx("auth_crt: asprintf failed");
+        cn = NULL;
+        goto out;
+    }
+
+    rc = mbedtls_x509write_crt_set_subject_name(&c, cn);
+    if (rc) {
+        warnx("auth_crt: mbedtls_x509write_crt_set_subject_name: %s",
+                _mbedtls_strerror(rc));
+        goto out;
+    }
+
+    rc = mbedtls_x509write_crt_set_issuer_name(&c, cn);
+    if (rc) {
+        warnx("auth_crt: mbedtls_x509write_crt_set_issuer_name: %s",
+                _mbedtls_strerror(rc));
+        goto out;
+    }
+
+    rc = mbedtls_x509write_crt_set_basic_constraints(&c, 1, -1);
+    if (rc) {
+        warnx("auth_crt: mbedtls_x509write_crt_set_basic_constraints: %s",
+                _mbedtls_strerror(rc));
+        goto out;
+    }
+
+    rc = mbedtls_x509write_crt_set_serial(&c, &sn);
+    if (rc) {
+        warnx("auth_crt: mbedtls_x509write_crt_set_serial: %s",
+                _mbedtls_strerror(rc));
+        goto out;
+    }
+
+    rc = mbedtls_x509write_crt_set_validity(&c, nb, na);
+    if (rc) {
+        warnx("auth_crt: mbedtls_x509write_crt_set_validity: %s",
+                _mbedtls_strerror(rc));
+        goto out;
+    }
+
+    rc = parse_addr(ident, AI_NUMERICHOST | AI_NUMERICSERV, AF_UNSPEC, &ai);
+    if (rc == 0) {
+        memcpy(&addr.addr, ai->ai_addr, ai->ai_addrlen);
+        addr.len = ai->ai_addrlen;
+        freeaddrinfo(ai);
+    } else
+        addr.len = 0;
+
+    while (1) {
+        buf_len *= 2;
+        free(buf);
+        buf = calloc(1, buf_len);
+        if (!buf) {
+            warn("auth_crt: calloc");
+            goto out;
+        }
+        unsigned char *p = buf + buf_len;
+        size_t len = 0;
+        const unsigned char *data = NULL;
+        size_t data_len = 0;
+        unsigned char tag;
+
+        if (addr.len) {
+            tag = MBEDTLS_ASN1_CONTEXT_SPECIFIC | 7;
+            if (addr.addr.sa.sa_family == AF_INET) {
+                data = (unsigned char *)&addr.addr.v4.sin_addr;
+                data_len = sizeof(addr.addr.v4.sin_addr);
+            } else if (addr.addr.sa.sa_family == AF_INET6) {
+                data = (unsigned char *)&addr.addr.v6.sin6_addr;
+                data_len = sizeof(addr.addr.v6.sin6_addr);
+            }
+        }
+        if (!data || !data_len) {
+            tag = MBEDTLS_ASN1_CONTEXT_SPECIFIC | 2;
+            data = (const unsigned char *)ident;
+            data_len = strlen(ident);
+        }
+
+        rc = mbedtls_asn1_write_raw_buffer(&p, buf, data, data_len);
+        if (rc >= 0)
+            len += rc;
+        else if (rc == MBEDTLS_ERR_ASN1_BUF_TOO_SMALL)
+            break;
+        else {
+            warnx("auth_crt: mbedtls_asn1_write_raw_buffer: %s",
+                    _mbedtls_strerror(rc));
+            goto out;
+        }
+        rc = mbedtls_asn1_write_len(&p, buf, data_len);
+        if (rc >= 0)
+            len += rc;
+        else if (rc == MBEDTLS_ERR_ASN1_BUF_TOO_SMALL)
+            break;
+        else {
+            warnx("auth_crt: mbedtls_asn1_write_len: %s",
+                    _mbedtls_strerror(rc));
+            goto out;
+        }
+        rc = mbedtls_asn1_write_tag(&p, buf, tag);
+        if (rc >= 0)
+            len += rc;
+        else if (rc == MBEDTLS_ERR_ASN1_BUF_TOO_SMALL)
+            break;
+        else {
+            warnx("auth_crt: mbedtls_asn1_write_tag: %s",
+                    _mbedtls_strerror(rc));
+            goto out;
+        }
+
+        if (rc == MBEDTLS_ERR_ASN1_BUF_TOO_SMALL)
+            continue;
+        rc = mbedtls_asn1_write_len(&p, buf, len);
+        if (rc >= 0)
+            len += rc;
+        else if (rc == MBEDTLS_ERR_ASN1_BUF_TOO_SMALL)
+            continue;
+        else {
+            warnx("auth_crt: mbedtls_asn1_write_len: %s",
+                    _mbedtls_strerror(rc));
+            goto out;
+        }
+        rc = mbedtls_asn1_write_tag(&p, buf,
+                MBEDTLS_ASN1_CONSTRUCTED | MBEDTLS_ASN1_SEQUENCE);
+        if (rc >= 0)
+            len += rc;
+        else if (rc == MBEDTLS_ERR_ASN1_BUF_TOO_SMALL)
+            continue;
+        else {
+            warnx("auth_crt: mbedtls_asn1_write_tag: %s",
+                    _mbedtls_strerror(rc));
+            goto out;
+        }
+        rc = mbedtls_x509write_crt_set_extension(&c,
+                MBEDTLS_OID_SUBJECT_ALT_NAME,
+                MBEDTLS_OID_SIZE(MBEDTLS_OID_SUBJECT_ALT_NAME),
+                1, buf + buf_len - len, len);
+        if (rc) {
+            warnx("auth_crt: mbedtls_x509write_crt_set_extension: %s",
+                    _mbedtls_strerror(rc));
+            goto out;
+        }
+        break;
+    }
+    rc = mbedtls_x509write_crt_set_extension(&c,
+            // http://oid-info.com/get/1.3.6.1.5.5.7.1.31
+            // pe(1) id-pe-acmeIdentifier(31)
+            MBEDTLS_OID_PKIX "\x01\x1F",
+            MBEDTLS_OID_SIZE(MBEDTLS_OID_PKIX "\x01\x1F"),
+            1, id, id_len);
+    if (rc) {
+        warnx("auth_crt: mbedtls_x509write_crt_set_extension: %s",
+                _mbedtls_strerror(rc));
+        goto out;
+    }
+
+    rc = mbedtls_x509write_crt_set_key_usage(&c,
+            MBEDTLS_X509_KU_DIGITAL_SIGNATURE | MBEDTLS_X509_KU_KEY_CERT_SIGN);
+    if (rc) {
+        warnx("auth_crt: mbedtls_x509write_crt_set_key_usage: %s",
+                _mbedtls_strerror(rc));
+        goto out;
+    }
+
+    rc = mbedtls_x509write_crt_set_subject_key_identifier(&c);
+    if (rc) {
+        warnx("auth_crt: mbedtls_x509write_crt_set_subject_key_identifier: %s",
+                _mbedtls_strerror(rc));
+        goto out;
+    }
+
+    rc = mbedtls_x509write_crt_set_authority_key_identifier(&c);
+    if (rc) {
+        warnx("auth_crt: mbedtls_x509write_crt_set_authority_key_identifier:"
+                " %s", _mbedtls_strerror(rc));
+        goto out;
+    }
+
+    while (1) {
+        rc = mbedtls_x509write_crt_der(&c, buf, buf_len,
+                mbedtls_ctr_drbg_random, &g.ctr_drbg);
+        if (rc > 0) {
+            *crt_len = rc;
+            *crt = calloc(1, *crt_len);
+            if (!*crt) {
+                warn("auth_crt: calloc");
+                goto out;
+            }
+            memcpy(*crt, buf + buf_len - *crt_len, *crt_len);
+            break;
+        } else if (rc == MBEDTLS_ERR_ASN1_BUF_TOO_SMALL) {
+            free(buf);
+            buf_len *= 2;
+            buf = calloc(1, buf_len);
+            if (!buf) {
+                warn("auth_crt: calloc");
+                goto out;
+            }
+        } else {
+            warnx("auth_crt: mbedtls_x509write_crt_der: %s",
+                    _mbedtls_strerror(rc));
+            goto out;
+        }
+    }
+
+    while (1) {
+        rc = mbedtls_pk_write_key_der(&k, buf, buf_len);
+        if (rc > 0) {
+            *key_len = rc;
+            *key = calloc(1, *key_len);
+            if (!*key) {
+                warn("auth_crt: calloc");
+                goto out;
+            }
+            memcpy(*key, buf + buf_len - *key_len, *key_len);
+            break;
+        } else if (rc == MBEDTLS_ERR_ASN1_BUF_TOO_SMALL) {
+            free(buf);
+            buf_len *= 2;
+            buf = calloc(1, buf_len);
+            if (!buf) {
+                warn("auth_crt: calloc");
+                goto out;
+            }
+        } else {
+            warnx("auth_crt: mbedtls_pk_write_key_der: %s",
+                    _mbedtls_strerror(rc));
+            goto out;
+        }
+    }
+
+    ret = 0;
+out:
+    mbedtls_x509write_crt_free(&c);
+    mbedtls_pk_free(&k);
+    mbedtls_mpi_free(&sn);
+    free(buf);
+    free(cn);
+    if (ret != 0) {
+        free(*key);
+        *key = NULL;
+        *key_len = 0;
+        free(*crt);
+        *crt = NULL;
+        *crt_len = 0;
+    }
+    return ret;
+}
 #endif
 
 static void controller_done(EV_P_ controller_t *c, bool drain)
@@ -1023,8 +1374,8 @@ static void controller_handle_cmd(controller_t *c, char *line, ev_tstamp ts)
 
 #if defined(USE_GNUTLS)
         gnutls_datum_t crt = {NULL, 0}, key = {NULL, 0};
-        if (auth_crt(ident, id, sizeof(id), &crt, &key) != GNUTLS_E_SUCCESS) {
-#elif defined(USE_OPENSSL)
+        if (auth_crt(ident, id, sizeof(id), &crt, &key) != 0) {
+#elif defined(USE_OPENSSL) || defined(USE_MBEDTLS)
         struct {
             unsigned char *data;
             unsigned int size;
@@ -1043,6 +1394,9 @@ static void controller_handle_cmd(controller_t *c, char *line, ev_tstamp ts)
 #elif defined(USE_OPENSSL)
             OPENSSL_free(key.data);
             OPENSSL_free(crt.data);
+#elif defined(USE_MBEDTLS)
+            free(key.data);
+            free(crt.data);
 #endif
             return;
         }
@@ -1055,6 +1409,9 @@ static void controller_handle_cmd(controller_t *c, char *line, ev_tstamp ts)
 #elif defined(USE_OPENSSL)
             OPENSSL_free(key.data);
             OPENSSL_free(crt.data);
+#elif defined(USE_MBEDTLS)
+            free(key.data);
+            free(crt.data);
 #endif
             return;
         }
@@ -1070,6 +1427,9 @@ static void controller_handle_cmd(controller_t *c, char *line, ev_tstamp ts)
 #elif defined(USE_OPENSSL)
                 OPENSSL_free(key.data);
                 OPENSSL_free(crt.data);
+#elif defined(USE_MBEDTLS)
+                free(key.data);
+                free(crt.data);
 #endif
                 return;
             }
@@ -1092,6 +1452,9 @@ static void controller_handle_cmd(controller_t *c, char *line, ev_tstamp ts)
 #elif defined(USE_OPENSSL)
         OPENSSL_free(key.data);
         OPENSSL_free(crt.data);
+#elif defined(USE_MBEDTLS)
+        free(key.data);
+        free(crt.data);
 #endif
         if (arpa[0])
             noticex("controller %08x: new auth %s for %s (%s)", c->id, auth,
@@ -1342,6 +1705,11 @@ static void client_done(EV_P_ client_t *c, drain_t drain)
 #elif defined(USE_OPENSSL)
         if (c->ssl)
             SSL_free(c->ssl);
+#elif defined(USE_MBEDTLS)
+        mbedtls_x509_crt_free(&c->crt);
+        mbedtls_pk_free(&c->key);
+        mbedtls_ssl_free(&c->ssl);
+        mbedtls_ssl_config_free(&c->cnf);
 #endif
         ev_timer_stop(EV_A_ &c->timer);
         SGLIB_DL_LIST_DELETE(client_t, g.clients, c, prev, next);
@@ -1763,6 +2131,171 @@ static int ssl_alpn_select_cb(SSL *s,
     }
     return SSL_TLSEXT_ERR_ALERT_FATAL;
 }
+#elif defined(USE_MBEDTLS)
+static int bio_read(void *ctx, unsigned char *data, size_t size)
+{
+    client_t *c = (client_t *)ctx;
+    if (data == NULL)
+        return 0;
+    if (!c)
+        return -1;
+
+#if EV_MULTIPLICITY
+    EV_P = c->loop;
+#endif
+    ssize_t s = recv(c->fd_f, data, size,
+            c->state == STATE_ACME ? 0 : MSG_PEEK);
+    if (s == 0) {
+        c->state = STATE_CLOSING;
+        return 0;
+    } else if (s == -1) {
+        if (errno != EAGAIN && errno != EWOULDBLOCK) {
+            warn("client %08x: frontend failed to read from %s:%s", c->id,
+                    c->rhost_f, c->rserv_f);
+            c->state = STATE_CLOSING;
+            return -1;
+        } else if (c->fd_f != -1 && c->state != STATE_DONE) {
+            ev_io_start(EV_A_ &c->io_rxf);
+        }
+        return MBEDTLS_ERR_SSL_WANT_READ;
+    }
+
+    if (c->state == STATE_ACME) {
+        c->frx += s;
+        return s;
+    }
+
+#if HAVE_SPLICE
+    s = write(c->fd_f2b[1], data, s);
+    if (s > 0)
+        c->n_f2b += s;
+#else
+    s = buf_put(&c->buf_f2b, data, s);
+#endif
+    if (s == -1) {
+        if (errno == EAGAIN || errno == EWOULDBLOCK)
+            return MBEDTLS_ERR_SSL_WANT_READ;
+    } else {
+        ssize_t sr = recv(c->fd_f, data, s, 0);
+        if (sr > 0)
+            c->frx += sr;
+        if (sr != s) {
+            warn("client %08x: frontend failed to buffer data from %s:%s",
+                    c->id, c->rhost_f, c->rserv_f);
+            c->state = STATE_CLOSING;
+            return 0;
+        }
+    }
+    return s;
+}
+
+static int bio_write(void *ctx, const unsigned char *data, size_t size)
+{
+    client_t *c = (client_t *)ctx;
+    if (!c)
+        return -1;
+#if EV_MULTIPLICITY
+    EV_P = c->loop;
+#endif
+    if (c->state != STATE_ACME) {
+        // prevent sending data to client until PROXY/ACME decision
+        return MBEDTLS_ERR_SSL_WANT_WRITE;
+    }
+
+#if HAVE_SPLICE
+    ssize_t s = write(c->fd_b2f[1], data, size);
+    if (s > 0)
+        c->n_b2f += s;
+#else
+    ssize_t s = buf_put(&c->buf_b2f, data, size);
+#endif
+    if (s == -1) {
+        if (errno != EAGAIN && errno != EWOULDBLOCK) {
+            warn("client %08x: frontend failed to buffer data from %s:%s",
+                    c->id, c->rhost_f, c->rserv_f);
+            c->state = STATE_CLOSING;
+            return -1;
+        } else
+            s = MBEDTLS_ERR_SSL_WANT_WRITE;
+    }
+    if (c->fd_f != -1)
+        ev_io_start(EV_A_ &c->io_txf);
+    return s;
+}
+
+static int sni_callback(void *p, mbedtls_ssl_context *ssl,
+        const unsigned char *name, size_t name_len)
+{
+    client_t *c = (client_t *)p;
+    if (!c || ssl != &c->ssl)
+        return -1;
+
+    memset(c->ident, 0, sizeof(c->ident));
+    if (name_len > sizeof(c->ident) - 1)
+        name_len = sizeof(c->ident) - 1;
+    memcpy(c->ident, name, name_len);
+    return 0;
+}
+
+static int do_handshake(client_t *c)
+{
+    int rc = 0;
+    while (c->ssl.state != MBEDTLS_SSL_HANDSHAKE_OVER) {
+        rc = mbedtls_ssl_handshake_step(&c->ssl);
+        if (rc)
+            break;
+        if (c->state == STATE_ACME)
+            continue;
+        if (c->ssl.state > MBEDTLS_SSL_CLIENT_HELLO) {
+            const char *proto = mbedtls_ssl_get_alpn_protocol(&c->ssl);
+            if (proto && strcmp(proto, "acme-tls/1") == 0) {
+                auth_t *auth = get_auth(c->ident);
+                if (!auth) {
+                    infox("client %08x: acme-tls/1 handshake: no auth for %s",
+                            c->id, c->ident);
+                    return -1;
+                }
+
+                mbedtls_x509_crt_free(&c->crt);
+                rc = mbedtls_x509_crt_parse_der(&c->crt, auth->crt,
+                        auth->crt_size);
+                if (rc) {
+                    warnx("client %08x: mbedtls_x509_crt_parse_der for %s: %s",
+                            c->ident, _mbedtls_strerror(rc));
+                    return -1;
+                }
+
+                mbedtls_pk_free(&c->key);
+                rc = mbedtls_pk_parse_key(&c->key, auth->key,
+                        auth->key_size, NULL, 0);
+                if (rc) {
+                    warnx("client %08x: mbedtls_pk_parse_key for %s: %s",
+                            c->ident, _mbedtls_strerror(rc));
+                    return -1;
+                }
+
+                rc = mbedtls_ssl_conf_own_cert(&c->cnf, &c->crt, &c->key);
+                if (rc) {
+                    warnx("client %08x: mbedtls_ssl_conf_own_cert for %s: %s",
+                            c->ident, _mbedtls_strerror(rc));
+                    return -1;
+                }
+
+                strncpy(c->auth, auth->auth, sizeof(c->auth)-1);
+#if HAVE_SPLICE
+                c->n_f2b = 0;
+#else
+                c->buf_f2b.n = 0;
+                c->buf_f2b.rp = 0;
+                c->buf_f2b.wp = 0;
+#endif
+                c->state = STATE_ACME;
+            } else
+                return -1;
+        }
+    }
+    return rc;
+}
 #endif
 
 static int tls_session_init(client_t *c, uint8_t *buf, size_t buf_len)
@@ -1829,6 +2362,67 @@ static int tls_session_init(client_t *c, uint8_t *buf, size_t buf_len)
     SSL_set0_rbio(c->ssl, bio);
     SSL_set0_wbio(c->ssl, bio);
     SSL_set_accept_state(c->ssl);
+#elif defined(USE_MBEDTLS)
+    mbedtls_ssl_config_init(&c->cnf);
+    int rc = mbedtls_ssl_config_defaults(&c->cnf, MBEDTLS_SSL_IS_SERVER,
+                    MBEDTLS_SSL_TRANSPORT_STREAM, MBEDTLS_SSL_PRESET_DEFAULT);
+    if (rc) {
+        warnx("client %08x: mbedtls_ssl_config_defaults: %s", c->id,
+                _mbedtls_strerror(rc));
+        return -1;
+    }
+    mbedtls_ssl_conf_min_version(&c->cnf, MBEDTLS_SSL_MAJOR_VERSION_3,
+            MBEDTLS_SSL_MINOR_VERSION_3);
+    static const char *protos[] = { "acme-tls/1", NULL };
+    rc = mbedtls_ssl_conf_alpn_protocols(&c->cnf, protos);
+    if (rc) {
+        warnx("client %08x: mbedtls_ssl_conf_alpn_protocols: %s", c->id,
+                _mbedtls_strerror(rc));
+        return -1;
+    }
+    mbedtls_ssl_conf_rng(&c->cnf, mbedtls_ctr_drbg_random, &g.ctr_drbg);
+    mbedtls_ssl_conf_sni(&c->cnf, sni_callback, c);
+    mbedtls_x509_crt_init(&c->crt);
+    rc = mbedtls_x509_crt_parse_der(&c->crt, g.crt, g.crt_len);
+    if (rc == MBEDTLS_ERR_X509_INVALID_EXTENSIONS +
+                MBEDTLS_ERR_ASN1_UNEXPECTED_TAG) {
+        critx("client %08x: mbedTLS is most likely built without "
+                "MBEDTLS_X509_ALLOW_UNSUPPORTED_CRITICAL_EXTENSION, "
+                "terminating", c->id);
+        g_shm->shutdown = true;
+        return -1;
+    } else if (rc) {
+        warnx("client %08x: mbedtls_x509_crt_parse_der: %s", c->id,
+                _mbedtls_strerror(rc));
+        return -1;
+    }
+    mbedtls_pk_init(&c->key);
+    rc = mbedtls_pk_parse_key(&c->key, g.key, g.key_len, NULL, 0);
+    if (rc) {
+        warnx("client %08x: mbedtls_pk_parse_key: %s", c->id,
+                _mbedtls_strerror(rc));
+        return -1;
+    }
+    rc = mbedtls_ssl_conf_own_cert(&c->cnf, &c->crt, &c->key);
+    if (rc) {
+        warnx("client %08x: mbedtls_ssl_conf_own_cert: %s", c->id,
+                c->ident, _mbedtls_strerror(rc));
+        return -1;
+    }
+    mbedtls_ssl_init(&c->ssl);
+    rc = mbedtls_ssl_setup(&c->ssl, &c->cnf);
+    if (rc) {
+        warnx("client %08x: mbedtls_ssl_setup: %s", c->id,
+                _mbedtls_strerror(rc));
+        return -1;
+    }
+    rc = mbedtls_ssl_session_reset(&c->ssl);
+    if (rc) {
+        warnx("client %08x: mbedtls_ssl_session_reset: %s", c->id,
+                _mbedtls_strerror(rc));
+        return -1;
+    }
+    mbedtls_ssl_set_bio(&c->ssl, c, bio_write, bio_read, NULL);
 #endif
     return 0;
 }
@@ -2214,6 +2808,28 @@ static void cb_client_rxf(EV_P_ ev_io *w, int revents)
             client_done(EV_A_ c, DRAIN_NONE);
             return;
         }
+#elif defined(USE_MBEDTLS)
+        rc = do_handshake(c);
+        if (c->state == STATE_CLOSING) {
+            client_done(EV_A_ c, DRAIN_FRONTEND);
+            return;
+        }
+        if (rc == MBEDTLS_ERR_SSL_WANT_READ ||
+                rc == MBEDTLS_ERR_SSL_WANT_WRITE ||
+                rc == MBEDTLS_ERR_SSL_ASYNC_IN_PROGRESS ||
+                rc == MBEDTLS_ERR_SSL_CRYPTO_IN_PROGRESS)
+            return;
+        if (c->state == STATE_ACME) {
+            if (rc == 0)
+                noticex("client %08x: acme-tls/1 handshake with auth %s for %s "
+                        "completed", c->id, c->auth, c->ident);
+            else
+                warnx("client %08x: acme-tls/1 handshake with auth %s for %s "
+                        "failed: %s", c->id, c->auth, c->ident,
+                        _mbedtls_strerror(rc));
+            client_done(EV_A_ c, DRAIN_NONE);
+            return;
+        }
 #endif
         if (c->state != STATE_DONE) {
             if (connect_backend(c) == 0) {
@@ -2377,6 +2993,24 @@ static void cb_client_txf(EV_P_ ev_io *w, int revents)
                     ERR_error_string(ERR_get_error(), NULL));
             ERR_clear_error();
         }
+#elif defined(USE_MBEDTLS)
+        rc = do_handshake(c);
+        if (c->state == STATE_CLOSING) {
+            client_done(EV_A_ c, DRAIN_FRONTEND);
+            return;
+        }
+        if (rc == MBEDTLS_ERR_SSL_WANT_READ ||
+                rc == MBEDTLS_ERR_SSL_WANT_WRITE ||
+                rc == MBEDTLS_ERR_SSL_ASYNC_IN_PROGRESS ||
+                rc == MBEDTLS_ERR_SSL_CRYPTO_IN_PROGRESS)
+            return;
+        else if (rc == 0)
+            noticex("client %08x: acme-tls/1 handshake with auth %s for %s "
+                    "completed", c->id, c->auth, c->ident);
+        else
+            warnx("client %08x: acme-tls/1 handshake with auth %s for %s "
+                    "failed: %s", c->id, c->auth, c->ident,
+                    _mbedtls_strerror(rc));
 #endif
         client_done(EV_A_ c, DRAIN_NONE);
         return;
@@ -2958,6 +3592,11 @@ static void cleanup_and_exit(int stage, int return_code)
                 SSL_CTX_free(g.ssl_ctx);
             if (g.bio_meth)
                 BIO_meth_free(g.bio_meth);
+#elif defined(USE_MBEDTLS)
+            mbedtls_ctr_drbg_free(&g.ctr_drbg);
+            mbedtls_entropy_free(&g.entropy);
+            free(g.key);
+            free(g.crt);
 #endif
             //intentional fallthrough
         case 0:
@@ -3810,6 +4449,31 @@ int main(int argc, char **argv)
     }
     SSL_CTX_set_client_hello_cb(g.ssl_ctx, ssl_client_hello_cb, NULL);
     SSL_CTX_set_alpn_select_cb(g.ssl_ctx, ssl_alpn_select_cb, NULL);
+#elif defined(USE_MBEDTLS)
+#ifdef MBEDTLS_VERSION_C
+    if (mbedtls_version_get_number() < 0x02100000) {
+        errx("mbedTLS version 2.16 or later is required");
+        cleanup_and_exit(0, EXIT_FAILURE);
+    }
+    if (mbedtls_version_check_feature(
+                "MBEDTLS_X509_ALLOW_UNSUPPORTED_CRITICAL_EXTENSION")) {
+        errx("mbedTLS needs to be built with "
+                "MBEDTLS_X509_ALLOW_UNSUPPORTED_CRITICAL_EXTENSION");
+        cleanup_and_exit(0, EXIT_FAILURE);
+    }
+#endif
+    mbedtls_entropy_init(&g.entropy);
+    mbedtls_ctr_drbg_init(&g.ctr_drbg);
+    rc = mbedtls_ctr_drbg_seed(&g.ctr_drbg, mbedtls_entropy_func,
+            &g.entropy, NULL, 0);
+    if (rc) {
+        errx("mbedtls_ctr_dbg_seed failed: %s", _mbedtls_strerror(rc));
+        cleanup_and_exit(1, EXIT_FAILURE);
+    }
+    const unsigned char id[] = {0x4, 0x1, 0x0};
+    if (auth_crt("dummy", id, sizeof(id), &g.crt, &g.crt_len,
+                &g.key, &g.key_len))
+        cleanup_and_exit(1, EXIT_FAILURE);
 #endif
 
     g.sockfd = socket(AF_UNIX, SOCK_STREAM, 0);

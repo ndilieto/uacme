@@ -188,7 +188,6 @@ or, depending on your installation
 ```
 uacme -v -s -c /path/to/uacme.d -h /usr/local/share/uacme/ualpn.sh issue www.your.domain.com
 ```
-Note: currently **ualpn** requires building with GnuTLS or OpenSSL. Future mbedTLS support is planned.
 
 ## Documentation
 

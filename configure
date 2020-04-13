@@ -1417,7 +1417,7 @@ Optional Packages:
   --without-openssl       build without OpenSSL
   --with-gnutls[=PATH]    build with GnuTLS, PATH is installation root
   --without-gnutls        build without GnuTLS
-  --with-ualpn            enable ualpn (not supported with mbedTLS)
+  --with-ualpn            enable ualpn
   --without-ualpn         disable ualpn
 
 Some influential environment variables:
@@ -6835,11 +6835,7 @@ $as_echo "$as_me: detected mbedTLS" >&6;}
     fi
 fi
 
-if test "x$OPT_GNUTLS" != "xno" -o "x$OPT_OPENSSL" != "xno"; then
-    OPT_UALPN=yes
-else
-    OPT_UALPN=no
-fi
+OPT_UALPN=yes
 
 # Check whether --with-ualpn was given.
 if test "${with_ualpn+set}" = set; then :
@@ -6848,9 +6844,6 @@ fi
 
 
 if test "x$OPT_UALPN" != "xno"; then
-    if test "x$USE_GNUTLS" != "xyes" -a "x$USE_OPENSSL" != "xyes"; then
-        as_fn_error $? "ualpn requires GnuTLS or OpenSSL" "$LINENO" 5
-    fi
     if test -n "$ac_tool_prefix"; then
   for ac_prog in ar lib "link -lib"
   do

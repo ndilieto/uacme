@@ -315,19 +315,12 @@ if test "x$OPT_MBEDTLS" != "xno"; then
     fi
 fi
 
-if test "x$OPT_GNUTLS" != "xno" -o "x$OPT_OPENSSL" != "xno"; then
-    OPT_UALPN=yes
-else
-    OPT_UALPN=no
-fi
+OPT_UALPN=yes
 AC_ARG_WITH(ualpn,
-[AS_HELP_STRING([--with-ualpn], [enable ualpn (not supported with mbedTLS)])
+[AS_HELP_STRING([--with-ualpn], [enable ualpn])
 AS_HELP_STRING([--without-ualpn], [disable ualpn])], OPT_UALPN=$withval)
 
 if test "x$OPT_UALPN" != "xno"; then
-    if test "x$USE_GNUTLS" != "xyes" -a "x$USE_OPENSSL" != "xyes"; then
-        AC_MSG_ERROR([ualpn requires GnuTLS or OpenSSL])
-    fi
     AM_PROG_AR
     AC_CHECK_HEADERS([sys/mman.h], [],
                      AC_MSG_ERROR([ualpn requires sys/mman.h]))

@@ -100,7 +100,7 @@ OPTIONS
     Enable server mode and disable (0) or specify (1, 2) the PROXY header
     version (default 1). The backend server needs to be configured accordingly:
     * nginx: <https://docs.nginx.com/nginx/admin-guide/load-balancer/using-proxy-protocol>
-    * apache: <https://httpd.apache.org/docs/2.4/mod/mod_remoteip.html>
+    * apache: <https://httpd.apache.org/docs/2.4/mod/mod_remoteip.html#remoteipproxyprotocol>
 
 *-P, --pidfile* 'file'::
     Specify pidfile location (default {runstatedir}/ualpn.pid)
