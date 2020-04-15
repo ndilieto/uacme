@@ -178,7 +178,7 @@ static const char *_mbedtls_strerror(int code)
 
 bool crypto_init(void)
 {
-#ifdef MBEDTLS_VERSION_C
+#if defined(MBEDTLS_VERSION_C)
     if (mbedtls_version_get_number() < 0x02100000) {
         warnx("crypto_init: mbedTLS version 2.16 or later is required");
         return false;

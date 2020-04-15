@@ -117,11 +117,11 @@ static const char *_mbedtls_strerror(int code)
 }
 #endif
 
-#ifndef EAGAIN
+#if !defined(EAGAIN)
 #define EAGAIN EWOULDBLOCK
 #endif
 
-#ifndef EWOULDBLOCK
+#if !defined(EWOULDBLOCK)
 #define EWOULDBLOCK EAGAIN
 #endif
 
@@ -142,7 +142,7 @@ typedef struct auth {
 SGLIB_DEFINE_RBTREE_PROTOTYPES(auth_t, left, right, rb, ACME_AUTH_CMP)
 SGLIB_DEFINE_RBTREE_FUNCTIONS(auth_t, left, right, rb, ACME_AUTH_CMP)
 
-#ifndef PIPE_BUF
+#if !defined(PIPE_BUF)
 #define PIPE_BUF 2048
 #endif
 
@@ -4334,7 +4334,7 @@ int main(int argc, char **argv)
             cleanup_and_exit(0, EXIT_FAILURE);
         }
         SGLIB_LIST_ADD(str_t, g.bind, s, next)
-#ifdef IPV6_V6ONLY
+#if defined(IPV6_V6ONLY)
         if (g.family == AF_UNSPEC) {
             s = calloc(1, sizeof(str_t));
             if (!s) {
@@ -4536,7 +4536,7 @@ int main(int argc, char **argv)
     g_shm = (struct shm *)mmap(NULL, g_shm_size, PROT_READ | PROT_WRITE,
             MAP_SHARED, g.devzero, 0);
 #elif HAVE_MAP_ANON
-#ifndef MAP_ANONYMOUS
+#if !defined(MAP_ANONYMOUS)
 #define MAP_ANONYMOUS MAP_ANON
 #endif
     g_shm = (struct shm *)mmap(NULL, g_shm_size, PROT_READ | PROT_WRITE,
@@ -4620,7 +4620,7 @@ int main(int argc, char **argv)
     for (str = g.bind; str; str = str->next) {
         int family = g.family;
         if (!str->str && g.family == AF_UNSPEC) {
-#ifdef IPV6_V6ONLY
+#if defined(IPV6_V6ONLY)
             family = (str == g.bind) ? AF_INET6 : AF_INET;
 #else
             family = AF_INET6;
@@ -4646,7 +4646,7 @@ int main(int argc, char **argv)
                 warn("failed to create socket for %s:%s", host, port);
                 continue;
             }
-#ifdef IPV6_V6ONLY
+#if defined(IPV6_V6ONLY)
             if ((a->ai_family == AF_INET6 && setsockopt(fd, IPPROTO_IPV6,
                             IPV6_V6ONLY, &one, sizeof(one)))) {
                 warn("failed to set IPV6_V6ONLY for %s:%s", host, port);
