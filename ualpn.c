@@ -105,6 +105,10 @@ static void openssl_error(const char *prefix)
 #if MBEDTLS_VERSION_NUMBER < 0x02100000
 #error mbedTLS version 2.16 or later is required
 #endif
+#if !defined(MBEDTLS_X509_ALLOW_UNSUPPORTED_CRITICAL_EXTENSION)
+#error mbedTLS was configured without \
+    MBEDTLS_X509_ALLOW_UNSUPPORTED_CRITICAL_EXTENSION
+#endif
 static const char *_mbedtls_strerror(int code)
 {
     static char buf[0x100];
@@ -4450,17 +4454,25 @@ int main(int argc, char **argv)
     SSL_CTX_set_client_hello_cb(g.ssl_ctx, ssl_client_hello_cb, NULL);
     SSL_CTX_set_alpn_select_cb(g.ssl_ctx, ssl_alpn_select_cb, NULL);
 #elif defined(USE_MBEDTLS)
-#ifdef MBEDTLS_VERSION_C
+#if defined(MBEDTLS_VERSION_C)
     if (mbedtls_version_get_number() < 0x02100000) {
         errx("mbedTLS version 2.16 or later is required");
         cleanup_and_exit(0, EXIT_FAILURE);
     }
+#if defined(MBEDTLS_VERSION_FEATURES)
     if (mbedtls_version_check_feature(
                 "MBEDTLS_X509_ALLOW_UNSUPPORTED_CRITICAL_EXTENSION")) {
         errx("mbedTLS needs to be built with "
                 "MBEDTLS_X509_ALLOW_UNSUPPORTED_CRITICAL_EXTENSION");
         cleanup_and_exit(0, EXIT_FAILURE);
     }
+#else
+#warning mbedTLS runtime feature check disabled. Consider reconfiguring \
+    mbedTLS with MBEDTLS_VERSION_FEATURES
+#endif
+#else
+#warning mbedTLS runtime version check disabled. Consider reconfiguring \
+    mbedTLS with MBEDTLS_VERSION_C
 #endif
     mbedtls_entropy_init(&g.entropy);
     mbedtls_ctr_drbg_init(&g.ctr_drbg);
