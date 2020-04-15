@@ -2,12 +2,12 @@
 .\"     Title: uacme
 .\"    Author: [see the "AUTHOR" section]
 .\" Generator: DocBook XSL Stylesheets v1.79.1 <http://docbook.sf.net/>
-.\"      Date: 03/12/2020
+.\"      Date: 04/15/2020
 .\"    Manual: User Commands
-.\"    Source: uacme 1.1.2
+.\"    Source: uacme 1.2
 .\"  Language: English
 .\"
-.TH "UACME" "1" "03/12/2020" "uacme 1\&.1\&.2" "User Commands"
+.TH "UACME" "1" "04/15/2020" "uacme 1\&.2" "User Commands"
 .\" -----------------------------------------------------------------
 .\" * Define some portability stuff
 .\" -----------------------------------------------------------------
@@ -31,7 +31,7 @@
 uacme \- ACMEv2 client written in plain C code with minimal dependencies
 .SH "SYNOPSIS"
 .sp
-\fBuacme\fR [\fB\-a\fR|\fB\-\-acme\-url\fR \fIURL\fR] [\fB\-b\fR|\fB\-\-bits\fR \fIBITS\fR] [\fB\-c\fR|\fB\-\-confdir\fR \fIDIR\fR] [\fB\-d\fR|\fB\-\-days\fR \fIDAYS\fR] [\fB\-f\fR|\fB\-\-force\fR] [\fB\-h\fR|\fB\-\-hook\fR \fIPROGRAM\fR] [\fB\-m\fR|\fB\-\-must\-staple\fR] [\fB\-n\fR|\fB\-\-never\fR] [\fB\-s\fR|\fB\-\-staging\fR] [\fB\-t\fR|\fB\-\-type\fR \fBRSA\fR|\fBEC\fR] [\fB\-v\fR|\fB\-\-verbose\fR \&...] [\fB\-V\fR|\fB\-\-version\fR] [\fB\-y\fR|\fB\-\-yes\fR] [\fB\-?\fR|\fB\-\-help\fR] \fBnew\fR [\fIEMAIL\fR] | \fBupdate\fR [\fIEMAIL\fR] | \fBdeactivate\fR | \fBnewkey\fR | \fBissue\fR \fIIDENTIFIER\fR [\fIALTNAME\fR \&...]] | \fBrevoke\fR \fICERTFILE\fR
+\fBuacme\fR [\fB\-a\fR|\fB\-\-acme\-url\fR \fIURL\fR] [\fB\-b\fR|\fB\-\-bits\fR \fIBITS\fR] [\fB\-c\fR|\fB\-\-confdir\fR \fIDIR\fR] [\fB\-d\fR|\fB\-\-days\fR \fIDAYS\fR] [\fB\-f\fR|\fB\-\-force\fR] [\fB\-h\fR|\fB\-\-hook\fR \fIPROGRAM\fR] [\fB\-m\fR|\fB\-\-must\-staple\fR] [\fB\-n\fR|\fB\-\-never\-create\fR] [\fB\-o\fR|\fB\-\-no\-ocsp\fR] [\fB\-s\fR|\fB\-\-staging\fR] [\fB\-t\fR|\fB\-\-type\fR \fBRSA\fR|\fBEC\fR] [\fB\-v\fR|\fB\-\-verbose\fR \&...] [\fB\-V\fR|\fB\-\-version\fR] [\fB\-y\fR|\fB\-\-yes\fR] [\fB\-?\fR|\fB\-\-help\fR] \fBnew\fR [\fIEMAIL\fR] | \fBupdate\fR [\fIEMAIL\fR] | \fBdeactivate\fR | \fBnewkey\fR | \fBissue\fR \fIIDENTIFIER\fR [\fIALTNAME\fR \&...]] | \fBrevoke\fR \fICERTFILE\fR
 .SH "DESCRIPTION"
 .sp
 \fBuacme\fR is a client for the ACMEv2 protocol described in RFC8555, written in plain C code with minimal dependencies (libcurl and one of GnuTLS, OpenSSL or mbedTLS)\&. The ACMEv2 protocol allows a Certificate Authority (https://letsencrypt\&.org is a popular one) and an applicant to automate the process of verification and certificate issuance\&. The protocol also provides facilities for other certificate management functions, such as certificate revocation\&. For more information see https://tools\&.ietf\&.org/html/rfc8555
@@ -95,7 +95,8 @@ certificate for
 .RS 4
 Do not reissue certificates that are still valid for longer than
 \fIDAYS\fR
-(default 30)\&.
+(default 30)\&. See also
+\fB\-o, \-\-no\-ocsp\fR\&.
 .RE
 .PP
 \fB\-f, \-\-force\fR
@@ -183,6 +184,19 @@ By default
 creates directories/keys if they do not exist\&. When this option is specified
 \fBuacme\fR
 never does so and instead exits with an error if anything required is missing\&.
+.RE
+.PP
+\fB\-o, \-\-no\-ocsp\fR
+.RS 4
+When this flag is
+\fBnot\fR
+specified and the certificate has an Authority Information Access extension with an OCSP server location according to
+https://tools\&.ietf\&.org/html/rfc5280#section\-4\&.2\&.2\&.1
+\fBuacme\fR
+makes an OCSP request to the server; if the certificate is reported as revoked
+\fBuacme\fR
+forces reissuance regardless of the expiration date\&. See also
+\fB\-d, \-\-days\fR\&.
 .RE
 .PP
 \fB\-s, \-\-staging\fR
@@ -283,7 +297,11 @@ and is still valid for longer than
 \fIDAYS\fR
 no action is taken unless
 \fB\-f, \-\-force\fR
-is specified\&. The new certificate is saved to
+is specified or
+\fB\-o, \-\-no\-ocsp\fR
+is
+\fBnot\fR
+specified and the certificate is reported as revoked by the OCSP server\&. The new certificate is saved to
 \fICONFDIR/IDENTIFIER/cert\&.pem\fR\&. If the certificate file already exists it is hardlinked to
 \fICONFDIR/IDENTIFIER/cert\-TIMESTAMP\&.pem\fR
 before overwriting\&. The private key for the certificate is loaded from

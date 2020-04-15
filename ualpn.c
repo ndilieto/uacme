@@ -49,9 +49,34 @@
 #include <unistd.h>
 
 #include <ev.h>
+#if defined(USE_GNUTLS)
 #include <gnutls/gnutls.h>
 #include <gnutls/crypto.h>
 #include <gnutls/x509.h>
+#elif defined(USE_OPENSSL)
+#include <openssl/bio.h>
+#include <openssl/bn.h>
+#include <openssl/crypto.h>
+#include <openssl/err.h>
+#include <openssl/objects.h>
+#include <openssl/opensslv.h>
+#include <openssl/ssl.h>
+#include <openssl/x509.h>
+#include <openssl/x509v3.h>
+#elif defined(USE_MBEDTLS)
+#include <mbedtls/asn1write.h>
+#include <mbedtls/bignum.h>
+#include <mbedtls/ctr_drbg.h>
+#include <mbedtls/entropy.h>
+#include <mbedtls/error.h>
+#include <mbedtls/md.h>
+#include <mbedtls/oid.h>
+#include <mbedtls/pk.h>
+#include <mbedtls/ssl.h>
+#include <mbedtls/version.h>
+#include <mbedtls/x509.h>
+#include <mbedtls/x509_crt.h>
+#endif
 
 #include "sglib.h"
 #include "base64.h"
@@ -60,15 +85,43 @@
 #define MAXHOST 64
 #define MAXSERV 16
 
+#if defined(USE_GNUTLS)
 #if GNUTLS_VERSION_NUMBER < 0x03031e
 #error GnuTLS version 3.3.30 or later is required
 #endif
+#elif defined(USE_OPENSSL)
+#if OPENSSL_VERSION_NUMBER < 0x1010100fL
+#error OpenSSL version 1.1.1 or later is required
+#endif
+static void openssl_error(const char *prefix)
+{
+    unsigned long e;
+    while ((e = ERR_get_error()) != 0) {
+        warnx("%s: openssl %s", prefix, ERR_error_string(e, NULL));
+        return;
+    }
+}
+#elif defined(USE_MBEDTLS)
+#if MBEDTLS_VERSION_NUMBER < 0x02100000
+#error mbedTLS version 2.16 or later is required
+#endif
+#if !defined(MBEDTLS_X509_ALLOW_UNSUPPORTED_CRITICAL_EXTENSION)
+#error mbedTLS was configured without \
+    MBEDTLS_X509_ALLOW_UNSUPPORTED_CRITICAL_EXTENSION
+#endif
+static const char *_mbedtls_strerror(int code)
+{
+    static char buf[0x100];
+    mbedtls_strerror(code, buf, sizeof(buf));
+    return buf;
+}
+#endif
 
-#ifndef EAGAIN
+#if !defined(EAGAIN)
 #define EAGAIN EWOULDBLOCK
 #endif
 
-#ifndef EWOULDBLOCK
+#if !defined(EWOULDBLOCK)
 #define EWOULDBLOCK EAGAIN
 #endif
 
@@ -89,7 +142,7 @@ typedef struct auth {
 SGLIB_DEFINE_RBTREE_PROTOTYPES(auth_t, left, right, rb, ACME_AUTH_CMP)
 SGLIB_DEFINE_RBTREE_FUNCTIONS(auth_t, left, right, rb, ACME_AUTH_CMP)
 
-#ifndef PIPE_BUF
+#if !defined(PIPE_BUF)
 #define PIPE_BUF 2048
 #endif
 
@@ -152,10 +205,20 @@ typedef struct client {
         STATE_ACME,
         STATE_PROXY_INIT,
         STATE_PROXY,
+        STATE_CLOSING,
         STATE_DONE
     } state;
+#if defined(USE_GNUTLS)
     gnutls_session_t tls;
     gnutls_certificate_credentials_t cred;
+#elif defined(USE_OPENSSL)
+    SSL *ssl;
+#elif defined(USE_MBEDTLS)
+    mbedtls_ssl_context ssl;
+    mbedtls_ssl_config cnf;
+    mbedtls_x509_crt crt;
+    mbedtls_pk_context key;
+#endif
     char ident[0x100];
     char auth[0x30];
     struct client *prev, *next;
@@ -231,6 +294,19 @@ static struct globs {
     listener_t *listeners;
     client_t *clients;
     worker_t *workers;
+#if defined(USE_OPENSSL)
+    SSL_CTX *ssl_ctx;
+    BIO_METHOD *bio_meth;
+    int ssl_idx;
+    int bio_idx;
+#elif defined(USE_MBEDTLS)
+    unsigned char *crt;
+    unsigned char *key;
+    unsigned int crt_len;
+    unsigned int key_len;
+    mbedtls_entropy_context entropy;
+    mbedtls_ctr_drbg_context ctr_drbg;
+#endif
     ev_io controller;
     ev_cleanup cleanup;
     ev_signal sigint;
@@ -268,6 +344,17 @@ static struct globs {
     .listeners = NULL,
     .clients = NULL,
     .workers = NULL,
+#if defined(USE_OPENSSL)
+    .ssl_ctx = NULL,
+    .bio_meth = NULL,
+    .ssl_idx = -1,
+    .bio_idx = -1,
+#elif defined(USE_MBEDTLS)
+    .crt = NULL,
+    .key = NULL,
+    .crt_len = 0,
+    .key_len = 0
+#endif
 };
 
 static struct shm {
@@ -467,6 +554,7 @@ auth_t *get_auth(const char *ident)
     return a;
 }
 
+#if defined(USE_GNUTLS)
 int auth_crt(const char *ident, const uint8_t *id, size_t id_len,
         gnutls_datum_t *crt, gnutls_datum_t *key)
 {
@@ -482,7 +570,7 @@ int auth_crt(const char *ident, const uint8_t *id, size_t id_len,
     rc = gnutls_x509_privkey_init(&k);
     if (rc != GNUTLS_E_SUCCESS) {
         warnx("auth_crt: gnutls_x509_privkey_init: %s", gnutls_strerror(rc));
-        return rc;
+        return -1;
     }
 
     rc = gnutls_x509_privkey_generate(k, GNUTLS_PK_EC,
@@ -491,14 +579,14 @@ int auth_crt(const char *ident, const uint8_t *id, size_t id_len,
         warnx("auth_crt: gnutls_x509_privkey_generate: %s",
                 gnutls_strerror(rc));
         gnutls_x509_privkey_deinit(k);
-        return rc;
+        return -1;
     }
 
     rc = gnutls_x509_crt_init(&c);
     if (rc != GNUTLS_E_SUCCESS) {
         warnx("auth_crt: gnutls_x509_crt_init: %s", gnutls_strerror(rc));
         gnutls_x509_privkey_deinit(k);
-        return rc;
+        return -1;
     }
 
     rc = gnutls_x509_crt_set_version(c, 3);
@@ -507,7 +595,7 @@ int auth_crt(const char *ident, const uint8_t *id, size_t id_len,
                 gnutls_strerror(rc));
         gnutls_x509_privkey_deinit(k);
         gnutls_x509_crt_deinit(c);
-        return rc;
+        return -1;
     }
 
     rc = gnutls_x509_crt_set_dn_by_oid(c, GNUTLS_OID_X520_COMMON_NAME, 0,
@@ -517,7 +605,7 @@ int auth_crt(const char *ident, const uint8_t *id, size_t id_len,
                 gnutls_strerror(rc));
         gnutls_x509_privkey_deinit(k);
         gnutls_x509_crt_deinit(c);
-        return rc;
+        return -1;
     }
 
     rc = gnutls_x509_crt_set_issuer_dn_by_oid(c, GNUTLS_OID_X520_COMMON_NAME,
@@ -527,7 +615,7 @@ int auth_crt(const char *ident, const uint8_t *id, size_t id_len,
                 gnutls_strerror(rc));
         gnutls_x509_privkey_deinit(k);
         gnutls_x509_crt_deinit(c);
-        return rc;
+        return -1;
     }
 
     rc = gnutls_rnd(GNUTLS_RND_NONCE, serial, sizeof(serial));
@@ -536,7 +624,7 @@ int auth_crt(const char *ident, const uint8_t *id, size_t id_len,
         warnx("auth_crt: gnutls_rnd: %s", gnutls_strerror(rc));
         gnutls_x509_privkey_deinit(k);
         gnutls_x509_crt_deinit(c);
-        return rc;
+        return -1;
     }
 
     rc = gnutls_x509_crt_set_serial(c, serial, sizeof(serial));
@@ -545,7 +633,7 @@ int auth_crt(const char *ident, const uint8_t *id, size_t id_len,
                 gnutls_strerror(rc));
         gnutls_x509_privkey_deinit(k);
         gnutls_x509_crt_deinit(c);
-        return rc;
+        return -1;
     }
 
     rc = gnutls_x509_crt_set_activation_time(c, now - 30*24*60*60);
@@ -554,7 +642,7 @@ int auth_crt(const char *ident, const uint8_t *id, size_t id_len,
                 gnutls_strerror(rc));
         gnutls_x509_privkey_deinit(k);
         gnutls_x509_crt_deinit(c);
-        return rc;
+        return -1;
     }
 
     rc = gnutls_x509_crt_set_expiration_time(c, now + 30*24*60*60);
@@ -563,7 +651,7 @@ int auth_crt(const char *ident, const uint8_t *id, size_t id_len,
                 gnutls_strerror(rc));
         gnutls_x509_privkey_deinit(k);
         gnutls_x509_crt_deinit(c);
-        return rc;
+        return -1;
     }
 
     rc = gnutls_x509_crt_set_basic_constraints(c, 1, -1);
@@ -572,7 +660,7 @@ int auth_crt(const char *ident, const uint8_t *id, size_t id_len,
                 gnutls_strerror(rc));
         gnutls_x509_privkey_deinit(k);
         gnutls_x509_crt_deinit(c);
-        return rc;
+        return -1;
     }
 
     rc = parse_addr(ident, AI_NUMERICHOST | AI_NUMERICSERV, AF_UNSPEC, &ai);
@@ -580,20 +668,25 @@ int auth_crt(const char *ident, const uint8_t *id, size_t id_len,
         struct sockaddr_in *addr = (struct sockaddr_in *)ai->ai_addr;
         rc = gnutls_x509_crt_set_subject_alt_name(c, GNUTLS_SAN_IPADDRESS,
                 &addr->sin_addr, sizeof(addr->sin_addr), GNUTLS_FSAN_APPEND);
+        freeaddrinfo(ai);
     } else if (rc == 0 && ai->ai_family == AF_INET6) {
         struct sockaddr_in6 *addr = (struct sockaddr_in6 *)ai->ai_addr;
         rc = gnutls_x509_crt_set_subject_alt_name(c, GNUTLS_SAN_IPADDRESS,
                 &addr->sin6_addr, sizeof(addr->sin6_addr), GNUTLS_FSAN_APPEND);
-    } else
+        freeaddrinfo(ai);
+    } else {
+        if (rc == 0)
+            freeaddrinfo(ai);
         rc = gnutls_x509_crt_set_subject_alt_name(c, GNUTLS_SAN_DNSNAME,
                 ident, strlen(ident), GNUTLS_FSAN_APPEND);
+    }
 
     if (rc != GNUTLS_E_SUCCESS) {
         warnx("auth_crt: gnutls_x509_crt_set_subject_alt_name: %s",
                 gnutls_strerror(rc));
         gnutls_x509_privkey_deinit(k);
         gnutls_x509_crt_deinit(c);
-        return rc;
+        return -1;
     }
 
     rc = gnutls_x509_crt_set_extension_by_oid(c, "1.3.6.1.5.5.7.1.31",
@@ -603,7 +696,7 @@ int auth_crt(const char *ident, const uint8_t *id, size_t id_len,
                 gnutls_strerror(rc));
         gnutls_x509_privkey_deinit(k);
         gnutls_x509_crt_deinit(c);
-        return rc;
+        return -1;
     }
 
     rc = gnutls_x509_crt_set_key(c, k);
@@ -611,7 +704,17 @@ int auth_crt(const char *ident, const uint8_t *id, size_t id_len,
         warnx("auth_crt: gnutls_x509_crt_set_key: %s", gnutls_strerror(rc));
         gnutls_x509_privkey_deinit(k);
         gnutls_x509_crt_deinit(c);
-        return rc;
+        return -1;
+    }
+
+    rc = gnutls_x509_crt_set_key_usage(c, GNUTLS_KEY_DIGITAL_SIGNATURE |
+                GNUTLS_KEY_KEY_CERT_SIGN);
+    if (rc != GNUTLS_E_SUCCESS) {
+        warnx("auth_crt: gnutls_x509_crt_set_key_usage: %s",
+                gnutls_strerror(rc));
+        gnutls_x509_privkey_deinit(k);
+        gnutls_x509_crt_deinit(c);
+        return -1;
     }
 
     rc = gnutls_x509_crt_get_key_id(c, 0, keyid, &keyid_size);
@@ -619,7 +722,7 @@ int auth_crt(const char *ident, const uint8_t *id, size_t id_len,
         warnx("auth_crt: gnutls_x509_crt_get_key_id: %s", gnutls_strerror(rc));
         gnutls_x509_privkey_deinit(k);
         gnutls_x509_crt_deinit(c);
-        return rc;
+        return -1;
     }
 
     rc = gnutls_x509_crt_set_subject_key_id(c, keyid, keyid_size);
@@ -628,7 +731,7 @@ int auth_crt(const char *ident, const uint8_t *id, size_t id_len,
                 gnutls_strerror(rc));
         gnutls_x509_privkey_deinit(k);
         gnutls_x509_crt_deinit(c);
-        return rc;
+        return -1;
     }
 
     rc = gnutls_x509_crt_set_authority_key_id(c, keyid, keyid_size);
@@ -637,7 +740,7 @@ int auth_crt(const char *ident, const uint8_t *id, size_t id_len,
                 gnutls_strerror(rc));
         gnutls_x509_privkey_deinit(k);
         gnutls_x509_crt_deinit(c);
-        return rc;
+        return -1;
     }
 
     rc = gnutls_x509_crt_sign2(c, c, k, GNUTLS_DIG_SHA256, 0);
@@ -645,7 +748,7 @@ int auth_crt(const char *ident, const uint8_t *id, size_t id_len,
         warnx("auth_crt: gnutls_x509_crt_sign2: %s", gnutls_strerror(rc));
         gnutls_x509_privkey_deinit(k);
         gnutls_x509_crt_deinit(c);
-        return rc;
+        return -1;
     }
 
     rc = gnutls_x509_privkey_export2(k, GNUTLS_X509_FMT_DER, key);
@@ -654,7 +757,7 @@ int auth_crt(const char *ident, const uint8_t *id, size_t id_len,
                 gnutls_strerror(rc));
         gnutls_x509_privkey_deinit(k);
         gnutls_x509_crt_deinit(c);
-        return rc;
+        return -1;
     }
 
     rc = gnutls_x509_crt_export2(c, GNUTLS_X509_FMT_DER, crt);
@@ -664,13 +767,498 @@ int auth_crt(const char *ident, const uint8_t *id, size_t id_len,
         gnutls_x509_privkey_deinit(k);
         gnutls_x509_crt_deinit(c);
         gnutls_free(key->data);
-        return rc;
+        return -1;
     }
 
     gnutls_x509_privkey_deinit(k);
     gnutls_x509_crt_deinit(c);
-    return GNUTLS_E_SUCCESS;
+    return 0;
 }
+#elif defined(USE_OPENSSL)
+int auth_crt(const char *ident, const uint8_t *id, size_t id_len,
+        unsigned char **crt, unsigned int *crt_len,
+        unsigned char **key, unsigned int *key_len)
+{
+    EVP_PKEY_CTX *pc = NULL;
+    EVP_PKEY *k = NULL;
+    X509_NAME *name = NULL;
+    X509 *c = NULL;
+    X509V3_CTX ctx;
+    BIGNUM *bn = NULL;
+    ASN1_OBJECT *acmeid = NULL;
+    ASN1_OCTET_STRING *idos = NULL;
+    X509_EXTENSION *ext = NULL;
+    char *san = NULL;
+    struct addrinfo *ai = NULL;
+    time_t now = time(NULL);
+    int ret = -1;
+    int rc;
+
+    idos = ASN1_OCTET_STRING_new();
+    if (!idos || !ASN1_OCTET_STRING_set(idos, id, id_len)) {
+        openssl_error("auth_crt");
+        goto out;
+    }
+
+    pc = EVP_PKEY_CTX_new_id(EVP_PKEY_EC, NULL);
+    if (!pc || !EVP_PKEY_keygen_init(pc)
+            || !EVP_PKEY_CTX_set_ec_paramgen_curve_nid(pc, NID_X9_62_prime256v1)
+            || !EVP_PKEY_keygen(pc, &k)) {
+        openssl_error("auth_crt");
+        goto out;
+    }
+
+    name = X509_NAME_new();
+    if (!name || !X509_NAME_add_entry_by_txt(name, "CN", MBSTRING_ASC,
+                (const unsigned char *)ident, -1, -1, 0)) {
+        openssl_error("auth_crt");
+        goto out;
+    }
+
+    bn = BN_new();
+    if (!bn || !BN_pseudo_rand(bn, 127, BN_RAND_TOP_ANY, BN_RAND_BOTTOM_ANY)) {
+        openssl_error("auth_crt");
+        goto out;
+    }
+
+    c = X509_new();
+    if (!c || !X509_set_version(c, 2)
+            || !X509_set_subject_name(c, name)
+            || !X509_set_issuer_name(c, name)
+            || !BN_to_ASN1_INTEGER(bn, X509_get_serialNumber(c))
+            || !ASN1_TIME_adj(X509_getm_notBefore(c), now, -30, 0)
+            || !ASN1_TIME_adj(X509_getm_notAfter(c), now, 30, 0)
+            || !X509_set_pubkey(c, k)) {
+        openssl_error("auth_crt");
+        goto out;
+    }
+
+    rc = parse_addr(ident, AI_NUMERICHOST | AI_NUMERICSERV, AF_UNSPEC, &ai);
+    if (rc == 0 && (ai->ai_family == AF_INET || ai->ai_family == AF_INET6)) {
+        freeaddrinfo(ai);
+        if (asprintf(&san, "IP:%s", ident) < 0) {
+            warnx("auth_crt: asprintf failed");
+            san = NULL;
+            goto out;
+        }
+    } else {
+        if (rc == 0)
+            freeaddrinfo(ai);
+        if (asprintf(&san, "DNS:%s", ident) < 0) {
+            warnx("auth_crt: asprintf failed");
+            san = NULL;
+            goto out;
+        }
+    }
+
+    acmeid = OBJ_txt2obj("1.3.6.1.5.5.7.1.31",1);
+    if (!acmeid) {
+        openssl_error("auth_crt");
+        goto out;
+    }
+
+    X509V3_set_ctx_nodb(&ctx);
+    X509V3_set_ctx(&ctx, c, c, NULL, NULL, 0);
+
+    ext = X509V3_EXT_conf_nid(NULL, &ctx, NID_subject_alt_name, san);
+    if (!ext || !X509_add_ext(c, ext, -1)) {
+        openssl_error("auth_crt");
+        goto out;
+    }
+    X509_EXTENSION_free(ext);
+
+    ext = X509V3_EXT_conf_nid(NULL, &ctx, NID_key_usage,
+            "critical, keyCertSign, digitalSignature");
+    if (!ext || !X509_add_ext(c, ext, -1)) {
+        openssl_error("auth_crt");
+        goto out;
+    }
+    X509_EXTENSION_free(ext);
+
+    ext = X509V3_EXT_conf_nid(NULL, &ctx, NID_basic_constraints,
+            "critical,CA:TRUE");
+    if (!ext || !X509_add_ext(c, ext, -1)) {
+        openssl_error("auth_crt");
+        goto out;
+    }
+    X509_EXTENSION_free(ext);
+
+    ext = X509V3_EXT_conf_nid(NULL, &ctx, NID_subject_key_identifier,
+            "hash");
+    if (!ext || !X509_add_ext(c, ext, -1)) {
+        openssl_error("auth_crt");
+        goto out;
+    }
+    X509_EXTENSION_free(ext);
+
+    ext = X509V3_EXT_conf_nid(NULL, &ctx, NID_authority_key_identifier,
+            "keyid,issuer");
+    if (!ext || !X509_add_ext(c, ext, -1)) {
+        openssl_error("auth_crt");
+        goto out;
+    }
+    X509_EXTENSION_free(ext);
+
+    ext = X509_EXTENSION_create_by_OBJ(NULL, acmeid, 1, idos);
+    if (!ext || !X509_add_ext(c, ext, -1)) {
+        openssl_error("auth_crt");
+        goto out;
+    }
+
+    if (!X509_sign(c, k, EVP_sha256())) {
+        openssl_error("auth_crt");
+        goto out;
+    }
+
+    *crt = NULL;
+    rc = i2d_X509(c, crt);
+    if (rc < 0) {
+        openssl_error("auth_crt");
+        goto out;
+    }
+    *crt_len = rc;
+
+    *key = NULL;
+    rc = i2d_PrivateKey(k, key);
+    if (rc < 0) {
+        openssl_error("auth_crt");
+        goto out;
+    }
+    *key_len = rc;
+
+    ret = 0;
+out:
+    EVP_PKEY_CTX_free(pc);
+    EVP_PKEY_free(k);
+    X509_NAME_free(name);
+    X509_free(c);
+    BN_free(bn);
+    ASN1_OBJECT_free(acmeid);
+    ASN1_OCTET_STRING_free(idos);
+    X509_EXTENSION_free(ext);
+    free(san);
+    if (ret != 0) {
+        OPENSSL_free(*key);
+        *key = NULL;
+        *key_len = 0;
+        OPENSSL_free(*crt);
+        *crt = NULL;
+        *crt_len = 0;
+    }
+    return ret;
+}
+#elif defined(USE_MBEDTLS)
+int auth_crt(const char *ident, const uint8_t *id, size_t id_len,
+        unsigned char **crt, unsigned int *crt_len,
+        unsigned char **key, unsigned int *key_len)
+{
+    size_t buf_len = 0x400;
+    unsigned char *buf = NULL;
+    struct addrinfo *ai;
+    uaddr_t addr;
+    struct tm t;
+    time_t tnb = time(NULL) - 30*24*3600;
+    time_t tna = tnb + 60*24*3600;
+    char nb[MBEDTLS_X509_RFC5280_UTC_TIME_LEN] = "";
+    char na[MBEDTLS_X509_RFC5280_UTC_TIME_LEN] = "";
+    char *cn = NULL;
+    int ret = -1;
+    int rc;
+    mbedtls_x509write_cert c;
+    mbedtls_pk_context k;
+    mbedtls_mpi sn;
+
+    strftime(nb, sizeof(nb), "%Y%m%d%H%M%S", gmtime_r(&tnb, &t));
+    strftime(na, sizeof(na), "%Y%m%d%H%M%S", gmtime_r(&tna, &t));
+
+    mbedtls_x509write_crt_init(&c);
+    mbedtls_pk_init(&k);
+    mbedtls_mpi_init(&sn);
+
+    rc = mbedtls_mpi_fill_random(&sn, 16, mbedtls_ctr_drbg_random, &g.ctr_drbg);
+    if (rc) {
+        warnx("auth_crt: mbedtls_mpi_fill_random: %s", _mbedtls_strerror(rc));
+        goto out;
+    }
+
+    rc = mbedtls_mpi_set_bit(&sn, 127, 0);
+    if (rc) {
+        warnx("auth_crt: mbedtls_mpi_set_bit: %s", _mbedtls_strerror(rc));
+        goto out;
+    }
+
+    const mbedtls_pk_info_t *pki = mbedtls_pk_info_from_type(MBEDTLS_PK_ECKEY);
+    if (!pki) {
+        warnx("auth_crt: mbedtls_pk_info_from_type: %s", _mbedtls_strerror(rc));
+        goto out;
+    }
+
+    rc = mbedtls_pk_setup(&k, pki);
+    if (rc) {
+        warnx("auth_crt: mbedtls_pk_setup: %s", _mbedtls_strerror(rc));
+        goto out;
+    }
+
+    rc = mbedtls_ecp_gen_key(MBEDTLS_ECP_DP_SECP256R1, mbedtls_pk_ec(k),
+            mbedtls_ctr_drbg_random, &g.ctr_drbg);
+    if (rc) {
+        warnx("auth_crt: mbedtls_ecp_gen_key: %s", _mbedtls_strerror(rc));
+        goto out;
+    }
+
+    mbedtls_x509write_crt_set_version(&c, MBEDTLS_X509_CRT_VERSION_3);
+    mbedtls_x509write_crt_set_md_alg(&c, MBEDTLS_MD_SHA256);
+    mbedtls_x509write_crt_set_subject_key(&c, &k);
+    mbedtls_x509write_crt_set_issuer_key(&c, &k);
+    if (asprintf(&cn, "CN=%s", ident) < 0) {
+        warnx("auth_crt: asprintf failed");
+        cn = NULL;
+        goto out;
+    }
+
+    rc = mbedtls_x509write_crt_set_subject_name(&c, cn);
+    if (rc) {
+        warnx("auth_crt: mbedtls_x509write_crt_set_subject_name: %s",
+                _mbedtls_strerror(rc));
+        goto out;
+    }
+
+    rc = mbedtls_x509write_crt_set_issuer_name(&c, cn);
+    if (rc) {
+        warnx("auth_crt: mbedtls_x509write_crt_set_issuer_name: %s",
+                _mbedtls_strerror(rc));
+        goto out;
+    }
+
+    rc = mbedtls_x509write_crt_set_basic_constraints(&c, 1, -1);
+    if (rc) {
+        warnx("auth_crt: mbedtls_x509write_crt_set_basic_constraints: %s",
+                _mbedtls_strerror(rc));
+        goto out;
+    }
+
+    rc = mbedtls_x509write_crt_set_serial(&c, &sn);
+    if (rc) {
+        warnx("auth_crt: mbedtls_x509write_crt_set_serial: %s",
+                _mbedtls_strerror(rc));
+        goto out;
+    }
+
+    rc = mbedtls_x509write_crt_set_validity(&c, nb, na);
+    if (rc) {
+        warnx("auth_crt: mbedtls_x509write_crt_set_validity: %s",
+                _mbedtls_strerror(rc));
+        goto out;
+    }
+
+    rc = parse_addr(ident, AI_NUMERICHOST | AI_NUMERICSERV, AF_UNSPEC, &ai);
+    if (rc == 0) {
+        memcpy(&addr.addr, ai->ai_addr, ai->ai_addrlen);
+        addr.len = ai->ai_addrlen;
+        freeaddrinfo(ai);
+    } else
+        addr.len = 0;
+
+    while (1) {
+        buf_len *= 2;
+        free(buf);
+        buf = calloc(1, buf_len);
+        if (!buf) {
+            warn("auth_crt: calloc");
+            goto out;
+        }
+        unsigned char *p = buf + buf_len;
+        size_t len = 0;
+        const unsigned char *data = NULL;
+        size_t data_len = 0;
+        unsigned char tag;
+
+        if (addr.len) {
+            tag = MBEDTLS_ASN1_CONTEXT_SPECIFIC | 7;
+            if (addr.addr.sa.sa_family == AF_INET) {
+                data = (unsigned char *)&addr.addr.v4.sin_addr;
+                data_len = sizeof(addr.addr.v4.sin_addr);
+            } else if (addr.addr.sa.sa_family == AF_INET6) {
+                data = (unsigned char *)&addr.addr.v6.sin6_addr;
+                data_len = sizeof(addr.addr.v6.sin6_addr);
+            }
+        }
+        if (!data || !data_len) {
+            tag = MBEDTLS_ASN1_CONTEXT_SPECIFIC | 2;
+            data = (const unsigned char *)ident;
+            data_len = strlen(ident);
+        }
+
+        rc = mbedtls_asn1_write_raw_buffer(&p, buf, data, data_len);
+        if (rc >= 0)
+            len += rc;
+        else if (rc == MBEDTLS_ERR_ASN1_BUF_TOO_SMALL)
+            break;
+        else {
+            warnx("auth_crt: mbedtls_asn1_write_raw_buffer: %s",
+                    _mbedtls_strerror(rc));
+            goto out;
+        }
+        rc = mbedtls_asn1_write_len(&p, buf, data_len);
+        if (rc >= 0)
+            len += rc;
+        else if (rc == MBEDTLS_ERR_ASN1_BUF_TOO_SMALL)
+            break;
+        else {
+            warnx("auth_crt: mbedtls_asn1_write_len: %s",
+                    _mbedtls_strerror(rc));
+            goto out;
+        }
+        rc = mbedtls_asn1_write_tag(&p, buf, tag);
+        if (rc >= 0)
+            len += rc;
+        else if (rc == MBEDTLS_ERR_ASN1_BUF_TOO_SMALL)
+            break;
+        else {
+            warnx("auth_crt: mbedtls_asn1_write_tag: %s",
+                    _mbedtls_strerror(rc));
+            goto out;
+        }
+
+        if (rc == MBEDTLS_ERR_ASN1_BUF_TOO_SMALL)
+            continue;
+        rc = mbedtls_asn1_write_len(&p, buf, len);
+        if (rc >= 0)
+            len += rc;
+        else if (rc == MBEDTLS_ERR_ASN1_BUF_TOO_SMALL)
+            continue;
+        else {
+            warnx("auth_crt: mbedtls_asn1_write_len: %s",
+                    _mbedtls_strerror(rc));
+            goto out;
+        }
+        rc = mbedtls_asn1_write_tag(&p, buf,
+                MBEDTLS_ASN1_CONSTRUCTED | MBEDTLS_ASN1_SEQUENCE);
+        if (rc >= 0)
+            len += rc;
+        else if (rc == MBEDTLS_ERR_ASN1_BUF_TOO_SMALL)
+            continue;
+        else {
+            warnx("auth_crt: mbedtls_asn1_write_tag: %s",
+                    _mbedtls_strerror(rc));
+            goto out;
+        }
+        rc = mbedtls_x509write_crt_set_extension(&c,
+                MBEDTLS_OID_SUBJECT_ALT_NAME,
+                MBEDTLS_OID_SIZE(MBEDTLS_OID_SUBJECT_ALT_NAME),
+                1, buf + buf_len - len, len);
+        if (rc) {
+            warnx("auth_crt: mbedtls_x509write_crt_set_extension: %s",
+                    _mbedtls_strerror(rc));
+            goto out;
+        }
+        break;
+    }
+    rc = mbedtls_x509write_crt_set_extension(&c,
+            // http://oid-info.com/get/1.3.6.1.5.5.7.1.31
+            // pe(1) id-pe-acmeIdentifier(31)
+            MBEDTLS_OID_PKIX "\x01\x1F",
+            MBEDTLS_OID_SIZE(MBEDTLS_OID_PKIX "\x01\x1F"),
+            1, id, id_len);
+    if (rc) {
+        warnx("auth_crt: mbedtls_x509write_crt_set_extension: %s",
+                _mbedtls_strerror(rc));
+        goto out;
+    }
+
+    rc = mbedtls_x509write_crt_set_key_usage(&c,
+            MBEDTLS_X509_KU_DIGITAL_SIGNATURE | MBEDTLS_X509_KU_KEY_CERT_SIGN);
+    if (rc) {
+        warnx("auth_crt: mbedtls_x509write_crt_set_key_usage: %s",
+                _mbedtls_strerror(rc));
+        goto out;
+    }
+
+    rc = mbedtls_x509write_crt_set_subject_key_identifier(&c);
+    if (rc) {
+        warnx("auth_crt: mbedtls_x509write_crt_set_subject_key_identifier: %s",
+                _mbedtls_strerror(rc));
+        goto out;
+    }
+
+    rc = mbedtls_x509write_crt_set_authority_key_identifier(&c);
+    if (rc) {
+        warnx("auth_crt: mbedtls_x509write_crt_set_authority_key_identifier:"
+                " %s", _mbedtls_strerror(rc));
+        goto out;
+    }
+
+    while (1) {
+        rc = mbedtls_x509write_crt_der(&c, buf, buf_len,
+                mbedtls_ctr_drbg_random, &g.ctr_drbg);
+        if (rc > 0) {
+            *crt_len = rc;
+            *crt = calloc(1, *crt_len);
+            if (!*crt) {
+                warn("auth_crt: calloc");
+                goto out;
+            }
+            memcpy(*crt, buf + buf_len - *crt_len, *crt_len);
+            break;
+        } else if (rc == MBEDTLS_ERR_ASN1_BUF_TOO_SMALL) {
+            free(buf);
+            buf_len *= 2;
+            buf = calloc(1, buf_len);
+            if (!buf) {
+                warn("auth_crt: calloc");
+                goto out;
+            }
+        } else {
+            warnx("auth_crt: mbedtls_x509write_crt_der: %s",
+                    _mbedtls_strerror(rc));
+            goto out;
+        }
+    }
+
+    while (1) {
+        rc = mbedtls_pk_write_key_der(&k, buf, buf_len);
+        if (rc > 0) {
+            *key_len = rc;
+            *key = calloc(1, *key_len);
+            if (!*key) {
+                warn("auth_crt: calloc");
+                goto out;
+            }
+            memcpy(*key, buf + buf_len - *key_len, *key_len);
+            break;
+        } else if (rc == MBEDTLS_ERR_ASN1_BUF_TOO_SMALL) {
+            free(buf);
+            buf_len *= 2;
+            buf = calloc(1, buf_len);
+            if (!buf) {
+                warn("auth_crt: calloc");
+                goto out;
+            }
+        } else {
+            warnx("auth_crt: mbedtls_pk_write_key_der: %s",
+                    _mbedtls_strerror(rc));
+            goto out;
+        }
+    }
+
+    ret = 0;
+out:
+    mbedtls_x509write_crt_free(&c);
+    mbedtls_pk_free(&k);
+    mbedtls_mpi_free(&sn);
+    free(buf);
+    free(cn);
+    if (ret != 0) {
+        free(*key);
+        *key = NULL;
+        *key_len = 0;
+        free(*crt);
+        *crt = NULL;
+        *crt_len = 0;
+    }
+    return ret;
+}
+#endif
 
 static void controller_done(EV_P_ controller_t *c, bool drain)
 {
@@ -748,10 +1336,10 @@ static void controller_handle_cmd(controller_t *c, char *line, ev_tstamp ts)
         memset(arpa, 0, sizeof(arpa));
         if (ai->ai_family == AF_INET) {
             struct sockaddr_in *ain = (struct sockaddr_in *)ai->ai_addr;
-            uint32_t addr = ain->sin_addr.s_addr;
+            uint32_t addr = ntohl(ain->sin_addr.s_addr);
             snprintf(arpa, sizeof(arpa), "%d.%d.%d.%d.in-addr.arpa",
-                    (addr >> 24) & 0xFF, (addr >> 16) & 0xFF,
-                    (addr >> 8) & 0xFF, addr & 0xFF);
+                    addr & 0xFF, (addr >> 8) & 0xFF,
+                    (addr >> 16) & 0xFF, (addr >> 24) & 0xFF);
         } else if (ai->ai_family == AF_INET6) {
             struct sockaddr_in6 *ain6 = (struct sockaddr_in6 *)ai->ai_addr;
             unsigned char *addr = ain6->sin6_addr.s6_addr;
@@ -788,16 +1376,47 @@ static void controller_handle_cmd(controller_t *c, char *line, ev_tstamp ts)
             return;
         }
 
-        gnutls_datum_t crt, key;
-        if (auth_crt(ident, id, sizeof(id), &crt, &key) != GNUTLS_E_SUCCESS) {
+#if defined(USE_GNUTLS)
+        gnutls_datum_t crt = {NULL, 0}, key = {NULL, 0};
+        if (auth_crt(ident, id, sizeof(id), &crt, &key) != 0) {
+#elif defined(USE_OPENSSL) || defined(USE_MBEDTLS)
+        struct {
+            unsigned char *data;
+            unsigned int size;
+        } crt = {NULL, 0}, key = {NULL, 0};
+        if (auth_crt(ident, id, sizeof(id), &crt.data, &crt.size,
+                    &key.data, &key.size) != 0) {
+#endif
             buf_puts(&c->buf_send, "ERR crypto failure\n");
+            return;
+        }
+        if (crt.size > sizeof(a->crt) || key.size > sizeof(a->key)) {
+            buf_puts(&c->buf_send, "ERR crypto failure\n");
+#if defined(USE_GNUTLS)
+            gnutls_free(key.data);
+            gnutls_free(crt.data);
+#elif defined(USE_OPENSSL)
+            OPENSSL_free(key.data);
+            OPENSSL_free(crt.data);
+#elif defined(USE_MBEDTLS)
+            free(key.data);
+            free(crt.data);
+#endif
             return;
         }
 
         if (auth_lock(100) != 0) {
             buf_puts(&c->buf_send, "ERR locked\n");
+#if defined(USE_GNUTLS)
             gnutls_free(key.data);
             gnutls_free(crt.data);
+#elif defined(USE_OPENSSL)
+            OPENSSL_free(key.data);
+            OPENSSL_free(crt.data);
+#elif defined(USE_MBEDTLS)
+            free(key.data);
+            free(crt.data);
+#endif
             return;
         }
 
@@ -806,13 +1425,21 @@ static void controller_handle_cmd(controller_t *c, char *line, ev_tstamp ts)
                 warnx("controller %08x: too many auths", c->id);
                 buf_puts(&c->buf_send, "ERR too many auths\n");
                 auth_unlock();
+#if defined(USE_GNUTLS)
                 gnutls_free(key.data);
                 gnutls_free(crt.data);
+#elif defined(USE_OPENSSL)
+                OPENSSL_free(key.data);
+                OPENSSL_free(crt.data);
+#elif defined(USE_MBEDTLS)
+                free(key.data);
+                free(crt.data);
+#endif
                 return;
             }
             a = g_shm->avail;
             SGLIB_DL_LIST_DELETE(auth_t, g_shm->avail, a, left, right);
-            strncpy(a->ident, arpa[0] ? arpa : ident, sizeof(a->ident));
+            strncpy(a->ident, arpa[0] ? arpa : ident, sizeof(a->ident) - 1);
             sglib_auth_t_add(&g_shm->auths, a);
             g.auths_touched = true;
         }
@@ -823,8 +1450,16 @@ static void controller_handle_cmd(controller_t *c, char *line, ev_tstamp ts)
         a->crt_size = crt.size;
         a->timestamp = ts;
         auth_unlock();
+#if defined(USE_GNUTLS)
         gnutls_free(key.data);
         gnutls_free(crt.data);
+#elif defined(USE_OPENSSL)
+        OPENSSL_free(key.data);
+        OPENSSL_free(crt.data);
+#elif defined(USE_MBEDTLS)
+        free(key.data);
+        free(crt.data);
+#endif
         if (arpa[0])
             noticex("controller %08x: new auth %s for %s (%s)", c->id, auth,
                     ident, arpa);
@@ -1066,16 +1701,27 @@ static void client_done(EV_P_ client_t *c, drain_t drain)
         close(c->fd_f2b[0]);
         close(c->fd_f2b[1]);
 #endif
+#if defined(USE_GNUTLS)
         if (c->tls)
             gnutls_deinit(c->tls);
         if (c->cred)
             gnutls_certificate_free_credentials(c->cred);
+#elif defined(USE_OPENSSL)
+        if (c->ssl)
+            SSL_free(c->ssl);
+#elif defined(USE_MBEDTLS)
+        mbedtls_x509_crt_free(&c->crt);
+        mbedtls_pk_free(&c->key);
+        mbedtls_ssl_free(&c->ssl);
+        mbedtls_ssl_config_free(&c->cnf);
+#endif
         ev_timer_stop(EV_A_ &c->timer);
         SGLIB_DL_LIST_DELETE(client_t, g.clients, c, prev, next);
         free(c);
     }
 }
 
+#if defined(USE_GNUTLS)
 static ssize_t tls_pull_func(gnutls_transport_ptr_t p, void *data, size_t size)
 {
     client_t *c = (client_t *)p;
@@ -1089,14 +1735,14 @@ static ssize_t tls_pull_func(gnutls_transport_ptr_t p, void *data, size_t size)
     ssize_t s = recv(c->fd_f, data, size,
             c->state == STATE_ACME ? 0 : MSG_PEEK);
     if (s == 0) {
-        client_done(EV_A_ c, DRAIN_FRONTEND);
+        c->state = STATE_CLOSING;
         return 0;
     } else if (s == -1) {
         gnutls_transport_set_errno(c->tls, errno);
         if (errno != EAGAIN && errno != EWOULDBLOCK) {
             warn("client %08x: frontend failed to read from %s:%s", c->id,
                     c->rhost_f, c->rserv_f);
-            client_done(EV_A_ c, DRAIN_FRONTEND);
+            c->state = STATE_CLOSING;
         } else if (c->fd_f != -1 && c->state != STATE_DONE)
             ev_io_start(EV_A_ &c->io_rxf);
         return -1;
@@ -1124,7 +1770,7 @@ static ssize_t tls_pull_func(gnutls_transport_ptr_t p, void *data, size_t size)
         if (sr != s) {
             warn("client %08x: frontend failed to buffer data from %s:%s",
                     c->id, c->rhost_f, c->rserv_f);
-            client_done(EV_A_ c, DRAIN_FRONTEND);
+            c->state = STATE_CLOSING;
             return 0;
         }
     }
@@ -1160,7 +1806,7 @@ static ssize_t tls_push_func(gnutls_transport_ptr_t p, const void *data,
         if (errno != EAGAIN && errno != EWOULDBLOCK) {
             warn("client %08x: frontend failed to buffer data from %s:%s",
                     c->id, c->rhost_f, c->rserv_f);
-            client_done(EV_A_ c, DRAIN_FRONTEND);
+            c->state = STATE_CLOSING;
             return -1;
         }
     }
@@ -1173,9 +1819,10 @@ static int tls_post_client_hello_func(gnutls_session_t s)
 {
     client_t *c = (client_t *)gnutls_session_get_ptr(s);
 
-    char name[0x100];
-    size_t name_len = sizeof(name);
     unsigned int type;
+    char name[0x100];
+    size_t name_len = sizeof(name)-1;
+    memset(name, 0, name_len);
 
     int rc = gnutls_server_name_get(c->tls, name, &name_len, &type, 0);
     if (rc != GNUTLS_E_SUCCESS)
@@ -1186,7 +1833,8 @@ static int tls_post_client_hello_func(gnutls_session_t s)
     if (rc != GNUTLS_E_SUCCESS)
         return rc;
 
-    if (strcmp((const char *)protocol.data, "acme-tls/1"))
+    if (protocol.size != strlen("acme-tls/1") ||
+            memcmp("acme-tls/1", protocol.data, protocol.size))
         return GNUTLS_E_APPLICATION_ERROR_MAX;
 
     auth_t *auth = get_auth(name);
@@ -1215,8 +1863,8 @@ static int tls_post_client_hello_func(gnutls_session_t s)
         return rc;
     }
 
-    strncpy(c->auth, auth->auth, sizeof(c->auth));
-    strncpy(c->ident, auth->ident, sizeof(c->ident));
+    strncpy(c->auth, auth->auth, sizeof(c->auth) - 1);
+    strncpy(c->ident, auth->ident, sizeof(c->ident) - 1);
 
 #if HAVE_SPLICE
     c->n_f2b = 0;
@@ -1229,22 +1877,445 @@ static int tls_post_client_hello_func(gnutls_session_t s)
 
     return GNUTLS_E_SUCCESS;
 }
+#elif defined(USE_OPENSSL)
+static int bio_read(BIO *b, char *data, int size)
+{
+    client_t *c = (client_t *)BIO_get_ex_data(b, g.bio_idx);
+    if (data == NULL)
+        return 0;
+    BIO_clear_retry_flags(b);
+    if (!c) {
+        errno = EINVAL;
+        return -1;
+    }
+#if EV_MULTIPLICITY
+    EV_P = c->loop;
+#endif
+    ssize_t s = recv(c->fd_f, data, size,
+            c->state == STATE_ACME ? 0 : MSG_PEEK);
+    if (s == 0) {
+        c->state = STATE_CLOSING;
+        return 0;
+    } else if (s == -1) {
+        if (errno != EAGAIN && errno != EWOULDBLOCK) {
+            warn("client %08x: frontend failed to read from %s:%s", c->id,
+                    c->rhost_f, c->rserv_f);
+            c->state = STATE_CLOSING;
+        } else if (c->fd_f != -1 && c->state != STATE_DONE) {
+            ev_io_start(EV_A_ &c->io_rxf);
+            BIO_set_retry_read(b);
+        }
+        return -1;
+    }
+
+    if (c->state == STATE_ACME) {
+        c->frx += s;
+        return s;
+    }
+
+#if HAVE_SPLICE
+    s = write(c->fd_f2b[1], data, s);
+    if (s > 0)
+        c->n_f2b += s;
+#else
+    s = buf_put(&c->buf_f2b, data, s);
+#endif
+    if (s == -1) {
+        if (errno == EAGAIN || errno == EWOULDBLOCK)
+            BIO_set_retry_read(b);
+        return -1;
+    } else {
+        ssize_t sr = recv(c->fd_f, data, s, 0);
+        if (sr > 0)
+            c->frx += sr;
+        if (sr != s) {
+            warn("client %08x: frontend failed to buffer data from %s:%s",
+                    c->id, c->rhost_f, c->rserv_f);
+            c->state = STATE_CLOSING;
+            return 0;
+        }
+    }
+    return s;
+}
+
+static int bio_write(BIO *b, const char *data, int size)
+{
+    client_t *c = (client_t *)BIO_get_ex_data(b, g.bio_idx);
+    BIO_clear_retry_flags(b);
+    if (!c) {
+        errno = EINVAL;
+        return -1;
+    }
+#if EV_MULTIPLICITY
+    EV_P = c->loop;
+#endif
+    if (c->state != STATE_ACME) {
+        // prevent sending data to client until PROXY/ACME decision
+        BIO_set_retry_write(b);
+        return -1;
+    }
+
+#if HAVE_SPLICE
+    ssize_t s = write(c->fd_b2f[1], data, size);
+    if (s > 0)
+        c->n_b2f += s;
+#else
+    ssize_t s = buf_put(&c->buf_b2f, data, size);
+#endif
+    if (s == -1) {
+        if (errno != EAGAIN && errno != EWOULDBLOCK) {
+            warn("client %08x: frontend failed to buffer data from %s:%s",
+                    c->id, c->rhost_f, c->rserv_f);
+            c->state = STATE_CLOSING;
+            return -1;
+        }
+        BIO_set_retry_write(b);
+    }
+    if (c->fd_f != -1)
+        ev_io_start(EV_A_ &c->io_txf);
+    return s;
+}
+
+static long bio_ctrl(BIO *b, int cmd, long num, void *ptr)
+{
+    (void) b;
+    (void) ptr;
+    (void) num;
+    switch (cmd) {
+        case BIO_CTRL_SET_CLOSE:
+        case BIO_CTRL_FLUSH:
+        case BIO_CTRL_DUP:
+            return 1;
+        default:
+            return 0;
+    }
+}
+
+static const BIO_METHOD *BIO_s_ualpn(void)
+{
+    if (g.bio_meth == NULL) {
+        int index = BIO_get_new_index();
+        if (index == -1) {
+            openssl_error("BIO_s_ualpn");
+            return NULL;
+        }
+        g.bio_meth = BIO_meth_new(index | BIO_TYPE_SOURCE_SINK, "ualpn");
+        if (g.bio_meth == NULL) {
+            openssl_error("BIO_s_ualpn");
+            return NULL;
+        }
+        BIO_meth_set_write(g.bio_meth, bio_write);
+        BIO_meth_set_read(g.bio_meth, bio_read);
+        BIO_meth_set_ctrl(g.bio_meth, bio_ctrl);
+    }
+    return g.bio_meth;
+}
+
+static int ssl_client_hello_cb(SSL *s, int *al, void *arg)
+{
+    client_t *c = (client_t *)SSL_get_ex_data(s, g.ssl_idx);
+    auth_t *auth = NULL;
+    bool alpn = false;
+    char name[0x100];
+    const unsigned char *ext = NULL;
+    size_t ext_len = 0;
+    size_t len;
+
+    (void) al;
+    (void) arg;
+    if (!c)
+        return SSL_CLIENT_HELLO_RETRY;
+
+    if (!SSL_client_hello_get0_ext(s,
+                TLSEXT_TYPE_application_layer_protocol_negotiation,
+                &ext, &ext_len) || ext_len < 3)
+        return SSL_CLIENT_HELLO_RETRY;
+    len = *ext++ << 8;
+    len += *ext++;
+    ext_len -= 2;
+    if (len != ext_len)
+        return SSL_CLIENT_HELLO_RETRY;
+    while (ext_len > 0) {
+        len = ext[0];
+        if (len + 1 > ext_len)
+            return SSL_CLIENT_HELLO_RETRY;
+        if (len == strlen("acme-tls/1") &&
+                memcmp("acme-tls/1", &ext[1], len) == 0) {
+            alpn = true;
+            break;
+        }
+        ext_len -= len + 1;
+        ext += len + 1;
+    }
+    if (!alpn)
+        return SSL_CLIENT_HELLO_RETRY;
+
+    if (!SSL_client_hello_get0_ext(s, TLSEXT_TYPE_server_name,
+                &ext, &ext_len) || ext_len < 5)
+        return SSL_CLIENT_HELLO_RETRY;
+    len = *ext++ << 8;
+    len += *ext++;
+    ext_len -= 2;
+    if (len != ext_len)
+        return SSL_CLIENT_HELLO_RETRY;
+    memset(name, 0, sizeof(name));
+    while (ext_len > 2) {
+        len = (ext[1] << 8) + ext[2];
+        if (len + 3 > ext_len)
+            return SSL_CLIENT_HELLO_RETRY;
+        if (ext[0] == TLSEXT_NAMETYPE_host_name) {
+            memcpy(name, &ext[3], len < sizeof(name) ? len : sizeof(name) - 1);
+            break;
+        }
+        ext_len -= len + 3;
+        ext += len + 3;
+    }
+
+    if (strlen(name) == 0)
+        return SSL_CLIENT_HELLO_RETRY;
+
+    auth = get_auth(name);
+    if (!auth) {
+        infox("client %08x: acme-tls/1 handshake: no auth for %s", c->id, name);
+        return SSL_CLIENT_HELLO_RETRY;
+    }
+
+    if (!SSL_use_certificate_ASN1(s, auth->crt, auth->crt_size)) {
+        warnx("client %08x: acme-tls/1 handshake with auth %s for %s failed: "
+                "SSL_use_certificate_ASN1: %s", c->id, auth->auth,
+                auth->ident, ERR_error_string(ERR_get_error(), NULL));
+        ERR_clear_error();
+        return SSL_CLIENT_HELLO_RETRY;
+    }
+
+    if (!SSL_use_PrivateKey_ASN1(EVP_PKEY_EC, s, auth->key, auth->key_size)) {
+        warnx("client %08x: acme-tls/1 handshake with auth %s for %s failed: "
+                "SSL_use_certificate_ASN1: %s", c->id, auth->auth,
+                auth->ident, ERR_error_string(ERR_get_error(), NULL));
+        ERR_clear_error();
+        return SSL_CLIENT_HELLO_RETRY;
+    }
+
+    strncpy(c->auth, auth->auth, sizeof(c->auth) - 1);
+    strncpy(c->ident, auth->ident, sizeof(c->ident) - 1);
+
+    return SSL_CLIENT_HELLO_SUCCESS;
+}
+
+static int ssl_alpn_select_cb(SSL *s,
+        const unsigned char **out, unsigned char *out_len,
+        const unsigned char *in, unsigned int in_len, void *arg)
+{
+    client_t *c = (client_t *)SSL_get_ex_data(s, g.ssl_idx);
+    const unsigned char *proto;
+    unsigned int proto_len = 0;
+
+    (void) arg;
+    if (!c)
+        return SSL_TLSEXT_ERR_ALERT_FATAL;
+
+    for (proto = in; proto < in + in_len; proto += proto_len) {
+        proto_len = *proto++;
+        if (in + in_len < proto + proto_len)
+            break;
+        if (proto_len == strlen("acme-tls/1") &&
+                memcmp(proto, "acme-tls/1", proto_len) == 0) {
+            *out = proto;
+            *out_len = proto_len;
+#if HAVE_SPLICE
+            c->n_f2b = 0;
+#else
+            c->buf_f2b.n = 0;
+            c->buf_f2b.rp = 0;
+            c->buf_f2b.wp = 0;
+#endif
+            c->state = STATE_ACME;
+            return SSL_TLSEXT_ERR_OK;
+        }
+    }
+    return SSL_TLSEXT_ERR_ALERT_FATAL;
+}
+#elif defined(USE_MBEDTLS)
+static int bio_read(void *ctx, unsigned char *data, size_t size)
+{
+    client_t *c = (client_t *)ctx;
+    if (data == NULL)
+        return 0;
+    if (!c)
+        return -1;
+
+#if EV_MULTIPLICITY
+    EV_P = c->loop;
+#endif
+    ssize_t s = recv(c->fd_f, data, size,
+            c->state == STATE_ACME ? 0 : MSG_PEEK);
+    if (s == 0) {
+        c->state = STATE_CLOSING;
+        return 0;
+    } else if (s == -1) {
+        if (errno != EAGAIN && errno != EWOULDBLOCK) {
+            warn("client %08x: frontend failed to read from %s:%s", c->id,
+                    c->rhost_f, c->rserv_f);
+            c->state = STATE_CLOSING;
+            return -1;
+        } else if (c->fd_f != -1 && c->state != STATE_DONE) {
+            ev_io_start(EV_A_ &c->io_rxf);
+        }
+        return MBEDTLS_ERR_SSL_WANT_READ;
+    }
+
+    if (c->state == STATE_ACME) {
+        c->frx += s;
+        return s;
+    }
+
+#if HAVE_SPLICE
+    s = write(c->fd_f2b[1], data, s);
+    if (s > 0)
+        c->n_f2b += s;
+#else
+    s = buf_put(&c->buf_f2b, data, s);
+#endif
+    if (s == -1) {
+        if (errno == EAGAIN || errno == EWOULDBLOCK)
+            return MBEDTLS_ERR_SSL_WANT_READ;
+    } else {
+        ssize_t sr = recv(c->fd_f, data, s, 0);
+        if (sr > 0)
+            c->frx += sr;
+        if (sr != s) {
+            warn("client %08x: frontend failed to buffer data from %s:%s",
+                    c->id, c->rhost_f, c->rserv_f);
+            c->state = STATE_CLOSING;
+            return 0;
+        }
+    }
+    return s;
+}
+
+static int bio_write(void *ctx, const unsigned char *data, size_t size)
+{
+    client_t *c = (client_t *)ctx;
+    if (!c)
+        return -1;
+#if EV_MULTIPLICITY
+    EV_P = c->loop;
+#endif
+    if (c->state != STATE_ACME) {
+        // prevent sending data to client until PROXY/ACME decision
+        return MBEDTLS_ERR_SSL_WANT_WRITE;
+    }
+
+#if HAVE_SPLICE
+    ssize_t s = write(c->fd_b2f[1], data, size);
+    if (s > 0)
+        c->n_b2f += s;
+#else
+    ssize_t s = buf_put(&c->buf_b2f, data, size);
+#endif
+    if (s == -1) {
+        if (errno != EAGAIN && errno != EWOULDBLOCK) {
+            warn("client %08x: frontend failed to buffer data from %s:%s",
+                    c->id, c->rhost_f, c->rserv_f);
+            c->state = STATE_CLOSING;
+            return -1;
+        } else
+            s = MBEDTLS_ERR_SSL_WANT_WRITE;
+    }
+    if (c->fd_f != -1)
+        ev_io_start(EV_A_ &c->io_txf);
+    return s;
+}
+
+static int sni_callback(void *p, mbedtls_ssl_context *ssl,
+        const unsigned char *name, size_t name_len)
+{
+    client_t *c = (client_t *)p;
+    if (!c || ssl != &c->ssl)
+        return -1;
+
+    memset(c->ident, 0, sizeof(c->ident));
+    if (name_len > sizeof(c->ident) - 1)
+        name_len = sizeof(c->ident) - 1;
+    memcpy(c->ident, name, name_len);
+    return 0;
+}
+
+static int do_handshake(client_t *c)
+{
+    int rc = 0;
+    while (c->ssl.state != MBEDTLS_SSL_HANDSHAKE_OVER) {
+        rc = mbedtls_ssl_handshake_step(&c->ssl);
+        if (rc)
+            break;
+        if (c->state == STATE_ACME)
+            continue;
+        if (c->ssl.state > MBEDTLS_SSL_CLIENT_HELLO) {
+            const char *proto = mbedtls_ssl_get_alpn_protocol(&c->ssl);
+            if (proto && strcmp(proto, "acme-tls/1") == 0) {
+                auth_t *auth = get_auth(c->ident);
+                if (!auth) {
+                    infox("client %08x: acme-tls/1 handshake: no auth for %s",
+                            c->id, c->ident);
+                    return -1;
+                }
+
+                mbedtls_x509_crt_free(&c->crt);
+                rc = mbedtls_x509_crt_parse_der(&c->crt, auth->crt,
+                        auth->crt_size);
+                if (rc) {
+                    warnx("client %08x: mbedtls_x509_crt_parse_der for %s: %s",
+                            c->ident, _mbedtls_strerror(rc));
+                    return -1;
+                }
+
+                mbedtls_pk_free(&c->key);
+                rc = mbedtls_pk_parse_key(&c->key, auth->key,
+                        auth->key_size, NULL, 0);
+                if (rc) {
+                    warnx("client %08x: mbedtls_pk_parse_key for %s: %s",
+                            c->ident, _mbedtls_strerror(rc));
+                    return -1;
+                }
+
+                rc = mbedtls_ssl_conf_own_cert(&c->cnf, &c->crt, &c->key);
+                if (rc) {
+                    warnx("client %08x: mbedtls_ssl_conf_own_cert for %s: %s",
+                            c->ident, _mbedtls_strerror(rc));
+                    return -1;
+                }
+
+                strncpy(c->auth, auth->auth, sizeof(c->auth)-1);
+#if HAVE_SPLICE
+                c->n_f2b = 0;
+#else
+                c->buf_f2b.n = 0;
+                c->buf_f2b.rp = 0;
+                c->buf_f2b.wp = 0;
+#endif
+                c->state = STATE_ACME;
+            } else
+                return -1;
+        }
+    }
+    return rc;
+}
+#endif
 
 static int tls_session_init(client_t *c, uint8_t *buf, size_t buf_len)
 {
-    int rc;
-
     if (buf_len > 0 && buf[0] != 0x16)
-        return GNUTLS_E_APPLICATION_ERROR_MAX;
+        return -1;
     if (buf_len > 1 && buf[1] != 0x03)
-        return GNUTLS_E_APPLICATION_ERROR_MAX;
+        return -1;
     if (buf_len > 2 && (buf[2] < 0x01 || buf[2] > 0x03))
-        return GNUTLS_E_APPLICATION_ERROR_MAX;
+        return -1;
 
-    rc = gnutls_init(&c->tls, GNUTLS_SERVER | GNUTLS_NONBLOCK);
+#if defined(USE_GNUTLS)
+    int rc = gnutls_init(&c->tls, GNUTLS_SERVER | GNUTLS_NONBLOCK);
     if (rc != GNUTLS_E_SUCCESS) {
         warnx("client %08x: gnutls_init: %s", c->id, gnutls_strerror(rc));
-        return rc;
+        return -1;
     }
     gnutls_session_set_ptr(c->tls, c);
     gnutls_transport_set_ptr(c->tls, c);
@@ -1261,22 +2332,103 @@ static int tls_session_init(client_t *c, uint8_t *buf, size_t buf_len)
     if (rc != GNUTLS_E_SUCCESS) {
         warnx("client %08x: gnutls_alpn_set_protocols", c->id,
                 gnutls_strerror(rc));
-        return rc;
+        return -1;
     }
     rc = gnutls_set_default_priority(c->tls);
     if (rc != GNUTLS_E_SUCCESS) {
         warnx("client %08x: gnutls_set_default_priority", c->id,
                 gnutls_strerror(rc));
-        return rc;
+        return -1;
     }
     rc = gnutls_certificate_allocate_credentials(&c->cred);
     if (rc != GNUTLS_E_SUCCESS) {
         warnx("client %08x: failed to allocate TLS credentials: %s", c->id,
                 gnutls_strerror(rc));
         gnutls_deinit(c->tls);
-        return rc;
+        return -1;
     }
-    return GNUTLS_E_SUCCESS;
+#elif defined(USE_OPENSSL)
+    c->ssl = SSL_new(g.ssl_ctx);
+    if (!c->ssl || !SSL_set_ex_data(c->ssl, g.ssl_idx, c)) {
+        char buf[32];
+        snprintf(buf, sizeof(buf), "client %08x:", c->id);
+        openssl_error(buf);
+        return -1;
+    }
+    BIO *bio = BIO_new(BIO_s_ualpn());
+    if (!bio || !BIO_set_ex_data(bio, g.bio_idx, c)) {
+        char buf[32];
+        snprintf(buf, sizeof(buf), "client %08x:", c->id);
+        openssl_error(buf);
+        return -1;
+    }
+    BIO_up_ref(bio);
+    SSL_set0_rbio(c->ssl, bio);
+    SSL_set0_wbio(c->ssl, bio);
+    SSL_set_accept_state(c->ssl);
+#elif defined(USE_MBEDTLS)
+    mbedtls_ssl_config_init(&c->cnf);
+    int rc = mbedtls_ssl_config_defaults(&c->cnf, MBEDTLS_SSL_IS_SERVER,
+                    MBEDTLS_SSL_TRANSPORT_STREAM, MBEDTLS_SSL_PRESET_DEFAULT);
+    if (rc) {
+        warnx("client %08x: mbedtls_ssl_config_defaults: %s", c->id,
+                _mbedtls_strerror(rc));
+        return -1;
+    }
+    mbedtls_ssl_conf_min_version(&c->cnf, MBEDTLS_SSL_MAJOR_VERSION_3,
+            MBEDTLS_SSL_MINOR_VERSION_3);
+    static const char *protos[] = { "acme-tls/1", NULL };
+    rc = mbedtls_ssl_conf_alpn_protocols(&c->cnf, protos);
+    if (rc) {
+        warnx("client %08x: mbedtls_ssl_conf_alpn_protocols: %s", c->id,
+                _mbedtls_strerror(rc));
+        return -1;
+    }
+    mbedtls_ssl_conf_rng(&c->cnf, mbedtls_ctr_drbg_random, &g.ctr_drbg);
+    mbedtls_ssl_conf_sni(&c->cnf, sni_callback, c);
+    mbedtls_x509_crt_init(&c->crt);
+    rc = mbedtls_x509_crt_parse_der(&c->crt, g.crt, g.crt_len);
+    if (rc == MBEDTLS_ERR_X509_INVALID_EXTENSIONS +
+                MBEDTLS_ERR_ASN1_UNEXPECTED_TAG) {
+        critx("client %08x: mbedTLS is most likely built without "
+                "MBEDTLS_X509_ALLOW_UNSUPPORTED_CRITICAL_EXTENSION, "
+                "terminating", c->id);
+        g_shm->shutdown = true;
+        return -1;
+    } else if (rc) {
+        warnx("client %08x: mbedtls_x509_crt_parse_der: %s", c->id,
+                _mbedtls_strerror(rc));
+        return -1;
+    }
+    mbedtls_pk_init(&c->key);
+    rc = mbedtls_pk_parse_key(&c->key, g.key, g.key_len, NULL, 0);
+    if (rc) {
+        warnx("client %08x: mbedtls_pk_parse_key: %s", c->id,
+                _mbedtls_strerror(rc));
+        return -1;
+    }
+    rc = mbedtls_ssl_conf_own_cert(&c->cnf, &c->crt, &c->key);
+    if (rc) {
+        warnx("client %08x: mbedtls_ssl_conf_own_cert: %s", c->id,
+                c->ident, _mbedtls_strerror(rc));
+        return -1;
+    }
+    mbedtls_ssl_init(&c->ssl);
+    rc = mbedtls_ssl_setup(&c->ssl, &c->cnf);
+    if (rc) {
+        warnx("client %08x: mbedtls_ssl_setup: %s", c->id,
+                _mbedtls_strerror(rc));
+        return -1;
+    }
+    rc = mbedtls_ssl_session_reset(&c->ssl);
+    if (rc) {
+        warnx("client %08x: mbedtls_ssl_session_reset: %s", c->id,
+                _mbedtls_strerror(rc));
+        return -1;
+    }
+    mbedtls_ssl_set_bio(&c->ssl, c, bio_write, bio_read, NULL);
+#endif
+    return 0;
 }
 
 #if HAVE_SPLICE
@@ -1590,6 +2742,8 @@ static void cb_client_rxf(EV_P_ ev_io *w, int revents)
     if ((revents & EV_READ) == 0)
         return;
 
+    c->timestamp = ev_now(EV_A);
+
     if (c->state == STATE_INIT) {
         uint8_t buf[3];
         ssize_t len = recv(c->fd_f, buf, sizeof(buf), MSG_PEEK);
@@ -1603,7 +2757,7 @@ static void cb_client_rxf(EV_P_ ev_io *w, int revents)
                 client_done(EV_A_ c, DRAIN_FRONTEND);
             }
             return;
-        } else if (tls_session_init(c, buf, len) == GNUTLS_E_SUCCESS)
+        } else if (tls_session_init(c, buf, len) == 0)
             c->state = STATE_ACME_MAYBE;
         else if (connect_backend(c) == 0) {
             c->state = STATE_PROXY_INIT;
@@ -1617,8 +2771,13 @@ static void cb_client_rxf(EV_P_ ev_io *w, int revents)
     }
 
     if (c->state == STATE_ACME_MAYBE || c->state == STATE_ACME) {
-        c->timestamp = ev_now(EV_A);
-        int rc = gnutls_handshake(c->tls);
+        int rc;
+#if defined(USE_GNUTLS)
+        rc = gnutls_handshake(c->tls);
+        if (c->state == STATE_CLOSING) {
+            client_done(EV_A_ c, DRAIN_FRONTEND);
+            return;
+        }
         if (rc == GNUTLS_E_INTERRUPTED || rc == GNUTLS_E_AGAIN)
             return;
         if (c->state == STATE_ACME) {
@@ -1632,6 +2791,50 @@ static void cb_client_rxf(EV_P_ ev_io *w, int revents)
             client_done(EV_A_ c, DRAIN_NONE);
             return;
         }
+#elif defined(USE_OPENSSL)
+        rc = SSL_get_error(c->ssl, SSL_do_handshake(c->ssl));
+        if (c->state == STATE_CLOSING) {
+            client_done(EV_A_ c, DRAIN_FRONTEND);
+            return;
+        }
+        if (rc == SSL_ERROR_WANT_READ || rc == SSL_ERROR_WANT_WRITE)
+            return;
+        if (c->state == STATE_ACME) {
+            if (rc == SSL_ERROR_NONE)
+                noticex("client %08x: acme-tls/1 handshake with auth %s for %s "
+                        "completed", c->id, c->auth, c->ident);
+            else {
+                warnx("client %08x: acme-tls/1 handshake with auth %s for %s "
+                        "failed: %s", c->id, c->auth, c->ident,
+                        ERR_error_string(ERR_get_error(), NULL));
+                ERR_clear_error();
+            }
+            client_done(EV_A_ c, DRAIN_NONE);
+            return;
+        }
+#elif defined(USE_MBEDTLS)
+        rc = do_handshake(c);
+        if (c->state == STATE_CLOSING) {
+            client_done(EV_A_ c, DRAIN_FRONTEND);
+            return;
+        }
+        if (rc == MBEDTLS_ERR_SSL_WANT_READ ||
+                rc == MBEDTLS_ERR_SSL_WANT_WRITE ||
+                rc == MBEDTLS_ERR_SSL_ASYNC_IN_PROGRESS ||
+                rc == MBEDTLS_ERR_SSL_CRYPTO_IN_PROGRESS)
+            return;
+        if (c->state == STATE_ACME) {
+            if (rc == 0)
+                noticex("client %08x: acme-tls/1 handshake with auth %s for %s "
+                        "completed", c->id, c->auth, c->ident);
+            else
+                warnx("client %08x: acme-tls/1 handshake with auth %s for %s "
+                        "failed: %s", c->id, c->auth, c->ident,
+                        _mbedtls_strerror(rc));
+            client_done(EV_A_ c, DRAIN_NONE);
+            return;
+        }
+#endif
         if (c->state != STATE_DONE) {
             if (connect_backend(c) == 0) {
                 c->state = STATE_PROXY_INIT;
@@ -1761,7 +2964,13 @@ static void cb_client_txf(EV_P_ ev_io *w, int revents)
         ev_io_start(EV_A_ &c->io_rxb);
 
     if (c->state == STATE_ACME) {
-        int rc = gnutls_handshake(c->tls);
+        int rc;
+#if defined(USE_GNUTLS)
+        rc = gnutls_handshake(c->tls);
+        if (c->state == STATE_CLOSING) {
+            client_done(EV_A_ c, DRAIN_FRONTEND);
+            return;
+        }
         if (rc == GNUTLS_E_INTERRUPTED || rc == GNUTLS_E_AGAIN)
             return;
         if (rc == GNUTLS_E_SUCCESS)
@@ -1771,6 +2980,42 @@ static void cb_client_txf(EV_P_ ev_io *w, int revents)
             warnx("client %08x: acme-tls/1 handshake with auth %s for %s "
                     "failed: %s", c->id, c->auth, c->ident,
                     gnutls_strerror(rc));
+#elif defined(USE_OPENSSL)
+        rc = SSL_get_error(c->ssl, SSL_do_handshake(c->ssl));
+        if (c->state == STATE_CLOSING) {
+            client_done(EV_A_ c, DRAIN_FRONTEND);
+            return;
+        }
+        if (rc == SSL_ERROR_WANT_READ || rc == SSL_ERROR_WANT_WRITE)
+            return;
+        else if (rc == SSL_ERROR_NONE)
+            noticex("client %08x: acme-tls/1 handshake with auth %s for %s "
+                    "completed", c->id, c->auth, c->ident);
+        else {
+            warnx("client %08x: acme-tls/1 handshake with auth %s for %s "
+                    "failed: %s", c->id, c->auth, c->ident,
+                    ERR_error_string(ERR_get_error(), NULL));
+            ERR_clear_error();
+        }
+#elif defined(USE_MBEDTLS)
+        rc = do_handshake(c);
+        if (c->state == STATE_CLOSING) {
+            client_done(EV_A_ c, DRAIN_FRONTEND);
+            return;
+        }
+        if (rc == MBEDTLS_ERR_SSL_WANT_READ ||
+                rc == MBEDTLS_ERR_SSL_WANT_WRITE ||
+                rc == MBEDTLS_ERR_SSL_ASYNC_IN_PROGRESS ||
+                rc == MBEDTLS_ERR_SSL_CRYPTO_IN_PROGRESS)
+            return;
+        else if (rc == 0)
+            noticex("client %08x: acme-tls/1 handshake with auth %s for %s "
+                    "completed", c->id, c->auth, c->ident);
+        else
+            warnx("client %08x: acme-tls/1 handshake with auth %s for %s "
+                    "failed: %s", c->id, c->auth, c->ident,
+                    _mbedtls_strerror(rc));
+#endif
         client_done(EV_A_ c, DRAIN_NONE);
         return;
     }
@@ -1787,6 +3032,7 @@ static void cb_client_timer(EV_P_ ev_timer *w, int revents)
     if (after < 0.0) {
         infox("client %08x: closing due to activity timeout", c->id);
         client_done(EV_A_ c, DRAIN_BOTH);
+        return;
     } else {
         ev_timer_set(w, after, 0.0);
         ev_timer_start(EV_A_ w);
@@ -1960,10 +3206,15 @@ static void cb_cleanup(EV_P_ ev_cleanup *w, int revents)
         ev_io_stop(EV_A_ &client->io_b2f1);
 #endif
         ev_timer_stop(EV_A_ &client->timer);
+#if defined(USE_GNUTLS)
         if (client->tls)
             gnutls_deinit(client->tls);
         if (client->cred)
             gnutls_certificate_free_credentials(client->cred);
+#elif defined(USE_OPENSSL)
+        if (client->ssl)
+            SSL_free(client->ssl);
+#endif
         SGLIB_DL_LIST_DELETE(client_t, g.clients, client, prev, next);
         free(client);
     }
@@ -2309,6 +3560,7 @@ static void cb_child(EV_P_ ev_child *w, int revents)
     SGLIB_DL_LIST_DELETE(worker_t, g.workers, worker, prev, next);
     noticex("worker %ld terminated with status %d", (long)worker->pid,
             w->rstatus);
+    free(worker);
 }
 
 static void cleanup_and_exit(int stage, int return_code)
@@ -2337,7 +3589,19 @@ static void cleanup_and_exit(int stage, int return_code)
             if (g.devzero != -1)
                 close(g.devzero);
 #endif
+#if defined(USE_GNUTLS)
             gnutls_global_deinit();
+#elif defined(USE_OPENSSL)
+            if (g.ssl_ctx)
+                SSL_CTX_free(g.ssl_ctx);
+            if (g.bio_meth)
+                BIO_meth_free(g.bio_meth);
+#elif defined(USE_MBEDTLS)
+            mbedtls_ctr_drbg_free(&g.ctr_drbg);
+            mbedtls_entropy_free(&g.entropy);
+            free(g.key);
+            free(g.crt);
+#endif
             //intentional fallthrough
         case 0:
             if (g.sockfd != -1) {
@@ -3070,7 +4334,7 @@ int main(int argc, char **argv)
             cleanup_and_exit(0, EXIT_FAILURE);
         }
         SGLIB_LIST_ADD(str_t, g.bind, s, next)
-#ifdef IPV6_V6ONLY
+#if defined(IPV6_V6ONLY)
         if (g.family == AF_UNSPEC) {
             s = calloc(1, sizeof(str_t));
             if (!s) {
@@ -3156,12 +4420,73 @@ int main(int argc, char **argv)
     signal(SIGPIPE, SIG_IGN);
     signal(SIGABRT, SIG_IGN);
 
+#if defined(USE_GNUTLS)
     if (!gnutls_check_version("3.3.30"))
     {
-        warnx("GnuTLS version 3.3.30 or later is required");
+        errx("GnuTLS version 3.3.30 or later is required");
         cleanup_and_exit(0, EXIT_FAILURE);
     }
     gnutls_global_init();
+#elif defined(USE_OPENSSL)
+    if (OpenSSL_version_num() < 0x1010100fL) {
+        errx("OpenSSL version 1.1.1 or later is required");
+        cleanup_and_exit(0, EXIT_FAILURE);
+    }
+    g.ssl_ctx = SSL_CTX_new(TLS_server_method());
+    if (!g.ssl_ctx) {
+        openssl_error("main");
+        cleanup_and_exit(0, EXIT_FAILURE);
+    }
+    if (!SSL_CTX_set_min_proto_version(g.ssl_ctx, TLS1_2_VERSION)) {
+        openssl_error("main");
+        cleanup_and_exit(1, EXIT_FAILURE);
+    }
+    g.ssl_idx = SSL_get_ex_new_index(0, NULL, NULL, NULL, NULL);
+    if (g.ssl_idx < 0) {
+        openssl_error("main");
+        cleanup_and_exit(1, EXIT_FAILURE);
+    }
+    g.bio_idx = BIO_get_ex_new_index(0, NULL, NULL, NULL, NULL);
+    if (g.bio_idx < 0) {
+        openssl_error("main");
+        cleanup_and_exit(1, EXIT_FAILURE);
+    }
+    SSL_CTX_set_client_hello_cb(g.ssl_ctx, ssl_client_hello_cb, NULL);
+    SSL_CTX_set_alpn_select_cb(g.ssl_ctx, ssl_alpn_select_cb, NULL);
+#elif defined(USE_MBEDTLS)
+#if defined(MBEDTLS_VERSION_C)
+    if (mbedtls_version_get_number() < 0x02100000) {
+        errx("mbedTLS version 2.16 or later is required");
+        cleanup_and_exit(0, EXIT_FAILURE);
+    }
+#if defined(MBEDTLS_VERSION_FEATURES)
+    if (mbedtls_version_check_feature(
+                "MBEDTLS_X509_ALLOW_UNSUPPORTED_CRITICAL_EXTENSION")) {
+        errx("mbedTLS needs to be built with "
+                "MBEDTLS_X509_ALLOW_UNSUPPORTED_CRITICAL_EXTENSION");
+        cleanup_and_exit(0, EXIT_FAILURE);
+    }
+#else
+#warning mbedTLS runtime feature check disabled. Consider reconfiguring \
+    mbedTLS with MBEDTLS_VERSION_FEATURES
+#endif
+#else
+#warning mbedTLS runtime version check disabled. Consider reconfiguring \
+    mbedTLS with MBEDTLS_VERSION_C
+#endif
+    mbedtls_entropy_init(&g.entropy);
+    mbedtls_ctr_drbg_init(&g.ctr_drbg);
+    rc = mbedtls_ctr_drbg_seed(&g.ctr_drbg, mbedtls_entropy_func,
+            &g.entropy, NULL, 0);
+    if (rc) {
+        errx("mbedtls_ctr_dbg_seed failed: %s", _mbedtls_strerror(rc));
+        cleanup_and_exit(1, EXIT_FAILURE);
+    }
+    const unsigned char id[] = {0x4, 0x1, 0x0};
+    if (auth_crt("dummy", id, sizeof(id), &g.crt, &g.crt_len,
+                &g.key, &g.key_len))
+        cleanup_and_exit(1, EXIT_FAILURE);
+#endif
 
     g.sockfd = socket(AF_UNIX, SOCK_STREAM, 0);
     if (g.sockfd == -1) {
@@ -3211,7 +4536,7 @@ int main(int argc, char **argv)
     g_shm = (struct shm *)mmap(NULL, g_shm_size, PROT_READ | PROT_WRITE,
             MAP_SHARED, g.devzero, 0);
 #elif HAVE_MAP_ANON
-#ifndef MAP_ANONYMOUS
+#if !defined(MAP_ANONYMOUS)
 #define MAP_ANONYMOUS MAP_ANON
 #endif
     g_shm = (struct shm *)mmap(NULL, g_shm_size, PROT_READ | PROT_WRITE,
@@ -3295,7 +4620,7 @@ int main(int argc, char **argv)
     for (str = g.bind; str; str = str->next) {
         int family = g.family;
         if (!str->str && g.family == AF_UNSPEC) {
-#ifdef IPV6_V6ONLY
+#if defined(IPV6_V6ONLY)
             family = (str == g.bind) ? AF_INET6 : AF_INET;
 #else
             family = AF_INET6;
@@ -3321,7 +4646,7 @@ int main(int argc, char **argv)
                 warn("failed to create socket for %s:%s", host, port);
                 continue;
             }
-#ifdef IPV6_V6ONLY
+#if defined(IPV6_V6ONLY)
             if ((a->ai_family == AF_INET6 && setsockopt(fd, IPPROTO_IPV6,
                             IPV6_V6ONLY, &one, sizeof(one)))) {
                 warn("failed to set IPV6_V6ONLY for %s:%s", host, port);

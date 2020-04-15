@@ -33,6 +33,7 @@ typedef struct {
 curldata_t *curldata_calloc(void);
 void curldata_free(curldata_t *c);
 curldata_t *curl_get(const char *url);
-curldata_t *curl_post(const char *url, const char *post);
+curldata_t *curl_post(const char *url, void *post_data, size_t post_size,
+        const char *header, ...);
 
 #endif

@@ -750,7 +750,7 @@ UALPN(1) Manual Page
     [<strong>-b</strong>|<strong>--bind</strong> <em>address</em>[@<em>port</em>]] [<strong>-c</strong>|<strong>--connect</strong> <em>address</em>[@<em>port</em>]]
     [<strong>-d</strong>|<strong>--daemon</strong>] [<strong>-l</strong>|<strong>--logfile</strong> <em>file</em>] [<strong>-m</strong>|<strong>--max-auths</strong> <em>N</em>]
     [<strong>-n</strong>|<strong>--num-workers</strong> <em>N</em>] [<strong>-p</strong>|<strong>--proxy</strong> <em>N</em>] [<strong>-P</strong>|<strong>--pidfile</strong> <em>file</em>]
-    [<strong>-r</strong>|<strong>--chroot dir] [</strong>-s*|<strong>--sock path</strong>] [<strong>-S</strong>|<strong>--sock-mode</strong> <em>mode</em>]
+    [<strong>-r</strong>|<strong>--chroot dir</strong>] [<strong>-s</strong>|<strong>--sock path</strong>] [<strong>-S</strong>|<strong>--sock-mode</strong> <em>mode</em>]
     [<strong>-t</strong>|<strong>--terminate</strong>] [<strong>-u</strong>|<strong>--user</strong> <em>user</em><span class="monospaced">[:</span><em>group</em>]] [<strong>-v</strong>|<strong>--verbose</strong> &#8230;]</p></div>
 </div>
 </div>
@@ -759,7 +759,7 @@ UALPN(1) Manual Page
 <div class="sectionbody">
 <div class="paragraph"><p><strong>ualpn</strong> is a lightweight proxying ACMEv2 tls-alpn-01 challenge responder
 compliant with RFC8737 (<a href="https://tools.ietf.org/html/RFC8737">https://tools.ietf.org/html/RFC8737</a>) and RFC8738
-(<a href="https://tools.ietf.org/html/RFC8737">https://tools.ietf.org/html/RFC8737</a>).</p></div>
+(<a href="https://tools.ietf.org/html/RFC8738">https://tools.ietf.org/html/RFC8738</a>).</p></div>
 <div class="paragraph"><p>Depending on how it is invoked, <strong>ualpn</strong> runs in either client or server mode.
 In client mode <strong>ualpn</strong> connects to a running server mode instance of itself
 through a unix domain socket, in order to add or remove ACMEv2 authorizations.
@@ -894,7 +894,7 @@ nginx: <a href="https://docs.nginx.com/nginx/admin-guide/load-balancer/using-pro
 </li>
 <li>
 <p>
-apache: <a href="https://httpd.apache.org/docs/2.4/mod/mod_remoteip.html">https://httpd.apache.org/docs/2.4/mod/mod_remoteip.html</a>
+apache: <a href="https://httpd.apache.org/docs/2.4/mod/mod_remoteip.html#remoteipproxyprotocol">https://httpd.apache.org/docs/2.4/mod/mod_remoteip.html#remoteipproxyprotocol</a>
 </p>
 </li>
 </ul></div>
@@ -1186,9 +1186,9 @@ along with this program.  If not, see <a href="http://www.gnu.org/licenses/">htt
 <div id="footnotes"><hr></div>
 <div id="footer">
 <div id="footer-text">
-Version 1.1.2<br>
+Version 1.2<br>
 Last updated
- 2020-03-12 08:04:09 CET
+ 2020-04-13 23:41:56 CEST
 </div>
 </div>
 </body>
