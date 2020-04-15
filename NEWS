@@ -1,6 +1,17 @@
 uacme NEWS
 Copyright (C) 2019,2020 Nicola Di Lieto <nicola.dilieto@gmail.com>
 
+## [1.1.2] - 2020-04-15
+### Added
+- uacme OCSP certificate status check
+- ualpn OpenSSL/mbedTLS implementations
+
+### Changed
+- add key usage to ualpn challenge certificate
+- ensure top bit of ualpn certificate S/N is 0 with OpenSSL
+- fix ualpn memory leaks and corner case bugs
+- minor cosmetic code/documentation changes
+
 ## [1.1.2] - 2020-03-12
 ### Changed
 - fix configure.ac typo affecting LDFLAGS
