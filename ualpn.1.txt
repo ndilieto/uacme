@@ -17,7 +17,7 @@ SYNOPSIS
     [*-b*|*--bind* 'address'[@'port']] [*-c*|*--connect* 'address'[@'port']]
     [*-d*|*--daemon*] [*-l*|*--logfile* 'file'] [*-m*|*--max-auths* 'N']
     [*-n*|*--num-workers* 'N'] [*-p*|*--proxy* 'N'] [*-P*|*--pidfile* 'file']
-    [*-r*|*--chroot dir] [*-s*|*--sock path*] [*-S*|*--sock-mode* 'mode']
+    [*-r*|*--chroot dir*] [*-s*|*--sock path*] [*-S*|*--sock-mode* 'mode']
     [*-t*|*--terminate*] [*-u*|*--user* 'user'`[:`'group']] [*-v*|*--verbose* ...]
 
 
@@ -25,7 +25,7 @@ DESCRIPTION
 -----------
 *ualpn* is a lightweight proxying ACMEv2 tls-alpn-01 challenge responder
 compliant with RFC8737 (<https://tools.ietf.org/html/RFC8737>) and RFC8738
-(<https://tools.ietf.org/html/RFC8737>).
+(<https://tools.ietf.org/html/RFC8738>).
 
 Depending on how it is invoked, *ualpn* runs in either client or server mode.
 In client mode *ualpn* connects to a running server mode instance of itself
@@ -100,7 +100,7 @@ OPTIONS
     Enable server mode and disable (0) or specify (1, 2) the PROXY header
     version (default 1). The backend server needs to be configured accordingly:
     * nginx: <https://docs.nginx.com/nginx/admin-guide/load-balancer/using-proxy-protocol>
-    * apache: <https://httpd.apache.org/docs/2.4/mod/mod_remoteip.html>
+    * apache: <https://httpd.apache.org/docs/2.4/mod/mod_remoteip.html#remoteipproxyprotocol>
 
 *-P, --pidfile* 'file'::
     Specify pidfile location (default {runstatedir}/ualpn.pid)

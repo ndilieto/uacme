@@ -1,3 +1,12 @@
+2020-04-15 Nicola Di Lieto <nicola.dilieto@gmail.com>
+	* Release 1.2
+	- add uacme OCSP certificate status check
+	- add ualpn OpenSSL/mbedTLS implementations
+	- add key usage to ualpn challenge certificate
+	- ensure top bit of ualpn certificate S/N is 0 with OpenSSL
+	- fix ualpn memory leaks and corner case bugs
+	- minor cosmetic code and documentation changes
+
 2020-03-12 Nicola Di Lieto <nicola.dilieto@gmail.com>
 	* Release 1.1.2
 	- fix configure.ac typo affecting LDFLAGS

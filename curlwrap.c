@@ -20,6 +20,7 @@
 
 #include "config.h"
 #include <err.h>
+#include <stdarg.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
@@ -134,8 +135,10 @@ curldata_t *curl_get(const char *url)
     return c;
 }
 
-curldata_t *curl_post(const char *url, const char *post)
+curldata_t *curl_post(const char *url, void *post_data, size_t post_size,
+        const char *header, ...)
 {
+    va_list ap;
     curldata_t *c = NULL;
     for (int retry = 0; retry < 3; retry++) {
         CURL *curl;
@@ -159,8 +162,14 @@ curldata_t *curl_post(const char *url, const char *post)
         curl_easy_setopt(curl, CURLOPT_HEADERDATA, c);
         curl_easy_setopt(curl, CURLOPT_USERAGENT,
                 "uacme/" VERSION " (https://github.com/ndilieto/uacme)");
-        curl_easy_setopt(curl, CURLOPT_POSTFIELDS, post);
-        list = curl_slist_append(list, "Content-Type: application/jose+json");
+        curl_easy_setopt(curl, CURLOPT_POSTFIELDS, post_data);
+        curl_easy_setopt(curl, CURLOPT_POSTFIELDSIZE, post_size);
+        va_start(ap, header);
+        while (header) {
+            list = curl_slist_append(list, header);
+            header = va_arg(ap, const char *);
+        }
+        va_end(ap);
         curl_easy_setopt(curl, CURLOPT_HTTPHEADER, list);
         res = curl_easy_perform(curl);
         curl_slist_free_all(list);

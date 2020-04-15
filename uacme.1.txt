@@ -15,9 +15,9 @@ SYNOPSIS
 --------
 *uacme* [*-a*|*--acme-url* 'URL'] [*-b*|*--bits* 'BITS']
     [*-c*|*--confdir* 'DIR'] [*-d*|*--days* 'DAYS'] [*-f*|*--force*]
-    [*-h*|*--hook* 'PROGRAM'] [*-m*|*--must-staple*] [*-n*|*--never*]
-    [*-s*|*--staging*] [*-t*|*--type* *RSA*|*EC*] [*-v*|*--verbose* ...]
-    [*-V*|*--version*] [*-y*|*--yes*] [*-?*|*--help*]
+    [*-h*|*--hook* 'PROGRAM'] [*-m*|*--must-staple*] [*-n*|*--never-create*]
+    [*-o*|*--no-ocsp*] [*-s*|*--staging*] [*-t*|*--type* *RSA*|*EC*]
+    [*-v*|*--verbose* ...] [*-V*|*--version*] [*-y*|*--yes*] [*-?*|*--help*]
     *new* ['EMAIL'] | *update* ['EMAIL'] | *deactivate* | *newkey* |
     *issue* 'IDENTIFIER' ['ALTNAME' ...]] | *revoke* 'CERTFILE'
 
@@ -59,7 +59,7 @@ OPTIONS
 
 *-d, --days*='DAYS'::
     Do not reissue certificates that are still valid for longer
-    than 'DAYS' (default 30).
+    than 'DAYS' (default 30). See also *-o, --no-ocsp*.
 
 *-f, --force*::
     Force certificate reissuance regardless of expiration date.
@@ -93,6 +93,14 @@ OPTIONS
     By default *uacme* creates directories/keys if they do not exist.
     When this option is specified *uacme* never does so and instead
     exits with an error if anything required is missing.
+
+*-o, --no-ocsp*::
+    When this flag is *not* specified and the certificate has an
+    Authority Information Access extension with an OCSP server location
+    according to <https://tools.ietf.org/html/rfc5280#section-4.2.2.1> 
+    *uacme* makes an OCSP request to the server; if the certificate is
+    reported as revoked *uacme* forces reissuance regardless of the
+    expiration date. See also *-d, --days*.
 
 *-s, --staging*::
     Use Let's Encrypt staging URL for testing. This only works if
@@ -155,11 +163,12 @@ USAGE
     Issue a certificate for 'IDENTIFIER' with zero or more 'ALTNAMEs'.
     If a certificate is already available at 'CONFDIR/IDENTIFIER/cert.pem'
     for the specified 'IDENTIFIER' and 'ALTNAMEs' and is still valid for
-    longer than 'DAYS' no action is taken unless *-f, --force* is
-    specified. The new certificate is saved to 'CONFDIR/IDENTIFIER/cert.pem'.
-    If the certificate file already exists it is hardlinked to
-    'CONFDIR/IDENTIFIER/cert-TIMESTAMP.pem' before overwriting.
-    The private key for the certificate is loaded from
+    longer than 'DAYS' no action is taken unless *-f, --force* is specified
+    or *-o, --no-ocsp* is *not* specified and the certificate is reported
+    as revoked by the OCSP server.  The new certificate is saved to
+    'CONFDIR/IDENTIFIER/cert.pem'.  If the certificate file already exists
+    it is hardlinked to 'CONFDIR/IDENTIFIER/cert-TIMESTAMP.pem' before
+    overwriting.  The private key for the certificate is loaded from
     'CONFDIR/private/IDENTIFIER/key.pem'. If no such file exists,
     a new key is generated unless *-n, --never-create* is specified.
     Wildcard IDENTIFIERs or ALTNAMEs are dealt with correctly, as long as
