@@ -1,3 +1,11 @@
+uacme (1.2-1) unstable; urgency=medium
+
+  * New upstream release
+  - addeed Rules-Requires-Root to debian/control
+  - removed debian/compat and added debhelper-compat to debian/control
+
+ -- Nicola Di Lieto <nicola.dilieto@gmail.com>  Thu, 16 Apr 2020 08:35:04 +0200
+
 uacme (1.1.2-1) unstable; urgency=medium
 
   * New upstream release

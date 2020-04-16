@@ -2,9 +2,19 @@ Source: uacme
 Section: net
 Priority: optional
 Maintainer: Nicola Di Lieto <nicola.dilieto@gmail.com>
-Build-Depends: debhelper (>= 11), autoconf-archive, pkg-config, libev-dev,
-               libgnutls28-dev (>= 3.3), curl, libcurl4-gnutls-dev (>= 7.38),
-               asciidoc, docbook-xml, docbook-xsl, libxml2-utils, xsltproc
+Build-Depends: debhelper-compat (= 12),
+               autoconf-archive,
+               pkg-config,
+               libev-dev,
+               libgnutls28-dev (>= 3.3),
+               curl,
+               libcurl4-gnutls-dev (>= 7.38),
+               asciidoc,
+               docbook-xml,
+               docbook-xsl,
+               libxml2-utils,
+               xsltproc
+Rules-Requires-Root: no
 Standards-Version: 4.5.0
 Homepage: https://github.com/ndilieto/uacme
 Vcs-Git: https://github.com/ndilieto/uacme
@@ -15,10 +25,10 @@ Architecture: any
 Depends: ${shlibs:Depends}, ${misc:Depends}
 Description: Lightweight client for the RFC8555 ACMEv2 protocol
  uacme is a client for the ACMEv2 protocol described in RFC8555,
- written in plain C code with minimal dependencies (libcurl and
- GnuTLS or mbedTLS).  The ACMEv2 protocol allows a Certificate
- Authority (<https://letsencrypt.org> is a popular one) and an
- applicant to automate the process of verification and certificate
- issuance.  The protocol also provides facilities for other
- certificate management functions, such as certificate revocation.
+ written in plain C with minimal dependencies (libcurl and GnuTLS
+ or mbedTLS).  The ACMEv2 protocol allows a Certificate Authority
+ (<https://letsencrypt.org> is a popular one) and an applicant to
+ automate the process of verification and certificate issuance.
+ The protocol also provides facilities for other certificate
+ management functions, such as certificate revocation.
  For more information see <https://tools.ietf.org/html/rfc8555>
