@@ -131,7 +131,7 @@ typedef struct auth {
     char auth[0x30];
     uint8_t key[0x80];
     size_t key_size;
-    uint8_t crt[0x300];
+    uint8_t crt[0x500];
     size_t crt_size;
     uint8_t rb;
     struct auth *left, *right;
@@ -366,6 +366,16 @@ static struct shm {
     auth_t pool[1];
 } *g_shm = NULL;
 static size_t g_shm_size = 0;
+
+static char *safe_strncpy(char *dst, const char *src, size_t n)
+{
+    size_t i;
+    for (i = 0; i + 1 < n && src[i] != 0; i++)
+        dst[i] = src[i];
+    if (i < n)
+        dst[i] = 0;
+    return dst;
+}
 
 static int set_nonblocking(int fd)
 {
@@ -1387,11 +1397,11 @@ static void controller_handle_cmd(controller_t *c, char *line, ev_tstamp ts)
         if (auth_crt(ident, id, sizeof(id), &crt.data, &crt.size,
                     &key.data, &key.size) != 0) {
 #endif
-            buf_puts(&c->buf_send, "ERR crypto failure\n");
+            buf_puts(&c->buf_send, "ERR crypto failure (auth_crt)\n");
             return;
         }
         if (crt.size > sizeof(a->crt) || key.size > sizeof(a->key)) {
-            buf_puts(&c->buf_send, "ERR crypto failure\n");
+            buf_puts(&c->buf_send, "ERR crypto failure (crt/key size)\n");
 #if defined(USE_GNUTLS)
             gnutls_free(key.data);
             gnutls_free(crt.data);
@@ -1439,11 +1449,11 @@ static void controller_handle_cmd(controller_t *c, char *line, ev_tstamp ts)
             }
             a = g_shm->avail;
             SGLIB_DL_LIST_DELETE(auth_t, g_shm->avail, a, left, right);
-            strncpy(a->ident, arpa[0] ? arpa : ident, sizeof(a->ident) - 1);
+            safe_strncpy(a->ident, arpa[0] ? arpa : ident, sizeof(a->ident));
             sglib_auth_t_add(&g_shm->auths, a);
             g.auths_touched = true;
         }
-        strncpy(a->auth, auth, sizeof(a->auth)-1);
+        safe_strncpy(a->auth, auth, sizeof(a->auth));
         memcpy(a->key, key.data, key.size);
         a->key_size = key.size;
         memcpy(a->crt, crt.data, crt.size);
@@ -1863,8 +1873,8 @@ static int tls_post_client_hello_func(gnutls_session_t s)
         return rc;
     }
 
-    strncpy(c->auth, auth->auth, sizeof(c->auth) - 1);
-    strncpy(c->ident, auth->ident, sizeof(c->ident) - 1);
+    safe_strncpy(c->auth, auth->auth, sizeof(c->auth));
+    safe_strncpy(c->ident, auth->ident, sizeof(c->ident));
 
 #if HAVE_SPLICE
     c->n_f2b = 0;
@@ -2096,8 +2106,8 @@ static int ssl_client_hello_cb(SSL *s, int *al, void *arg)
         return SSL_CLIENT_HELLO_RETRY;
     }
 
-    strncpy(c->auth, auth->auth, sizeof(c->auth) - 1);
-    strncpy(c->ident, auth->ident, sizeof(c->ident) - 1);
+    safe_strncpy(c->auth, auth->auth, sizeof(c->auth));
+    safe_strncpy(c->ident, auth->ident, sizeof(c->ident));
 
     return SSL_CLIENT_HELLO_SUCCESS;
 }
@@ -2285,7 +2295,7 @@ static int do_handshake(client_t *c)
                     return -1;
                 }
 
-                strncpy(c->auth, auth->auth, sizeof(c->auth)-1);
+                safe_strncpy(c->auth, auth->auth, sizeof(c->auth));
 #if HAVE_SPLICE
                 c->n_f2b = 0;
 #else
@@ -4230,7 +4240,7 @@ int main(int argc, char **argv)
     }
 
     memset(&sock_addr, 0, sizeof(sock_addr));
-    strncpy(sock_addr.sun_path, g.socket, sizeof(sock_addr.sun_path)-1);
+    safe_strncpy(sock_addr.sun_path, g.socket, sizeof(sock_addr.sun_path));
     sock_addr.sun_family = AF_UNIX;
 
     if (g.stop || server_mode) {
