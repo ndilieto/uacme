@@ -1,3 +1,8 @@
+2020-04-17 Nicola Di Lieto <nicola.dilieto@gmail.com>
+	* Release 1.2.1
+	- increase cert buf size to cope with long identifiers
+	- fix gcc8 -Wstringop-truncation warning
+
 2020-04-15 Nicola Di Lieto <nicola.dilieto@gmail.com>
 	* Release 1.2
 	- add uacme OCSP certificate status check
