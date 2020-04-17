@@ -1,7 +1,12 @@
 uacme NEWS
 Copyright (C) 2019,2020 Nicola Di Lieto <nicola.dilieto@gmail.com>
 
-## [1.1.2] - 2020-04-15
+## [1.2.1] - 2020-04-17
+### Changed
+- increase cert buf size to cope with long identifiers
+- fix gcc8 -Wstringop-truncation warning
+
+## [1.2] - 2020-04-15
 ### Added
 - uacme OCSP certificate status check
 - ualpn OpenSSL/mbedTLS implementations
