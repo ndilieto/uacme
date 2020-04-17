@@ -1,3 +1,13 @@
+uacme (1.2.1-1) unstable; urgency=medium
+
+  * New upstream release
+  - debian/rules changes:
+    - removed --disable-maintainer-mode (now default in configure.ac)
+    - removed DEB_CFLAGS_MAINT_APPEND (-Wall -pedantic are already
+      in configure.ac)
+
+ -- Nicola Di Lieto <nicola.dilieto@gmail.com>  Fri, 17 Apr 2020 07:44:02 +0200
+
 uacme (1.2-1) unstable; urgency=medium
 
   * New upstream release
