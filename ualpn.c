@@ -2600,7 +2600,7 @@ static int connect_backend(client_t *c)
             return -1;
         }
 
-        c->fd_b = socket(ai->ai_family, ai->ai_socktype, ai->ai_protocol);
+        c->fd_b = socket(ai->ai_family, SOCK_STREAM, 0);
         if (c->fd_b == -1) {
             warn("client %08x: failed to create backend socket", c->id);
             freeaddrinfo(ai);
@@ -4651,7 +4651,7 @@ int main(int argc, char **argv)
                 continue;
             }
 
-            fd = socket(a->ai_family, a->ai_socktype, 0);
+            fd = socket(a->ai_family, SOCK_STREAM, 0);
             if (fd == -1) {
                 warn("failed to create socket for %s:%s", host, port);
                 continue;
