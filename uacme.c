@@ -70,6 +70,29 @@ typedef struct acme {
     char *certdir;
 } acme_t;
 
+#if !HAVE_STRCASESTR
+char *strcasestr(const char *haystack, const char *needle)
+{
+    char *ret = NULL;
+    char *_haystack = strdup(haystack);
+    char *_needle = strdup(needle);
+
+    if (!_haystack || !needle)
+        warn("strcasestr: strdup failed");
+    else {
+        char *p;
+        for (p = _haystack; *p; p++)
+            *p = tolower(*p);
+        for (p = _needle; *p; p++)
+            *p = tolower(*p);
+        ret = strstr(_haystack, _needle);
+    }
+    free(_haystack);
+    free(_needle);
+    return ret;
+}
+#endif
+
 char *find_header(const char *headers, const char *name)
 {
     char *regex = NULL;
@@ -121,7 +144,7 @@ int acme_get(acme_t *a, const char *url)
     free(a->nonce);
     a->nonce = find_header(c->headers, "Replay-Nonce");
     a->type = find_header(c->headers, "Content-Type");
-    if (a->type && strstr(a->type, "json"))
+    if (a->type && strcasestr(a->type, "json"))
         a->json = json_parse(c->body, c->body_len);
     a->headers = c->headers;
     c->headers = NULL;
@@ -218,7 +241,7 @@ int acme_post(acme_t *a, const char *url, const char *format, ...)
         free(a->nonce);
         a->nonce = find_header(c->headers, "Replay-Nonce");
         a->type = find_header(c->headers, "Content-Type");
-        if (a->type && strstr(a->type, "json"))
+        if (a->type && strcasestr(a->type, "json"))
             a->json = json_parse(c->body, c->body_len);
         a->headers = c->headers;
         c->headers = NULL;
@@ -240,7 +263,7 @@ int acme_post(acme_t *a, const char *url, const char *format, ...)
                 warnx("acme_post: return code %d", ret);
         }
         if (ret != 400 || !a->type || !a->nonce || !a->json ||
-                strcasecmp(a->type, "application/problem+json") != 0 ||
+                !strcasestr(a->type, "application/problem+json") ||
                 json_compare_string(a->json, "type",
                     "urn:ietf:params:acme:error:badNonce") != 0)
             break;
@@ -341,7 +364,7 @@ bool acme_error(acme_t *a)
 {
     if (!a->json) return false;
 
-    if (a->type && strcasecmp(a->type, "application/problem+json") == 0) {
+    if (a->type && strcasestr(a->type, "application/problem+json")) {
         warnx("the server reported the following error:");
         json_dump(stderr, a->json);
         return true;
@@ -409,7 +432,7 @@ bool account_new(acme_t *a, bool yes)
 
         case 400:
             if (a->json && a->type &&
-                    strcasecmp(a->type, "application/problem+json") == 0 &&
+                    strcasestr(a->type, "application/problem+json") &&
                     json_compare_string(a->json, "type",
                       "urn:ietf:params:acme:error:accountDoesNotExist") == 0) {
                 const json_value_t *meta = json_find(a->dir, "meta");
@@ -473,7 +496,7 @@ bool account_retrieve(acme_t *a)
 
         case 400:
             if (a->json && a->type &&
-                    strcasecmp(a->type, "application/problem+json") == 0 &&
+                    strcasestr(a->type, "application/problem+json") &&
                     json_compare_string(a->json, "type",
                       "urn:ietf:params:acme:error:accountDoesNotExist") == 0) {
                 warnx("no account associated with %s/key.pem found at %s. "

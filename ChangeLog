@@ -1,3 +1,8 @@
+2020-04-22 Nicola Di Lieto <nicola.dilieto@gmail.com>
+	* Release 1.2.3
+	- fix Content-Type header parsing
+	  https://github.com/ndilieto/uacme/issues/22
+
 2020-04-18 Nicola Di Lieto <nicola.dilieto@gmail.com>
 	* Release 1.2.2
 	- fix ualpn socket type bug on uClibc based systems
