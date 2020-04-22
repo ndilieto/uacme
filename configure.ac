@@ -63,6 +63,7 @@ AC_CHECK_FUNCS([asprintf vasprintf], [],
                AC_MSG_ERROR([uacme requires (v)asprintf]))
 AC_CHECK_FUNCS([getopt_long], [],
                AC_MSG_ERROR([uacme requires getopt_long]))
+AC_CHECK_FUNCS([strcasestr])
 AC_CHECK_FUNCS([setproctitle])
 
 if test -n "$PKG_CONFIG"; then
