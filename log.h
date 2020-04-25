@@ -22,9 +22,17 @@
 #define __LOG_H__
 #include <syslog.h>
 
+#ifdef __GNUC__
+#define DECLARE_LOG_FUNC(func, level)           \
+    void __attribute__((format (printf, 1, 2))) \
+        func##x(const char *format, ...);       \
+    void __attribute__((format (printf, 1, 2))) \
+        func(const char *format, ...);
+#else
 #define DECLARE_LOG_FUNC(func, level)      \
     void func##x(const char *format, ...); \
     void func(const char *format, ...);
+#endif
 
 #define DEFINE_LOG_FUNC(func, level)       \
     void func##x(const char *format, ...)  \

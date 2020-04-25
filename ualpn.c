@@ -2275,7 +2275,7 @@ static int do_handshake(client_t *c)
                         auth->crt_size);
                 if (rc) {
                     warnx("client %08x: mbedtls_x509_crt_parse_der for %s: %s",
-                            c->ident, _mbedtls_strerror(rc));
+                            c->id, c->ident, _mbedtls_strerror(rc));
                     return -1;
                 }
 
@@ -2284,14 +2284,14 @@ static int do_handshake(client_t *c)
                         auth->key_size, NULL, 0);
                 if (rc) {
                     warnx("client %08x: mbedtls_pk_parse_key for %s: %s",
-                            c->ident, _mbedtls_strerror(rc));
+                            c->id, c->ident, _mbedtls_strerror(rc));
                     return -1;
                 }
 
                 rc = mbedtls_ssl_conf_own_cert(&c->cnf, &c->crt, &c->key);
                 if (rc) {
                     warnx("client %08x: mbedtls_ssl_conf_own_cert for %s: %s",
-                            c->ident, _mbedtls_strerror(rc));
+                            c->id, c->ident, _mbedtls_strerror(rc));
                     return -1;
                 }
 
@@ -2340,13 +2340,13 @@ static int tls_session_init(client_t *c, uint8_t *buf, size_t buf_len)
     };
     rc = gnutls_alpn_set_protocols(c->tls, &proto, 1, GNUTLS_ALPN_MAND);
     if (rc != GNUTLS_E_SUCCESS) {
-        warnx("client %08x: gnutls_alpn_set_protocols", c->id,
+        warnx("client %08x: gnutls_alpn_set_protocols: %s", c->id,
                 gnutls_strerror(rc));
         return -1;
     }
     rc = gnutls_set_default_priority(c->tls);
     if (rc != GNUTLS_E_SUCCESS) {
-        warnx("client %08x: gnutls_set_default_priority", c->id,
+        warnx("client %08x: gnutls_set_default_priority: %s", c->id,
                 gnutls_strerror(rc));
         return -1;
     }
@@ -2420,7 +2420,7 @@ static int tls_session_init(client_t *c, uint8_t *buf, size_t buf_len)
     rc = mbedtls_ssl_conf_own_cert(&c->cnf, &c->crt, &c->key);
     if (rc) {
         warnx("client %08x: mbedtls_ssl_conf_own_cert: %s", c->id,
-                c->ident, _mbedtls_strerror(rc));
+                _mbedtls_strerror(rc));
         return -1;
     }
     mbedtls_ssl_init(&c->ssl);
@@ -2585,7 +2585,7 @@ static int connect_backend(client_t *c)
                 c->rserv_b, sizeof(c->rserv_b),
                 NI_NUMERICHOST | NI_NUMERICSERV);
         if (rc != 0) {
-            warnx("client %08x: failed to get backend address info: %s",
+            warnx("client %08x: failed to get backend address info: %s", c->id,
                     rc == EAI_SYSTEM ? strerror(errno) : gai_strerror(rc));
             freeaddrinfo(ai);
             continue;
@@ -4070,7 +4070,7 @@ int main(int argc, char **argv)
             case 'l':
                 f = fopen(optarg, "a+");
                 if (!f) {
-                    err("failed to open %s");
+                    err("failed to open %s", optarg);
                     cleanup_and_exit(0, EXIT_FAILURE);
                 } else {
                     g.logfilename = strdup(optarg);
@@ -4235,7 +4235,7 @@ int main(int argc, char **argv)
     }
 
     if (strlen(g.socket) > sizeof(sock_addr.sun_path) - 1) {
-        errx("socket name is too long (%s)");
+        errx("socket name is too long (%s)", g.socket);
         cleanup_and_exit(0, EXIT_FAILURE);
     }
 
