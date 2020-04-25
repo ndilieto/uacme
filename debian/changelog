@@ -1,3 +1,9 @@
+uacme (1.2.4-1) unstable; urgency=medium
+
+  * New upstream release
+
+ -- Nicola Di Lieto <nicola.dilieto@gmail.com>  Sat, 25 Apr 2020 16:04:37 +0200
+
 uacme (1.2.3-1) unstable; urgency=medium
 
   * New upstream release
