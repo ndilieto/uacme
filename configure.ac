@@ -201,7 +201,6 @@ if test "x$OPT_GNUTLS" != "xno"; then
         AC_CHECK_LIB(gnutls, gnutls_global_init,
                      [AC_DEFINE(USE_GNUTLS, 1, [if GnuTLS is enabled])
                       AC_SUBST(USE_GNUTLS, [1])
-                      GNUTLS_ENABLED=1
                       USE_GNUTLS="yes"],
                      [AC_MSG_ERROR([gnutls check failed])])
         AC_CHECK_FUNCS([gnutls_decode_rs_value], [], [NEED_LIBTASN1="yes"])
@@ -271,7 +270,6 @@ if test "x$OPT_OPENSSL" != "xno"; then
         AC_CHECK_LIB(ssl, OpenSSL_version_num,
                      [AC_DEFINE(USE_OPENSSL, 1, [if OpenSSL is enabled])
                       AC_SUBST(USE_OPENSSL, [1])
-                      OPENSSL_ENABLED=1
                       USE_OPENSSL="yes"],
                      [AC_MSG_ERROR([openssl check failed])])
     fi
@@ -279,40 +277,24 @@ fi
 AM_CONDITIONAL(ENABLE_READFILE, test "x$USE_OPENSSL" != "xyes")
 
 if test "x$OPT_MBEDTLS" != "xno"; then
+    addlib="-lmbedtls -lmbedx509 -lmbedcrypto"
     if test "x$OPT_MBEDTLS" = "xyes"; then
-        OPT_MBEDTLS=""
-    fi
-    if test -z "$OPT_MBEDTLS" ; then
-        AC_CHECK_LIB(mbedtls, mbedtls_entropy_init,
-                     [AC_DEFINE(USE_MBEDTLS, 1, [if mbedTLS is enabled])
-                      AC_SUBST(USE_MBEDTLS, [1])
-                      MBEDTLS_ENABLED=1
-                      USE_MBEDTLS="yes"],
-                     [], -lmbedtls -lmbedx509 -lmbedcrypto)
-    fi
-    addld=""
-    addlib=""
-    addcflags=""
-    mbedtlslib=""
-    if test "x$USE_MBEDTLS" != "xyes"; then
+        addld=""
+        addcflags=""
+    else
         addld=-L$OPT_MBEDTLS/lib$libsuff
         addcflags=-I$OPT_MBEDTLS/include
-        mbedtlslib=$OPT_MBEDTLS/lib$libsuff
-        LDFLAGS="$LDFLAGS $addld"
-        if test "$addcflags" != "-I/usr/include"; then
-            CPPFLAGS="$CPPFLAGS $addcflags"
-        fi
-        AC_CHECK_LIB(mbedtls, mbedtls_entropy_init,
-                     [AC_DEFINE(USE_MBEDTLS, 1, [if mbedTLS is enabled])
-                      AC_SUBST(USE_MBEDTLS, [1])
-                      MBEDTLS_ENABLED=1
-                      USE_MBEDTLS="yes"],
-                     [AC_MSG_ERROR([mbedtls check failed])],
-                     -lmbedtls -lmbedx509 -lmbedcrypto)
     fi
+    LIBS="$addlib $LIBS"
+    LDFLAGS="$LDFLAGS $addld"
+    CPPFLAGS="$CPPFLAGS $addcflags"
+    AC_CHECK_LIB(mbedtls, mbedtls_entropy_init,
+                 [AC_DEFINE(USE_MBEDTLS, 1, [if mbedTLS is enabled])
+                  AC_SUBST(USE_MBEDTLS, [1])
+                  USE_MBEDTLS="yes"],
+                 [AC_MSG_ERROR([mbedtls check failed])])
     if test "x$USE_MBEDTLS" = "xyes"; then
         AC_MSG_NOTICE([detected mbedTLS])
-        LIBS="-lmbedtls -lmbedx509 -lmbedcrypto $LIBS"
     fi
 fi
 

@@ -1,6 +1,12 @@
 uacme NEWS
 Copyright (C) 2019,2020 Nicola Di Lieto <nicola.dilieto@gmail.com>
 
+## [1.2.4] - 2020-04-25
+### Changed
+- improve mbedTLS detection in configure.ac
+- check format string arguments with GCC
+- ualpn: fix incorrect message arguments
+
 ## [1.2.3] - 2020-04-22
 ### Changed
 - fix Content-Type header parsing
