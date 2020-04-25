@@ -6525,7 +6525,6 @@ $as_echo "#define USE_GNUTLS 1" >>confdefs.h
 
                       USE_GNUTLS=1
 
-                      GNUTLS_ENABLED=1
                       USE_GNUTLS="yes"
 else
   as_fn_error $? "gnutls check failed" "$LINENO" 5
@@ -6709,7 +6708,6 @@ $as_echo "#define USE_OPENSSL 1" >>confdefs.h
 
                       USE_OPENSSL=1
 
-                      OPENSSL_ENABLED=1
                       USE_OPENSSL="yes"
 else
   as_fn_error $? "openssl check failed" "$LINENO" 5
@@ -6727,76 +6725,24 @@ fi
 
 
 if test "x$OPT_MBEDTLS" != "xno"; then
+    addlib="-lmbedtls -lmbedx509 -lmbedcrypto"
     if test "x$OPT_MBEDTLS" = "xyes"; then
-        OPT_MBEDTLS=""
-    fi
-    if test -z "$OPT_MBEDTLS" ; then
-        { $as_echo "$as_me:${as_lineno-$LINENO}: checking for mbedtls_entropy_init in -lmbedtls" >&5
-$as_echo_n "checking for mbedtls_entropy_init in -lmbedtls... " >&6; }
-if ${ac_cv_lib_mbedtls_mbedtls_entropy_init+:} false; then :
-  $as_echo_n "(cached) " >&6
-else
-  ac_check_lib_save_LIBS=$LIBS
-LIBS="-lmbedtls -lmbedtls -lmbedx509 -lmbedcrypto $LIBS"
-cat confdefs.h - <<_ACEOF >conftest.$ac_ext
-/* end confdefs.h.  */
-
-/* Override any GCC internal prototype to avoid an error.
-   Use char because int might match the return type of a GCC
-   builtin and then its argument prototype would still apply.  */
-#ifdef __cplusplus
-extern "C"
-#endif
-char mbedtls_entropy_init ();
-int
-main ()
-{
-return mbedtls_entropy_init ();
-  ;
-  return 0;
-}
-_ACEOF
-if ac_fn_c_try_link "$LINENO"; then :
-  ac_cv_lib_mbedtls_mbedtls_entropy_init=yes
-else
-  ac_cv_lib_mbedtls_mbedtls_entropy_init=no
-fi
-rm -f core conftest.err conftest.$ac_objext \
-    conftest$ac_exeext conftest.$ac_ext
-LIBS=$ac_check_lib_save_LIBS
-fi
-{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_lib_mbedtls_mbedtls_entropy_init" >&5
-$as_echo "$ac_cv_lib_mbedtls_mbedtls_entropy_init" >&6; }
-if test "x$ac_cv_lib_mbedtls_mbedtls_entropy_init" = xyes; then :
-
-$as_echo "#define USE_MBEDTLS 1" >>confdefs.h
-
-                      USE_MBEDTLS=1
-
-                      MBEDTLS_ENABLED=1
-                      USE_MBEDTLS="yes"
-fi
-
-    fi
-    addld=""
-    addlib=""
-    addcflags=""
-    mbedtlslib=""
-    if test "x$USE_MBEDTLS" != "xyes"; then
+        addld=""
+        addcflags=""
+    else
         addld=-L$OPT_MBEDTLS/lib$libsuff
         addcflags=-I$OPT_MBEDTLS/include
-        mbedtlslib=$OPT_MBEDTLS/lib$libsuff
-        LDFLAGS="$LDFLAGS $addld"
-        if test "$addcflags" != "-I/usr/include"; then
-            CPPFLAGS="$CPPFLAGS $addcflags"
-        fi
-        { $as_echo "$as_me:${as_lineno-$LINENO}: checking for mbedtls_entropy_init in -lmbedtls" >&5
+    fi
+    LIBS="$addlib $LIBS"
+    LDFLAGS="$LDFLAGS $addld"
+    CPPFLAGS="$CPPFLAGS $addcflags"
+    { $as_echo "$as_me:${as_lineno-$LINENO}: checking for mbedtls_entropy_init in -lmbedtls" >&5
 $as_echo_n "checking for mbedtls_entropy_init in -lmbedtls... " >&6; }
 if ${ac_cv_lib_mbedtls_mbedtls_entropy_init+:} false; then :
   $as_echo_n "(cached) " >&6
 else
   ac_check_lib_save_LIBS=$LIBS
-LIBS="-lmbedtls -lmbedtls -lmbedx509 -lmbedcrypto $LIBS"
+LIBS="-lmbedtls  $LIBS"
 cat confdefs.h - <<_ACEOF >conftest.$ac_ext
 /* end confdefs.h.  */
 
@@ -6830,19 +6776,16 @@ if test "x$ac_cv_lib_mbedtls_mbedtls_entropy_init" = xyes; then :
 
 $as_echo "#define USE_MBEDTLS 1" >>confdefs.h
 
-                      USE_MBEDTLS=1
+                  USE_MBEDTLS=1
 
-                      MBEDTLS_ENABLED=1
-                      USE_MBEDTLS="yes"
+                  USE_MBEDTLS="yes"
 else
   as_fn_error $? "mbedtls check failed" "$LINENO" 5
 fi
 
-    fi
     if test "x$USE_MBEDTLS" = "xyes"; then
         { $as_echo "$as_me:${as_lineno-$LINENO}: detected mbedTLS" >&5
 $as_echo "$as_me: detected mbedTLS" >&6;}
-        LIBS="-lmbedtls -lmbedx509 -lmbedcrypto $LIBS"
     fi
 fi
 
