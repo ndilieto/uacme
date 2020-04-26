@@ -19,7 +19,8 @@ SYNOPSIS
     [*-o*|*--no-ocsp*] [*-s*|*--staging*] [*-t*|*--type* *RSA*|*EC*]
     [*-v*|*--verbose* ...] [*-V*|*--version*] [*-y*|*--yes*] [*-?*|*--help*]
     *new* ['EMAIL'] | *update* ['EMAIL'] | *deactivate* | *newkey* |
-    *issue* 'IDENTIFIER' ['ALTNAME' ...]] | *revoke* 'CERTFILE'
+    *issue* 'IDENTIFIER' ['ALTNAME' ...]] | *revoke* 'CERTFILE' |
+    *signonly* 'CSR'
 
 
 DESCRIPTION
@@ -178,6 +179,10 @@ USAGE
     'CONFDIR/test.com/cert.pem'.
     IP address IDENTIFIERs and ALTNAMEs are also supported according to
     <https://tools.ietf.org/html/rfc8738#section-3>
+
+*uacme* ['OPTIONS' ...] *signonly* 'CSR'::
+    Issue a certificate for the certificate signing request stored in
+    'CSR'. If successful the certificate will be stored in 'CSR.cert.pem'.
 
 *uacme* ['OPTIONS' ...] *revoke* 'CERTFILE'::
     Revoke the certificate stored in 'CERTFILE'. Only certificates
