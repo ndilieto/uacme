@@ -3151,8 +3151,166 @@ out:
 }
 
 #if defined(USE_OPENSSL)
+static ASN1_STRING* get_subject_commonName(X509_REQ* req)
+{
+    X509_NAME* name;
+    ASN1_STRING* res = NULL, *entry;
+    int p;
+
+    name = X509_REQ_get_subject_name(req);
+    p = X509_NAME_get_index_by_NID(name, NID_commonName, -1);
+
+    if (p >= 0) {
+        entry = X509_NAME_ENTRY_get_data(X509_NAME_get_entry(name, p));
+        if ((ASN1_STRING_type(entry) == V_ASN1_IA5STRING) ||
+            (ASN1_STRING_type(entry) == V_ASN1_UTF8STRING))
+            res = entry;
+    }
+
+    return res;
+}
+
+static ASN1_IA5STRING* get_dns_name(GENERAL_NAMES* names, int idx)
+{
+    ASN1_IA5STRING *alt, *res = NULL;
+    GENERAL_NAME* n;
+    int t;
+
+    n = sk_GENERAL_NAME_value(names, idx);
+    if (!n)
+        goto out;
+
+    alt = GENERAL_NAME_get0_value(n, &t);
+    if (t != GEN_DNS)
+        goto out;
+
+    res = alt;
+
+out:
+   return res;
+}
+
+static GENERAL_NAMES* get_subject_alt_name(X509_REQ* req)
+{
+    GENERAL_NAMES* alt_names = NULL;
+    STACK_OF(X509_EXTENSION) *exts;
+
+    exts = X509_REQ_get_extensions(req);
+    if (exts == NULL) {
+        goto out;
+    }
+
+    alt_names = X509V3_get_d2i(exts, NID_subject_alt_name, NULL, NULL);
+
+out:
+    if (exts)
+        sk_X509_EXTENSION_pop_free(exts, X509_EXTENSION_free);
+
+    return alt_names;
+}
+
 int csr_read(const char* csr_file, char** base64, char*** ident)
 {
+    FILE* fd;
+    X509_REQ* req = NULL;
+    ASN1_STRING* subject;
+    ASN1_IA5STRING* alt;
+    GENERAL_NAMES* alt_names;
+    struct idents id;
+    int r, i, res = 1;
+    size_t length;
+    unsigned char *data = NULL, *tmp = NULL;
+
+    idents_init(&id);
+    *ident = NULL;
+    fd = fopen(csr_file, "rb");
+    if (!fd) {
+        goto out;
+    }
+
+    if (!PEM_read_X509_REQ(fd, &req, NULL, NULL)) {
+        openssl_error("csr_read");
+        goto out;
+    }
+
+    r = i2d_X509_REQ(req, NULL);
+    if (r < 0) {
+        openssl_error("csr_read");
+        goto out;
+    }
+
+    length = r;
+    data = calloc(length, sizeof(unsigned char));
+    if (!data) {
+        warn("csr_read: calloc failed");
+        goto out;
+    }
+
+    tmp = data;
+    if (i2d_X509_REQ(req, &tmp) != (int) length) {
+        openssl_error("csr_read");
+        goto out;
+    }
+
+    subject = get_subject_commonName(req);
+    if (subject) {
+        idents_addarg(&id, subject->length);
+    }
+
+    alt_names = get_subject_alt_name(req);
+    if (alt_names) {
+        for (i = 0; i < sk_GENERAL_NAME_num(alt_names); i++) {
+            alt = get_dns_name(alt_names, i);
+            if (!alt)
+                continue;
+            idents_addarg(&id, alt->length);
+        }
+    }
+
+    if (idents_alloc(&id)) {
+        warn("csr_read: idents_alloc failed");
+        goto out;
+    }
+    *ident = idents_get(&id);
+
+    if (subject) {
+        memcpy(idents_here(&id), subject->data, subject->length);
+        if (idents_commit(&id, subject->length)) {
+            warn("csr_read: idents_commit failed");
+            goto out;
+        }
+    }
+    
+    if (alt_names) {
+        for (i = 0; i < sk_GENERAL_NAME_num(alt_names); i++) {
+            alt = get_dns_name(alt_names, i);
+            if (!alt)
+                continue;
+            memcpy(idents_here(&id), alt->data, alt->length);
+            if (idents_commit(&id, alt->length)) {
+                warn("csr_read: idents_commit failed");
+                goto out;
+            }
+        }
+    }
+
+    *base64 = base64encode(data, length);
+    if (!*base64) {
+        warnx("csr_read: base64encode failed");
+        goto out;
+    }
+
+    res = 0;
+
+out:
+    sk_GENERAL_NAME_pop_free(alt_names, GENERAL_NAME_free);
+    X509_REQ_free(req);
+    fclose(fd);
+    free(data);
+    if (res)
+        free(*ident);
+
+    return res;
 }
 #elif defined(USE_GNUTLS)
 int csr_read(const char* csr_file, char** base64, char*** ident)
