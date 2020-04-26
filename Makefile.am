@@ -39,8 +39,8 @@ endif
 endif
 
 uacme_SOURCES = uacme.c base64.c base64.h crypto.c crypto.h \
-		curlwrap.c curlwrap.h json.c json.h jsmn.h \
-		msg.c msg.h
+		curlwrap.c curlwrap.h idents.c idents.h json.c \
+		json.h jsmn.h msg.c msg.h
 uacme_CPPFLAGS = -DRUNSTATEDIR="\"${runstatedir}\"" \
 		 -DSYSCONFDIR="\"${sysconfdir}\"" \
 		 $(CURL_CPPFLAGS)
