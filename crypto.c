@@ -3428,7 +3428,209 @@ out:
     return res;
 }
 #elif defined(USE_MBEDTLS)
+static mbedtls_x509_buf* get_subject_commonName(mbedtls_x509_csr* csr)
+{
+    mbedtls_x509_name* obj = NULL;
+    mbedtls_x509_buf* res = NULL;
+
+    obj = mbedtls_asn1_find_named_data(&(csr->subject), MBEDTLS_OID_AT_CN, MBEDTLS_OID_SIZE(MBEDTLS_OID_AT_CN));
+    if (!res &&
+        ((obj->val.tag == MBEDTLS_ASN1_UTF8_STRING) ||
+         (obj->val.tag == MBEDTLS_ASN1_PRINTABLE_STRING) ||
+         (obj->val.tag == MBEDTLS_ASN1_IA5_STRING)))
+        res = &(obj->val);
+
+out:
+    return res;
+}
+
+static int find_object(unsigned char* start, const unsigned char* end,
+                const unsigned char* oid, size_t oid_sz, mbedtls_asn1_buf *attr)
+{
+    unsigned char* p = start;
+    int r;
+    size_t l;
+
+    do {
+        r = mbedtls_asn1_get_tag(&p, end, &l, MBEDTLS_ASN1_CONSTRUCTED | MBEDTLS_ASN1_SEQUENCE);
+        if (r)
+            continue;
+
+        attr->p = p;
+        r = mbedtls_asn1_get_tag(&(attr->p), p + l, &(attr->len), MBEDTLS_ASN1_OID);
+        if (r)
+            continue;
+
+        attr->tag = MBEDTLS_ASN1_OID;
+        p += l;
+
+        if (!((attr->len != oid_sz) || memcmp( oid, attr->p, attr->len))) {
+            attr->p += attr->len;
+            attr->tag = *(attr->p);
+            (attr->p)++;
+            r = mbedtls_asn1_get_len(&(attr->p), p+l,&(attr->len));
+            break;
+        }
+    }
+    while (!r);
+
+out:
+    return r;
+}
+
+static int get_subject_alt_name(mbedtls_x509_csr* csr, unsigned char **start, size_t* len)
+{
+    int r;
+    unsigned char *p, *e;
+    mbedtls_asn1_buf attr;
+    size_t l;
+
+    *start = NULL;
+    *len = 0;  
+
+    /*
+     * Start parsing at the subject_raw; then skip the public key and end up at the attributes
+     */
+    p = csr->subject_raw.p + csr->subject_raw.len;
+    e = csr->raw.p + csr->raw.len;
+
+    /*
+     * Skip the public key info
+     */
+    r = mbedtls_asn1_get_tag(&p, e, &l, MBEDTLS_ASN1_CONSTRUCTED | MBEDTLS_ASN1_SEQUENCE);
+    if (r)
+        goto out;
+    p += l;
+
+    /*
+     * These are the attributes
+     */
+    r = mbedtls_asn1_get_tag(&p, e, &l, MBEDTLS_ASN1_CONSTRUCTED | MBEDTLS_ASN1_CONTEXT_SPECIFIC);
+    if (r)
+        goto out;
+
+
+    /* requested extensions */
+    if (find_object(p, e, MBEDTLS_OID_PKCS9_CSR_EXT_REQ, MBEDTLS_OID_SIZE(MBEDTLS_OID_PKCS9_CSR_EXT_REQ), &attr) ||
+        ((attr.tag & MBEDTLS_ASN1_TAG_VALUE_MASK) != MBEDTLS_ASN1_SET))
+        goto out; /* Not an error, just no extensions to be had */
+
+    p = attr.p;
+    e = attr.p + attr.len;
+
+    r = mbedtls_asn1_get_tag(&p, e, &l, MBEDTLS_ASN1_CONSTRUCTED | MBEDTLS_ASN1_SEQUENCE);
+    if (r)
+        goto out;
+
+    if (find_object(p, e, MBEDTLS_OID_SUBJECT_ALT_NAME, MBEDTLS_OID_SIZE(MBEDTLS_OID_SUBJECT_ALT_NAME), &attr) ||
+        ((attr.tag & MBEDTLS_ASN1_TAG_VALUE_MASK) != MBEDTLS_ASN1_OCTET_STRING))
+        goto out; /* Not an error, just no subject_alt_name to be had */
+
+    p = attr.p;
+    e = attr.p + attr.len;
+
+    r = mbedtls_asn1_get_tag(&p, e, &l, MBEDTLS_ASN1_CONSTRUCTED | MBEDTLS_ASN1_SEQUENCE);
+    if (r)
+        goto out;
+
+    /* subject_alt_name */
+    *start = p;
+    *len = l;
+
+    r = 0;
+
+out:
+    return r;
+}
+
 int csr_read(const char* csr_file, char** base64, char*** ident)
 {
+    mbedtls_x509_csr handle;
+    mbedtls_x509_buf* subject;
+    struct idents id;
+    size_t l;
+    int r, t, res = 1;
+    unsigned char *p = NULL, *tmp = NULL, *e = NULL;
+    
+    idents_init(&id);
+    *ident = NULL;
+
+    mbedtls_x509_csr_init(&handle);
+
+    r = mbedtls_x509_csr_parse_file(&handle, csr_file);
+    if (r) {
+        warnx("csr_read: mbedtls_x509_csr_parse_file failed: %s",
+                _mbedtls_strerror(r));
+        goto out;
+    }
+
+    subject = get_subject_commonName(&handle);
+    r = get_subject_alt_name(&handle, &p, &l);
+    if (r) {
+        warnx("csr_read: get_subject_alt_name failed");
+        goto out;
+    }
+    idents_addarg(&id, subject->len);
+
+    tmp = p;
+    e = p + l;
+    while (p < e) {
+        t = *p & MBEDTLS_ASN1_TAG_VALUE_MASK;
+        p ++;
+        r = mbedtls_asn1_get_len(&p, e, &l);
+        if (r)
+            goto out;
+
+        /* dNSName */
+        if (t == 2)
+            idents_addarg(&id, l);
+
+        p += l;
+    }
+    p = tmp;
+
+    if (idents_alloc(&id)) {
+        warn("csr_read: idents_alloc failed");
+        goto out;
+    }
+    *ident = idents_get(&id);
+
+    memcpy(idents_here(&id), subject->p, subject->len);
+    if (subject && idents_commit(&id, subject->len)) {
+        warn("csr_read: idents_commit failed");
+        goto out;
+    }
+
+    while (p < e) {
+        t = *p & MBEDTLS_ASN1_TAG_VALUE_MASK;
+        p ++;
+        r = mbedtls_asn1_get_len(&p, e, &l);
+        if (r)
+            goto out;
+
+        /* dNSName */
+        memcpy(idents_here(&id), p, l);
+        if ((t == 2) && idents_commit(&id, l)) {
+            warn("csr_read: idents_commit failed");
+            goto out;
+        }
+        p += l;
+    }
+
+    *base64 = base64encode(handle.raw.p, handle.raw.len);
+    if (!*base64) {
+        warnx("csr_read: base64encode failed");
+        goto out;
+    }
+
+    res = 0;
+
+out:
+    if (res)
+        free(*ident);
+
+    mbedtls_x509_csr_free(&handle);
+
+    return res;
 }
 #endif
