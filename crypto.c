@@ -3315,6 +3315,117 @@ out:
 #elif defined(USE_GNUTLS)
 int csr_read(const char* csr_file, char** base64, char*** ident)
 {
+    gnutls_x509_crq_t handle;
+    gnutls_datum_t import, export;
+    struct idents id;
+    int r, i, res = 1;
+    unsigned c, t;
+    size_t len;
+
+    memset(&import, 0, sizeof(gnutls_datum_t));
+    memset(&export, 0, sizeof(gnutls_datum_t));
+    idents_init(&id);
+    *ident = NULL;
+    *base64 = NULL;
+
+    import.data = (unsigned char*) read_file(csr_file, &len);
+    if (!import.data) {
+        warnx("csr_read: read_file failed");
+        goto out;
+    }
+    import.size = len;
+
+    r = gnutls_x509_crq_init(&handle);
+    if (r != GNUTLS_E_SUCCESS) {
+        warnx("csr_read: gnutls_x509_crq_init: %s", gnutls_strerror(r));
+        goto out;
+    }
+
+    r = gnutls_x509_crq_import(handle, &import, GNUTLS_X509_FMT_PEM);
+    if (r != GNUTLS_E_SUCCESS) {
+        warnx("csr_read: gnutls_x509_crq_import: %s", gnutls_strerror(r));
+        goto out;
+    }
+
+    len = 0;
+    r = gnutls_x509_crq_get_dn_by_oid(handle, GNUTLS_OID_X520_COMMON_NAME, 0, 0, NULL, &len);
+    if (r != GNUTLS_E_SHORT_MEMORY_BUFFER) {
+        warnx("csr_read: gnutls_x509_crq_get_dn_by_oid: %s", gnutls_strerror(r));
+        goto out;
+    }
+    idents_addarg(&id, len);
+
+    for (i = 0; r == GNUTLS_E_SHORT_MEMORY_BUFFER; i++) {
+        len = 0;
+        r = gnutls_x509_crq_get_subject_alt_name(handle, i, NULL, &len, &t, &c);
+        if ((r == GNUTLS_E_SHORT_MEMORY_BUFFER) && (t == GNUTLS_SAN_DNSNAME))
+           idents_addarg(&id, len);
+    }
+
+    if (r != GNUTLS_E_REQUESTED_DATA_NOT_AVAILABLE) {
+        warnx("csr_read: gnutls_x509_crq_get_subject_alt_name: %s", gnutls_strerror(r));
+        goto out;
+    }
+
+    if (idents_alloc(&id)) {
+        warnx("csr_read: idents_alloc failed");
+        goto out;
+    }
+    *ident = idents_get(&id);
+
+    len = idents_left(&id);
+    r = gnutls_x509_crq_get_dn_by_oid(handle, GNUTLS_OID_X520_COMMON_NAME, 0, 0, idents_here(&id), &len);
+    if (r != GNUTLS_E_SUCCESS) {
+        warnx("csr_read: gnutls_x509_crq_get_dn_by_oid: %s", gnutls_strerror(r));
+        goto out;
+    }
+    if (idents_commit(&id, len)) {
+        warnx("csr_read: idents_commit failed");
+        goto out;
+    }
+
+    for (i = 0; r >= 0; i++) {
+        len = idents_left(&id);
+        r = gnutls_x509_crq_get_subject_alt_name(handle, i, idents_here(&id), &len, &t, &c);
+        if (t == GNUTLS_SAN_DNSNAME) {
+            if ((r >= 0) && idents_commit(&id, len)) {
+                break; /* force an error */
+            }
+        } else {
+            if (r == GNUTLS_E_SHORT_MEMORY_BUFFER) {
+                r = GNUTLS_E_SUCCESS; /* Ignore */
+            }
+        }
+    }
+
+    if (r != GNUTLS_E_REQUESTED_DATA_NOT_AVAILABLE) {
+        warnx("csr_read: gnutls_x509_crq_get_subject_alt_name: %s", gnutls_strerror(r));
+        goto out;
+    }
+
+    r = gnutls_x509_crq_export2(handle, GNUTLS_X509_FMT_DER, &export);
+    if (r != GNUTLS_E_SUCCESS) {
+        warnx("csr_read: gnutls_x509_crq_export2: %s", gnutls_strerror(r));
+        goto out;
+    }
+
+    *base64 = base64encode(export.data, export.size);
+    if (!*base64) {
+        warnx("csr_read: base64encode failed");
+        goto out;
+    }
+
+    res = 0;
+
+out:
+    if (import.data)
+        gnutls_x509_crq_deinit(handle);
+    free(import.data);
+    free(export.data);
+    if (res)
+        free(*ident);
+
+    return res;
 }
 #elif defined(USE_MBEDTLS)
 int csr_read(const char* csr_file, char** base64, char*** ident)
