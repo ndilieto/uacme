@@ -30,6 +30,7 @@
 #include <regex.h>
 #include <stdarg.h>
 #include <stdbool.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -65,6 +66,7 @@ typedef struct acme {
     const char *ident;
     const char * const *names;
     const char *confdir;
+    char *csr_pem;
     char *keydir;
     char *ckeydir;
     char *certdir;
@@ -939,10 +941,15 @@ bool cert_issue(acme_t *a, bool status_req)
         }
     }
 
-    msg(1, "generating certificate request");
-    csr = csr_gen(a->names, status_req, a->ckey);
+    if (a->csr_pem) {
+        csr = a->csr_pem;
+    } else {
+        msg(1, "generating certificate request");
+        csr = csr_gen(a->names, status_req, a->ckey);
+    }
+
     if (!csr) {
-        warnx("failed to generate certificate signing request");
+        warnx("failed to acquire certificate signing request");
         goto out;
     }
 
@@ -1058,7 +1065,8 @@ out:
     free(bakfile);
     free(tmpfile);
     free(certfile);
-    free(csr);
+    if (!a->csr_pem)
+        free(csr);
     free(ids);
     free(orderurl);
     return success;
@@ -1162,7 +1170,7 @@ void usage(const char *progname)
         "\t[-n|--never-create] [-o|--no-ocsp] [-s|--staging] [-t|--type RSA | EC]\n"
         "\t[-v|--verbose ...] [-V|--version] [-y|--yes] [-?|--help]\n"
         "\tnew [EMAIL] | update [EMAIL] | deactivate | newkey |\n"
-        "\tissue IDENTIFIER [ALTNAME ...]] | revoke CERTFILE\n", progname);
+        "\tissue IDENTIFIER [ALTNAME ...]] | revoke CERTFILE | signonly CSR\n", progname);
 }
 
 int main(int argc, char **argv)
@@ -1187,6 +1195,7 @@ int main(int argc, char **argv)
         {NULL,           0,                 NULL, 0}
     };
 
+    char** idents;
     int ret = 2;
     bool never = false;
     bool force = false;
@@ -1204,6 +1213,7 @@ int main(int argc, char **argv)
     memset(&a, 0, sizeof(a));
     a.directory = PRODUCTION_URL;
     a.confdir = DEFAULT_CONFDIR;
+    a.csr_pem = NULL;
 
     if (argc < 2) {
         usage(basename(argv[0]));
@@ -1397,6 +1407,17 @@ int main(int argc, char **argv)
         a.ident = a.names[0];
         if (a.ident[0] == '*' && a.ident[1] == '.')
             a.ident += 2;
+    } else if (strcmp(action, "signonly") == 0) {
+        if (optind == argc) {
+            usage(basename(argv[0]));
+            goto out;
+        }
+        if (csr_read(argv[optind++], &(a.csr_pem), &idents)) {
+            warnx("Unable to read CSR file");
+            goto out;
+        }
+        a.names = (const char * const *) idents;
+        a.ident = a.names[0];
     } else if (strcmp(action, "revoke") == 0) {
         if (optind == argc) {
             usage(basename(argv[0]));
@@ -1499,6 +1520,10 @@ int main(int argc, char **argv)
         if (acme_bootstrap(&a) && account_retrieve(&a)
                 && cert_issue(&a, status_req))
             ret = 0;
+    } else if (strcmp(action, "signonly") == 0) {
+        if (acme_bootstrap(&a) && account_retrieve(&a)
+                && cert_issue(&a, status_req))
+            ret = 0;
     } else if (strcmp(action, "revoke") == 0) {
         if (acme_bootstrap(&a) && account_retrieve(&a) &&
                 cert_revoke(&a, filename, 0))
@@ -1522,6 +1547,8 @@ out:
     free(a.keydir);
     free(a.ckeydir);
     free(a.certdir);
+    free(a.csr_pem);
+    free(idents);
     crypto_deinit();
     curl_global_cleanup();
     exit(ret);
