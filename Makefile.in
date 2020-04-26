@@ -149,12 +149,13 @@ am__installdirs = "$(DESTDIR)$(bindir)" "$(DESTDIR)$(pkgdatadir)" \
 	"$(DESTDIR)$(man1dir)" "$(DESTDIR)$(htmldir)"
 PROGRAMS = $(bin_PROGRAMS)
 am__uacme_SOURCES_DIST = uacme.c base64.c base64.h crypto.c crypto.h \
-	curlwrap.c curlwrap.h json.c json.h jsmn.h msg.c msg.h \
-	read-file.c read-file.h
+	curlwrap.c curlwrap.h idents.c idents.h json.c json.h jsmn.h \
+	msg.c msg.h read-file.c read-file.h
 @ENABLE_READFILE_TRUE@am__objects_1 = uacme-read-file.$(OBJEXT)
 am_uacme_OBJECTS = uacme-uacme.$(OBJEXT) uacme-base64.$(OBJEXT) \
 	uacme-crypto.$(OBJEXT) uacme-curlwrap.$(OBJEXT) \
-	uacme-json.$(OBJEXT) uacme-msg.$(OBJEXT) $(am__objects_1)
+	uacme-idents.$(OBJEXT) uacme-json.$(OBJEXT) \
+	uacme-msg.$(OBJEXT) $(am__objects_1)
 uacme_OBJECTS = $(am_uacme_OBJECTS)
 am__DEPENDENCIES_1 =
 uacme_DEPENDENCIES = $(am__DEPENDENCIES_1)
@@ -391,7 +392,6 @@ pdfdir = @pdfdir@
 prefix = @prefix@
 program_transform_name = @program_transform_name@
 psdir = @psdir@
-runstatedir = @runstatedir@
 sbindir = @sbindir@
 sharedstatedir = @sharedstatedir@
 srcdir = @srcdir@
@@ -412,7 +412,8 @@ ARFLAGS = cr
 @ENABLE_LIBEV_TRUE@@ENABLE_UALPN_TRUE@noinst_LIBRARIES = libev.a
 @ENABLE_LIBEV_TRUE@@ENABLE_UALPN_TRUE@libev_a_SOURCES = libev/ev.c
 uacme_SOURCES = uacme.c base64.c base64.h crypto.c crypto.h curlwrap.c \
-	curlwrap.h json.c json.h jsmn.h msg.c msg.h $(am__append_5)
+	curlwrap.h idents.c idents.h json.c json.h jsmn.h msg.c msg.h \
+	$(am__append_5)
 uacme_CPPFLAGS = -DRUNSTATEDIR="\"${runstatedir}\"" \
 		 -DSYSCONFDIR="\"${sysconfdir}\"" \
 		 $(CURL_CPPFLAGS)
@@ -596,6 +597,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/uacme-base64.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/uacme-crypto.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/uacme-curlwrap.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/uacme-idents.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/uacme-json.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/uacme-msg.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/uacme-read-file.Po@am__quote@
@@ -676,6 +678,20 @@ uacme-curlwrap.obj: curlwrap.c
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='curlwrap.c' object='uacme-curlwrap.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(uacme_CPPFLAGS) $(CPPFLAGS) $(uacme_CFLAGS) $(CFLAGS) -c -o uacme-curlwrap.obj `if test -f 'curlwrap.c'; then $(CYGPATH_W) 'curlwrap.c'; else $(CYGPATH_W) '$(srcdir)/curlwrap.c'; fi`
+
+uacme-idents.o: idents.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(uacme_CPPFLAGS) $(CPPFLAGS) $(uacme_CFLAGS) $(CFLAGS) -MT uacme-idents.o -MD -MP -MF $(DEPDIR)/uacme-idents.Tpo -c -o uacme-idents.o `test -f 'idents.c' || echo '$(srcdir)/'`idents.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/uacme-idents.Tpo $(DEPDIR)/uacme-idents.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='idents.c' object='uacme-idents.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(uacme_CPPFLAGS) $(CPPFLAGS) $(uacme_CFLAGS) $(CFLAGS) -c -o uacme-idents.o `test -f 'idents.c' || echo '$(srcdir)/'`idents.c
+
+uacme-idents.obj: idents.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(uacme_CPPFLAGS) $(CPPFLAGS) $(uacme_CFLAGS) $(CFLAGS) -MT uacme-idents.obj -MD -MP -MF $(DEPDIR)/uacme-idents.Tpo -c -o uacme-idents.obj `if test -f 'idents.c'; then $(CYGPATH_W) 'idents.c'; else $(CYGPATH_W) '$(srcdir)/idents.c'; fi`
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/uacme-idents.Tpo $(DEPDIR)/uacme-idents.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='idents.c' object='uacme-idents.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(uacme_CPPFLAGS) $(CPPFLAGS) $(uacme_CFLAGS) $(CFLAGS) -c -o uacme-idents.obj `if test -f 'idents.c'; then $(CYGPATH_W) 'idents.c'; else $(CYGPATH_W) '$(srcdir)/idents.c'; fi`
 
 uacme-json.o: json.c
 @am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(uacme_CPPFLAGS) $(CPPFLAGS) $(uacme_CFLAGS) $(CFLAGS) -MT uacme-json.o -MD -MP -MF $(DEPDIR)/uacme-json.Tpo -c -o uacme-json.o `test -f 'json.c' || echo '$(srcdir)/'`json.c

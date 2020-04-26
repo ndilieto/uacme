@@ -35,6 +35,7 @@
 #include "base64.h"
 #include "crypto.h"
 #include "curlwrap.h"
+#include "idents.h"
 #include "msg.h"
 #if !defined(USE_OPENSSL)
 #include "read-file.h"
@@ -3127,3 +3128,38 @@ out:
     free(certdata);
     return ret;
 }
+
+static char* base64encode(unsigned char* binary, size_t size)
+{
+    char* base64 = NULL;
+    int r;
+
+    r = base64_ENCODED_LEN(size, base64_VARIANT_URLSAFE_NO_PADDING);
+    if (!(base64 = calloc(r, sizeof(unsigned char)))) {
+        warn("base64encode: calloc failed");
+        goto out;
+    }
+
+    if (!bin2base64(base64, r, binary, size,
+                    base64_VARIANT_URLSAFE_NO_PADDING)) {
+        free(base64);
+        goto out;
+    }
+
+out:
+    return base64;
+}
+
+#if defined(USE_OPENSSL)
+int csr_read(const char* csr_file, char** base64, char*** ident)
+{
+}
+#elif defined(USE_GNUTLS)
+int csr_read(const char* csr_file, char** base64, char*** ident)
+{
+}
+#elif defined(USE_MBEDTLS)
+int csr_read(const char* csr_file, char** base64, char*** ident)
+{
+}
+#endif
