@@ -752,7 +752,8 @@ UACME(1) Manual Page
     [<strong>-o</strong>|<strong>--no-ocsp</strong>] [<strong>-s</strong>|<strong>--staging</strong>] [<strong>-t</strong>|<strong>--type</strong> <strong>RSA</strong>|<strong>EC</strong>]
     [<strong>-v</strong>|<strong>--verbose</strong> &#8230;] [<strong>-V</strong>|<strong>--version</strong>] [<strong>-y</strong>|<strong>--yes</strong>] [<strong>-?</strong>|<strong>--help</strong>]
     <strong>new</strong> [<em>EMAIL</em>] | <strong>update</strong> [<em>EMAIL</em>] | <strong>deactivate</strong> | <strong>newkey</strong> |
-    <strong>issue</strong> <em>IDENTIFIER</em> [<em>ALTNAME</em> &#8230;]] | <strong>revoke</strong> <em>CERTFILE</em></p></div>
+    <strong>issue</strong> <em>IDENTIFIER</em> [<em>ALTNAME</em> &#8230;]] | <strong>revoke</strong> <em>CERTFILE</em> |
+    <strong>signonly</strong> <em>CSR</em></p></div>
 </div>
 </div>
 <div class="sect1">
@@ -1114,6 +1115,15 @@ The key authorization (for <strong>dns-01</strong> and <strong>tls-alpn-01</stro
     <em>CONFDIR/test.com/cert.pem</em>.
     IP address IDENTIFIERs and ALTNAMEs are also supported according to
     <a href="https://tools.ietf.org/html/rfc8738#section-3">https://tools.ietf.org/html/rfc8738#section-3</a>
+</p>
+</dd>
+<dt class="hdlist1">
+<strong>uacme</strong> [<em>OPTIONS</em> &#8230;] <strong>signonly</strong> <em>CSR</em>
+</dt>
+<dd>
+<p>
+    Issue a certificate for the certificate signing request stored in
+    <em>CSR</em>. If successful the certificate will be stored in <em>CSR.cert.pem</em>.
 </p>
 </dd>
 <dt class="hdlist1">
