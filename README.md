@@ -68,6 +68,7 @@ Pre-built packages are available for several distributions:
 * https://software.opensuse.org/package/uacme
 * https://pkgs.alpinelinux.org/packages?name=uacme
 * https://github.com/openwrt/packages/tree/master/net/uacme
+* https://github.com/buildroot/buildroot/tree/master/package/uacme
 
 ## Getting started
 
@@ -165,7 +166,8 @@ address space.
 necessary tls-alpn-01 key authorizations for the domains being validated
 by the ACME server. **ualpn** was designed to be easy to integrate with
 not only **uacme** (check the example ualpn.sh hook script) but also other
-ACME clients.
+ACME clients. A [certbot plugin](https://github.com/ndilieto/certbot-ualpn)
+is also available.
 
 To get started with **ualpn**:
 * move your real HTTPS server to port 4443 and also enable it to accept
