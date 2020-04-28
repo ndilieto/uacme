@@ -66,6 +66,7 @@ typedef struct acme {
     const char *ident;
     const char * const *names;
     const char *confdir;
+    char *csr_file;
     char *csr_pem;
     char *keydir;
     char *ckeydir;
@@ -1006,23 +1007,44 @@ bool cert_issue(acme_t *a, bool status_req)
         goto out;
     }
 
-    if (asprintf(&certfile, "%s/cert.pem", a->certdir) < 0) {
-        certfile = NULL;
-        warnx("cert_issue: asprintf failed");
-        goto out;
-    }
+    if (a->csr_file) {
+        if (asprintf(&certfile, "%s.cert.pem", a->csr_file) < 0) {
+            certfile = NULL;
+            warnx("cert_issue: asprintf failed");
+            goto out;
+        }
 
-    if (asprintf(&tmpfile, "%s/cert.pem.tmp", a->certdir) < 0) {
-        tmpfile = NULL;
-        warnx("cert_issue: asprintf failed");
-        goto out;
-    }
+        if (asprintf(&tmpfile, "%s.cert.pem.tmp", a->csr_file) < 0) {
+            tmpfile = NULL;
+            warnx("cert_issue: asprintf failed");
+            goto out;
+        }
 
-    if (asprintf(&bakfile, "%s/cert-%llu.pem", a->certdir,
-                (unsigned long long)t) < 0) {
-        bakfile = NULL;
-        warnx("cert_issue: asprintf failed");
-        goto out;
+        if (asprintf(&bakfile, "%s.cert-%llu.pem", a->csr_file,
+                    (unsigned long long)t) < 0) {
+                bakfile = NULL;
+            warnx("cert_issue: asprintf failed");
+            goto out;
+        }
+    } else {
+        if (asprintf(&certfile, "%s/cert.pem", a->certdir) < 0) {
+            certfile = NULL;
+            warnx("cert_issue: asprintf failed");
+            goto out;
+        }
+
+        if (asprintf(&tmpfile, "%s/cert.pem.tmp", a->certdir) < 0) {
+            tmpfile = NULL;
+            warnx("cert_issue: asprintf failed");
+            goto out;
+        }
+
+        if (asprintf(&bakfile, "%s/cert-%llu.pem", a->certdir,
+                    (unsigned long long)t) < 0) {
+                bakfile = NULL;
+            warnx("cert_issue: asprintf failed");
+            goto out;
+        }
     }
 
     msg(1, "saving certificate to %s", tmpfile);
@@ -1213,6 +1235,7 @@ int main(int argc, char **argv)
     memset(&a, 0, sizeof(a));
     a.directory = PRODUCTION_URL;
     a.confdir = DEFAULT_CONFDIR;
+    a.csr_file = NULL;
     a.csr_pem = NULL;
 
     if (argc < 2) {
@@ -1412,7 +1435,8 @@ int main(int argc, char **argv)
             usage(basename(argv[0]));
             goto out;
         }
-        if (csr_read(argv[optind++], &(a.csr_pem), &idents)) {
+        a.csr_file = argv[optind++];
+        if (csr_read(a.csr_file, &(a.csr_pem), &idents)) {
             warnx("Unable to read CSR file");
             goto out;
         }
