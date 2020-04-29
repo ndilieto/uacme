@@ -20,6 +20,7 @@
 
 #include "config.h"
 
+#include <arpa/inet.h>
 #include <err.h>
 #include <errno.h>
 #include <netdb.h>
@@ -3150,6 +3151,53 @@ out:
     return base64;
 }
 
+static int decode_ipaddress(const unsigned char* data, size_t length,
+                            char* buf, size_t* buf_len)
+{
+    int ret = 1, af;
+    size_t req, tmp;
+    struct in_addr v4addr;
+    struct in6_addr v6addr;
+    void* src;
+
+    switch(length) {
+        case 4: /* IPv4 address */
+            req = INET_ADDRSTRLEN;
+            af = AF_INET;
+            src = &(v4addr.s_addr);
+            break;
+
+        case 16: /* IPv6 address */
+            req = INET6_ADDRSTRLEN;
+            af = AF_INET6;
+            src = &(v6addr.s6_addr);
+            break;
+
+        default:
+            req = 0;
+            break;
+    }
+
+    if (!req)
+        goto out;
+
+    tmp = *buf_len;
+    *buf_len = req;
+
+    if (tmp < req)
+        goto out;
+
+    memset(buf, 0, req);
+    memcpy(src, data, length);
+    if (inet_ntop(af, src, buf, *buf_len) == NULL)
+        goto out;
+
+    ret = 0;
+
+out:
+    return ret;
+}
+
 #if defined(USE_OPENSSL)
 static ASN1_STRING* get_subject_commonName(X509_REQ* req)
 {
@@ -3190,6 +3238,27 @@ out:
    return res;
 }
 
+static int get_ipaddress(GENERAL_NAMES* names, int idx,
+                  char* buf, size_t* buf_len)
+{
+    ASN1_OCTET_STRING *alt;
+    GENERAL_NAME* n;
+    int t, r = 1;
+
+    n = sk_GENERAL_NAME_value(names, idx);
+    if (!n)
+        goto out;
+
+    alt = GENERAL_NAME_get0_value(n, &t);
+    if (t != GEN_IPADD)
+        goto out;
+
+    r = decode_ipaddress(alt->data, alt->length, buf, buf_len);
+
+out:
+   return r;
+}
+
 static GENERAL_NAMES* get_subject_alt_name(X509_REQ* req)
 {
     GENERAL_NAMES* alt_names = NULL;
@@ -3218,7 +3287,7 @@ int csr_read(const char* csr_file, char** base64, char*** ident)
     GENERAL_NAMES* alt_names;
     struct idents id;
     int r, i, res = 1;
-    size_t length;
+    size_t length, buf_len;
     unsigned char *data = NULL, *tmp = NULL;
 
     idents_init(&id);
@@ -3261,9 +3330,19 @@ int csr_read(const char* csr_file, char** base64, char*** ident)
     if (alt_names) {
         for (i = 0; i < sk_GENERAL_NAME_num(alt_names); i++) {
             alt = get_dns_name(alt_names, i);
-            if (!alt)
+            r = (alt != NULL);
+            if (r)
+                buf_len = alt->length;
+
+            if (!r) {
+                buf_len = 0;
+                get_ipaddress(alt_names, i, NULL, &buf_len);
+                r = (buf_len != 0);
+            }
+
+            if (!r)
                 continue;
-            idents_addarg(&id, alt->length);
+            idents_addarg(&id, buf_len);
         }
     }
 
@@ -3284,10 +3363,21 @@ int csr_read(const char* csr_file, char** base64, char*** ident)
     if (alt_names) {
         for (i = 0; i < sk_GENERAL_NAME_num(alt_names); i++) {
             alt = get_dns_name(alt_names, i);
-            if (!alt)
+            r = (alt != NULL);
+            if (r) {
+                memcpy(idents_here(&id), alt->data, alt->length);
+                buf_len = alt->length;
+            }
+
+            if (!r) {
+                buf_len = idents_left(&id);
+                r = get_ipaddress(alt_names, i, idents_here(&id), &buf_len);
+            }
+
+            if (!r)
                 continue;
-            memcpy(idents_here(&id), alt->data, alt->length);
-            if (idents_commit(&id, alt->length)) {
+
+            if (idents_commit(&id, buf_len)) {
                 warn("csr_read: idents_commit failed");
                 goto out;
             }
@@ -3320,7 +3410,7 @@ int csr_read(const char* csr_file, char** base64, char*** ident)
     struct idents id;
     int r, i, res = 1;
     unsigned c, t;
-    size_t len;
+    size_t len, buf_len;
 
     memset(&import, 0, sizeof(gnutls_datum_t));
     memset(&export, 0, sizeof(gnutls_datum_t));
@@ -3358,8 +3448,22 @@ int csr_read(const char* csr_file, char** base64, char*** ident)
     for (i = 0; r == GNUTLS_E_SHORT_MEMORY_BUFFER; i++) {
         len = 0;
         r = gnutls_x509_crq_get_subject_alt_name(handle, i, NULL, &len, &t, &c);
-        if ((r == GNUTLS_E_SHORT_MEMORY_BUFFER) && (t == GNUTLS_SAN_DNSNAME))
-           idents_addarg(&id, len);
+        if (r == GNUTLS_E_SHORT_MEMORY_BUFFER) {
+            switch (t) {
+                case GNUTLS_SAN_DNSNAME:
+                    idents_addarg(&id, len);
+                    break;
+
+                case GNUTLS_SAN_IPADDRESS:
+                    decode_ipaddress(NULL, len, NULL, &buf_len);
+                    if (buf_len)
+                        idents_addarg(&id, buf_len);
+                    break;
+
+                default:
+                    break;
+            }
+        }
     }
 
     if (r != GNUTLS_E_REQUESTED_DATA_NOT_AVAILABLE) {
@@ -3387,14 +3491,25 @@ int csr_read(const char* csr_file, char** base64, char*** ident)
     for (i = 0; r >= 0; i++) {
         len = idents_left(&id);
         r = gnutls_x509_crq_get_subject_alt_name(handle, i, idents_here(&id), &len, &t, &c);
-        if (t == GNUTLS_SAN_DNSNAME) {
-            if ((r >= 0) && idents_commit(&id, len)) {
-                break; /* force an error */
+        if (r >= 0) {
+            switch (t) {
+                case GNUTLS_SAN_DNSNAME:
+                    if (idents_commit(&id, len))
+                        r = GNUTLS_E_INVALID_REQUEST; /* force an error */
+                    break;
+
+                case GNUTLS_SAN_IPADDRESS:
+                    if (decode_ipaddress((unsigned char*)idents_here(&id), len, idents_here(&id), &buf_len) ||
+                        idents_commit(&id, buf_len))
+                        r = GNUTLS_E_INVALID_REQUEST; /* force an error */
+                    break;
+
+                default:
+                    break;
             }
         } else {
-            if (r == GNUTLS_E_SHORT_MEMORY_BUFFER) {
+            if (r == GNUTLS_E_SHORT_MEMORY_BUFFER)
                 r = GNUTLS_E_SUCCESS; /* Ignore */
-            }
         }
     }
 
@@ -3427,6 +3542,7 @@ out:
 
     return res;
 }
+
 #elif defined(USE_MBEDTLS)
 static mbedtls_x509_buf* get_subject_commonName(mbedtls_x509_csr* csr)
 {
@@ -3548,7 +3664,7 @@ int csr_read(const char* csr_file, char** base64, char*** ident)
     mbedtls_x509_csr handle;
     mbedtls_x509_buf* subject;
     struct idents id;
-    size_t l;
+    size_t l, bl;
     int r, t, res = 1;
     unsigned char *p = NULL, *tmp = NULL, *e = NULL;
     
@@ -3581,10 +3697,20 @@ int csr_read(const char* csr_file, char** base64, char*** ident)
         if (r)
             goto out;
 
-        /* dNSName */
-        if (t == 2)
-            idents_addarg(&id, l);
+        switch (t) {
+            case 2: /* dNSName */
+                idents_addarg(&id, l);
+                break;
 
+            case 7: /* IPAddress */
+                decode_ipaddress(NULL, l, NULL, &bl);
+                if (bl)
+                    idents_addarg(&id, l);
+                break;
+
+            default:
+                break;
+        }
         p += l;
     }
     p = tmp;
@@ -3608,9 +3734,22 @@ int csr_read(const char* csr_file, char** base64, char*** ident)
         if (r)
             goto out;
 
-        /* dNSName */
-        memcpy(idents_here(&id), p, l);
-        if ((t == 2) && idents_commit(&id, l)) {
+        switch (t) {
+            case 2: /* dNSName */
+                memcpy(idents_here(&id), p, l);
+                bl = l;
+                break;
+
+            case 7: /* IPAddress */
+                decode_ipaddress(p, l, idents_here(&id), &bl);
+                break;
+
+            default:
+                bl = 0;
+                break;
+        }
+
+        if (bl && idents_commit(&id, bl)) {
             warn("csr_read: idents_commit failed");
             goto out;
         }
