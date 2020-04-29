@@ -31,12 +31,12 @@ hook program can be an executable, shell script, perl script, python
 script, or any file that the operating system can execute.
 * **ACME challenge agnostic** - It provides the user or hook program
 with all tokens and information required to complete any challenge type
-(including http-01, dns-01 and tls-alpn-01) but leaves the task of setting up 
-and cleaning up the challenge environment to the user or hook. An example
-shell script to handle http-01 challenges is provided.
-* **tls-alpn-01 challenge support** - The distrubution also includes
-**ualpn**, a lightweight proxying tls-alpn-01 challenge responder compliant
-with [RFC8737](https://tools.ietf.org/html/rfc8737) and
+but leaves the task of setting up and cleaning up the challenge environment
+to the user or hook. Example shell scripts to handle http-01, dns-01 and
+tls-alpn-01 challenges are provided.
+* **Zero downtime tls-alpn-01 challenge support** - The distrubution also
+includes **ualpn**, a lightweight proxying tls-alpn-01 challenge responder
+compliant with [RFC8737](https://tools.ietf.org/html/rfc8737) and
 [RFC8738](https://tools.ietf.org/html/rfc8738).
 * **Can run as a cron job** - to renew certificates automatically 
 when needed, even for remote machines
@@ -115,7 +115,7 @@ types may be served in random order by the server. Do not make any assumptions
 and read **uacme**'s output carefully.
 
 ## Automating updates
-Use the -h flag:
+Use the -h flag to manage the challenge with a hook script:
 ```
 uacme -v -c /path/to/uacme.d -h /usr/share/uacme/uacme.sh issue www.your.domain.com
 ```
@@ -123,8 +123,8 @@ or (depending on your installation)
 ```
 uacme -v -c /path/to/uacme.d -h /usr/local/share/uacme/uacme.sh issue www.your.domain.com
 ```
-This will use the example uacme.sh script included in the distribution to 
-set up http-01 challenges. You might need to edit the script to match your
+This will use the example uacme.sh hook script included in the distribution to
+manage http-01 challenges. You might need to edit the script to match your
 webserver's environment.
 
 Once everything works correctly you can also set up cron, for example
@@ -143,9 +143,17 @@ returns 0 (indicating the certificate has been reissued).
 6 15 * * * /usr/bin/uacme -c /path/to/uacme.d -h /usr/share/uacme/uacme.sh issue www.your.domain.com && /usr/share/uacme/reload.sh
 ```
 
-Check https://github.com/jirutka/muacme for a complete, ready-to-go solution
-and https://gitlab.alpinelinux.org/alpine/infra/docker/uacme-nsd-wildcard
-for an advanced example with dns-01 challenge management.
+Check https://github.com/jirutka/muacme for a complete, ready-to-go solution.
+
+## dns-01 challenge support
+
+The nsupdate.sh hook script included in the distribution allows managing dns-01
+challenges with [nsupdate](https://linux.die.net/man/1/nsupdate). This only
+works if your name server supports RFC 2136 ([bind](https://www.isc.org/bind)
+does, [nsd](https://www.nlnetlabs.nl/projects/nsd/about) does not).
+
+https://gitlab.alpinelinux.org/alpine/infra/docker/uacme-nsd-wildcard
+is another example that works with nsd.
 
 ## tls-alpn-01 challenge support
 
@@ -154,7 +162,9 @@ to handle incoming HTTPS connections on port 443. Most of the time it just
 transparently proxies connections to the real web server (which can be on
 either another machine, or a different TCP port on the same machine). When a
 tls-alpn-01 challenge handshake comes in, **ualpn** handles it on the fly
-instead of proxying it to the webserver.
+instead of proxying it to the webserver. This means that unlike other available
+tls-alpn-01 responders, **ualpn** does not require your webserver to stop
+during the challenge (zero downtime).
 
 The event-driven implementation is based on [libev](http://libev.schmorp.de)
 and considerably reduces the cost of context switches and memory usage. In
