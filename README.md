@@ -171,7 +171,7 @@ without a round trip to user space, which further enhances performance.
 [ualpn][ualpn] also listens to a UNIX domain socket so that it can be fed the
 necessary tls-alpn-01 key authorizations for the domains being validated
 by the ACME server. [ualpn][ualpn] was designed to be easy to integrate with
-not only [uacme][uacme] (check the example [ualpn.sh][ualpn/sh] hook script)
+not only [uacme][uacme] (check the example [ualpn.sh][ualpn.sh] hook script)
 but also other ACME clients. A [certbot plugin][plugin] is also available.
 
 To get started with [ualpn][ualpn]:
