@@ -4,7 +4,6 @@
 lightweight client for the [RFC8555][RFC8555] ACMEv2 protocol, written in
 plain C with minimal dependencies ([libcurl][libcurl] and one of
 [GnuTLS][GnuTLS], [OpenSSL][OpenSSL] or [mbedTLS][mbedTLS].
-
 The ACMEv2 protocol allows a Certificate Authority ([Let's Encrypt][le]
 is a popular one) and an applicant to automate the process of verification
 and certificate issuance. The protocol also provides facilities for other
@@ -31,7 +30,7 @@ with all tokens and information required to complete any challenge type
 but leaves the task of setting up and cleaning up the challenge environment
 to the user or hook. Example shell scripts to handle [http-01][uacme.sh],
 [dns-01][nsupdate.sh] and [tls-alpn-01][ualpn.sh] challenges are provided.
-* **Zero downtime tls-alpn-01 challenge support** - The distrubution also
+* **Zero downtime [tls-alpn-01 support][tls-alpn-01]** - The distrubution also
 includes [ualpn][ualpn], a lightweight proxying tls-alpn-01 challenge responder
 compliant with [RFC8737][RFC8737] and [RFC8738][RFC8738].
 * **Can run as a cron job** - to renew certificates automatically 
@@ -149,12 +148,12 @@ managing dns-01 challenges with [nsupdate][nsupdate]. This only works if your
 name server supports [RFC2136][RFC2136] ([bind][bind] does, [nsd][nsd] doesn't).
 
 https://gitlab.alpinelinux.org/alpine/infra/docker/uacme-nsd-wildcard
-is another example that works with nsd.
+is another example that works with [nsd][nsd].
 
 ## tls-alpn-01 challenge support
 
 [ualpn][ualpn] is a lightweight proxying [tls-alpn-01][RFC8737] challenge
-responder , designed to handle incoming HTTPS connections on port 443.
+responder, designed to handle incoming HTTPS connections on port 443.
 Most of the time it just transparently proxies connections to the real web
 server (which can be on either another machine, or a different TCP port on
 the same machine).
@@ -222,6 +221,7 @@ If you have any suggestions for improvements, pull requests are welcome.
 [le]: https://letsencrypt.org
 [uacme.sh]: https://github.com/ndilieto/uacme/blob/master/uacme.sh
 [ualpn.sh]: https://github.com/ndilieto/uacme/blob/master/ualpn.sh
+[tls-alpn-01]: #tls-alpn-01-challenge-support
 [plugin]: https://github.com/ndilieto/certbot-ualpn
 [nsupdate.sh]: https://github.com/ndilieto/uacme/blob/master/nsupdate.sh
 [nsupdate]: https://linux.die.net/man/1/nsupdate
