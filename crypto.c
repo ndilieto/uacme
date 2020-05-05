@@ -76,6 +76,7 @@
 #include <mbedtls/oid.h>
 #include <mbedtls/pem.h>
 #include <mbedtls/pk.h>
+#include <mbedtls/platform.h>
 #include <mbedtls/version.h>
 #include <mbedtls/x509_crt.h>
 #include <mbedtls/x509_csr.h>
@@ -1805,7 +1806,7 @@ bool is_ip(const char *s, unsigned char *ip, size_t *ip_len)
     return ret;
 }
 
-char *csr_gen(const char * const *names, bool status_req, privkey_t key)
+char *csr_gen(char * const *names, bool status_req, privkey_t key)
 {
     char *req = NULL;
     unsigned char *csrdata = NULL;
@@ -2338,6 +2339,633 @@ out:
 }
 
 #if defined(USE_GNUTLS)
+static char **csr_names(gnutls_x509_crq_t crq)
+{
+    int i, r = 0, n = 0, ncn = 0, nsan = 0;
+    char **ret = NULL;
+    char **names = NULL;
+    char *buf = NULL;
+    char *ip = NULL;
+    size_t size = 0;
+    bool cn = true;
+
+    do {
+        r = cn ?
+            gnutls_x509_crq_get_dn_by_oid(crq, GNUTLS_OID_X520_COMMON_NAME,
+                    ncn, 0, buf, &size) :
+            gnutls_x509_crq_get_subject_alt_name(crq, nsan, buf, &size,
+                    NULL, NULL);
+
+        switch (r) {
+            case GNUTLS_E_REQUESTED_DATA_NOT_AVAILABLE:
+                if (cn) {
+                    cn = false;
+                    r = GNUTLS_E_SUCCESS;
+                }
+                break;
+
+            case GNUTLS_E_SHORT_MEMORY_BUFFER:
+                buf = calloc(1, size);
+                if (!buf) {
+                    warn("csr_names: calloc failed");
+                    goto out;
+                }
+                break;
+
+            case GNUTLS_SAN_IPADDRESS:
+                ip = calloc(1, INET6_ADDRSTRLEN);
+                if (!ip) {
+                    warnx("csr_names: calloc failed");
+                    goto out;
+                }
+                if (!inet_ntop(size == 4 ? AF_INET : AF_INET6, buf, ip,
+                            INET6_ADDRSTRLEN)) {
+                    warnx("csr_names: invalid IP addres in Subj Alt Name");
+                    free(ip);
+                    ip = NULL;
+                    continue;
+                }
+                free(buf);
+                buf = ip;
+                ip = NULL;
+                // intentional fallthrough
+            case GNUTLS_E_SUCCESS:
+            case GNUTLS_SAN_DNSNAME:
+                for (i = 0; i < n; i++) {
+                    if (strcasecmp(buf, names[i]) == 0)
+                        break;
+                }
+                if (i < n)
+                    free(buf);
+                else {
+                    names = realloc(names, (n + 2) * sizeof(buf));
+                    if (!names) {
+                        warn("csr_names: realloc failed");
+                        goto out;
+                    }
+                    names[n++] = buf;
+                    names[n] = NULL;
+                }
+                buf = NULL;
+                size = 0;
+                if (cn)
+                    ncn++;
+                else
+                    nsan++;
+                break;
+
+            default:
+                if (r < 0) {
+                    warnx("csr_names: %s: %s",
+                            cn ? "gnutls_x509_crq_get_dn_by_oid" :
+                            "gnutls_x509_crq_get_subject_alt_name",
+                            gnutls_strerror(r));
+                    goto out;
+                }
+        }
+    } while (r != GNUTLS_E_REQUESTED_DATA_NOT_AVAILABLE);
+
+    if (n > 0) {
+        ret = names;
+        names = NULL;
+    }
+
+out:
+    for (i = 0; names && names[i]; i++)
+        free(names[i]);
+    free(names);
+    return ret;
+}
+#elif defined(USE_OPENSSL)
+static char **csr_names(X509_REQ *crq)
+{
+    int i, n = 0, ncn = -1, nsan = 0;
+    char **ret = NULL;
+    char **names = NULL;
+    bool cn = true;
+    X509_NAME *name = NULL;
+    STACK_OF(X509_EXTENSION) *exts = NULL;
+    GENERAL_NAMES* alts = NULL;
+
+    name = X509_REQ_get_subject_name(crq);
+    if (!name)
+        cn = false;
+
+    exts = X509_REQ_get_extensions(crq);
+    if (exts)
+        alts = X509V3_get_d2i(exts, NID_subject_alt_name, NULL, NULL);
+
+    while (1) {
+        char *nm = NULL;
+        if (cn) {
+            ncn = X509_NAME_get_index_by_NID(name, NID_commonName, ncn);
+            if (ncn < 0) {
+                cn = false;
+                continue;
+            }
+            X509_NAME_ENTRY *entry = X509_NAME_get_entry(name, ncn);
+            if (!entry)
+                continue;
+            ASN1_STRING *str = X509_NAME_ENTRY_get_data(entry);
+            if (!str)
+                continue;
+            unsigned char *buf = NULL;
+            int size = ASN1_STRING_to_UTF8(&buf, str);
+            if (size < 0) {
+                openssl_error("csr_names");
+                continue;
+            }
+            nm = strndup((const char *)buf, size);
+            if (!nm) {
+                warn("csr_names: strndup failed");
+                OPENSSL_free(buf);
+                goto out;
+            }
+            OPENSSL_free(buf);
+        } else if (alts && nsan < sk_GENERAL_NAME_num(alts)) {
+            int type;
+            GENERAL_NAME *gn = sk_GENERAL_NAME_value(alts, nsan++);
+            if (!gn)
+                continue;
+            ASN1_STRING *value = GENERAL_NAME_get0_value(gn, &type);
+            if (!value)
+                continue;
+            if (type == GEN_DNS) {
+                unsigned char *buf = NULL;
+                int size = ASN1_STRING_to_UTF8(&buf, value);
+                if (size < 0) {
+                    openssl_error("csr_names");
+                    continue;
+                }
+                nm = strndup((const char *)buf, size);
+                if (!nm) {
+                    warn("csr_names: strndup failed");
+                    OPENSSL_free(buf);
+                    goto out;
+                }
+                OPENSSL_free(buf);
+            } else if (type == GEN_IPADD) {
+                int af;
+                int len;
+                switch (ASN1_STRING_length(value)) {
+                    case 4:
+                        af = AF_INET;
+                        len = INET_ADDRSTRLEN;
+                        break;
+                    case 16:
+                        af = AF_INET6;
+                        len = INET6_ADDRSTRLEN;
+                        break;
+                    default:
+                        warnx("csr_names: invalid IP addres in Subj Alt Name");
+                        continue;
+                }
+                nm = calloc(1, len);
+                if (!nm) {
+                    warnx("csr_names: calloc failed");
+                    goto out;
+                }
+                if (!inet_ntop(af, ASN1_STRING_get0_data(value), nm, len)) {
+                    warnx("csr_names: invalid IP addres in Subj Alt Name");
+                    free(nm);
+                    continue;
+                }
+            }
+        } else
+            break;
+
+        if (nm) {
+            for (i = 0; i < n; i++) {
+                if (strcasecmp(nm, names[i]) == 0)
+                    break;
+            }
+            if (i < n)
+                free(nm);
+            else {
+                char **tmp = realloc(names, (n + 2) * sizeof(nm));
+                if (!tmp) {
+                    warn("csr_names: realloc failed");
+                    free(nm);
+                    goto out;
+                }
+                names = tmp;
+                names[n++] = nm;
+                names[n] = NULL;
+            }
+        }
+    }
+
+    if (n > 0) {
+        ret = names;
+        names = NULL;
+    }
+
+out:
+    if (names) {
+        for (i = 0; names[i]; i++)
+            free(names[i]);
+        free(names);
+    }
+    if (exts)
+        sk_X509_EXTENSION_pop_free(exts, X509_EXTENSION_free);
+    if (alts)
+        sk_GENERAL_NAME_pop_free(alts, GENERAL_NAME_free);
+    return ret;
+}
+#elif defined(USE_MBEDTLS)
+// Unlike the built-in mbedTLS parser this function supports IP identifiers
+static int ext_san(unsigned char *p, size_t len, mbedtls_x509_sequence *san)
+{
+    unsigned char *end = p + len;
+    unsigned char *end_ext;
+    int r;
+
+    r = mbedtls_asn1_get_tag(&p, end, &len,
+            MBEDTLS_ASN1_CONSTRUCTED | MBEDTLS_ASN1_SEQUENCE);
+    if (r)
+        return MBEDTLS_ERR_X509_INVALID_EXTENSIONS + r;
+
+    if (end != p + len)
+        return MBEDTLS_ERR_X509_INVALID_EXTENSIONS +
+            MBEDTLS_ERR_ASN1_LENGTH_MISMATCH;
+
+    while (p < end) {
+        r = mbedtls_asn1_get_tag(&p, end, &len,
+            MBEDTLS_ASN1_CONSTRUCTED | MBEDTLS_ASN1_SEQUENCE);
+        if (r)
+            return MBEDTLS_ERR_X509_INVALID_EXTENSIONS + r;
+
+        end_ext = p + len;
+
+        r = mbedtls_asn1_get_tag(&p, end_ext, &len, MBEDTLS_ASN1_OID);
+        if (r)
+            return MBEDTLS_ERR_X509_INVALID_EXTENSIONS + r;
+
+        if (len != MBEDTLS_OID_SIZE(MBEDTLS_OID_SUBJECT_ALT_NAME) ||
+                memcmp(MBEDTLS_OID_SUBJECT_ALT_NAME, p, len) != 0) {
+            p = end_ext;
+            continue;
+        }
+
+        p += len;
+
+        int crit;
+        r = mbedtls_asn1_get_bool(&p, end_ext, &crit);
+        if (r && r != MBEDTLS_ERR_ASN1_UNEXPECTED_TAG)
+            return MBEDTLS_ERR_X509_INVALID_EXTENSIONS + r;
+
+        r = mbedtls_asn1_get_tag(&p, end_ext, &len, MBEDTLS_ASN1_OCTET_STRING);
+        if (r)
+            return MBEDTLS_ERR_X509_INVALID_EXTENSIONS + r;
+
+        if (p + len != end_ext)
+            return MBEDTLS_ERR_X509_INVALID_EXTENSIONS +
+                MBEDTLS_ERR_ASN1_LENGTH_MISMATCH;
+
+        r = mbedtls_asn1_get_tag(&p, end_ext, &len,
+            MBEDTLS_ASN1_CONSTRUCTED | MBEDTLS_ASN1_SEQUENCE);
+        if (r)
+            return MBEDTLS_ERR_X509_INVALID_EXTENSIONS + r;
+
+        if (p + len != end_ext)
+            return MBEDTLS_ERR_X509_INVALID_EXTENSIONS +
+                MBEDTLS_ERR_ASN1_LENGTH_MISMATCH;
+
+        while (p < end_ext) {
+            if (end_ext - p < 1)
+                return MBEDTLS_ERR_X509_INVALID_EXTENSIONS +
+                    MBEDTLS_ERR_ASN1_OUT_OF_DATA;
+
+            unsigned char tag = *p++;
+            r = mbedtls_asn1_get_len(&p, end_ext, &len);
+            if (r)
+                return MBEDTLS_ERR_X509_INVALID_EXTENSIONS + r;
+
+            if ((tag & MBEDTLS_ASN1_TAG_CLASS_MASK) !=
+                    MBEDTLS_ASN1_CONTEXT_SPECIFIC)
+                return MBEDTLS_ERR_X509_INVALID_EXTENSIONS +
+                    MBEDTLS_ERR_ASN1_UNEXPECTED_TAG;
+
+            if (san->buf.p) {
+                if (san->next)
+                    return MBEDTLS_ERR_X509_INVALID_EXTENSIONS;
+
+                san->next = mbedtls_calloc(1, sizeof(mbedtls_asn1_sequence));
+                if (!san->next)
+                    return MBEDTLS_ERR_X509_INVALID_EXTENSIONS +
+                        MBEDTLS_ERR_ASN1_ALLOC_FAILED;
+
+                san = san->next;
+            }
+
+            san->buf.tag = tag;
+            san->buf.len = len;
+            san->buf.p = p;
+            p += len;
+        }
+
+        san->next = NULL;
+        if (p != end_ext)
+            return MBEDTLS_ERR_X509_INVALID_EXTENSIONS +
+                MBEDTLS_ERR_ASN1_LENGTH_MISMATCH;
+    }
+
+    return 0;
+}
+
+static int csr_san(const mbedtls_x509_csr *crq, mbedtls_x509_sequence *san)
+{
+    unsigned char *p = crq->cri.p;
+    size_t len = crq->cri.len;
+    unsigned char *end = p + len;
+    unsigned char *end_attr;
+    int i = 0, r;
+
+    r = mbedtls_asn1_get_tag(&p, end, &len,
+            MBEDTLS_ASN1_CONSTRUCTED | MBEDTLS_ASN1_SEQUENCE);
+    if (r)
+        return MBEDTLS_ERR_X509_INVALID_FORMAT + r;
+
+    r = mbedtls_asn1_get_int(&p, end, &i);
+    if (r && r != MBEDTLS_ERR_ASN1_UNEXPECTED_TAG)
+        return MBEDTLS_ERR_X509_INVALID_VERSION + r;
+
+    if (i != 0)
+        return MBEDTLS_ERR_X509_UNKNOWN_VERSION;
+
+    for (i = 0; i < 2; i++) {
+        r = mbedtls_asn1_get_tag(&p, end, &len,
+                MBEDTLS_ASN1_CONSTRUCTED | MBEDTLS_ASN1_SEQUENCE);
+        if (r)
+            return MBEDTLS_ERR_X509_INVALID_FORMAT + r;
+        p += len;
+    }
+
+    r = mbedtls_asn1_get_tag(&p, end, &len,
+            MBEDTLS_ASN1_CONSTRUCTED | MBEDTLS_ASN1_CONTEXT_SPECIFIC);
+    if (r)
+        return MBEDTLS_ERR_X509_INVALID_FORMAT + r;
+
+    while (p < end) {
+        r = mbedtls_asn1_get_tag(&p, end, &len,
+            MBEDTLS_ASN1_CONSTRUCTED | MBEDTLS_ASN1_SEQUENCE);
+        if (r)
+            return MBEDTLS_ERR_X509_INVALID_FORMAT + r;
+
+        end_attr = p + len;
+
+        r = mbedtls_asn1_get_tag(&p, end_attr, &len, MBEDTLS_ASN1_OID);
+        if (r)
+            return MBEDTLS_ERR_X509_INVALID_FORMAT + r;
+
+        if (len == MBEDTLS_OID_SIZE(MBEDTLS_OID_PKCS9_CSR_EXT_REQ) &&
+                memcmp(MBEDTLS_OID_PKCS9_CSR_EXT_REQ, p, len) == 0) {
+            p += len;
+
+            r = mbedtls_asn1_get_tag(&p, end_attr, &len,
+                    MBEDTLS_ASN1_CONSTRUCTED | MBEDTLS_ASN1_SET);
+            if (r)
+                return MBEDTLS_ERR_X509_INVALID_FORMAT + r;
+            else
+                return ext_san(p, len, san);
+        }
+
+        p = end_attr;
+    }
+
+    return 0;
+}
+
+static char **csr_names(mbedtls_x509_csr *crq)
+{
+    int i, n = 0;
+    char **ret = NULL;
+    char **names = NULL;
+
+    mbedtls_x509_name *name = &crq->subject;
+    mbedtls_x509_sequence sans, *san = &sans;
+    memset(&sans, 0, sizeof(sans));
+
+    i = csr_san(crq, san);
+    if (i) {
+        warnx("csr_names: csr_san failed: %s", _mbedtls_strerror(i));
+        goto out;
+    }
+
+    while (1) {
+        char *nm = NULL;
+        if (name) {
+            if (MBEDTLS_OID_CMP(MBEDTLS_OID_AT_CN, &name->oid) == 0) {
+                nm = strndup((const char *)name->val.p, name->val.len);
+                if (!nm) {
+                    warn("csr_names: strndup failed");
+                    goto out;
+                }
+            }
+            name = name->next;
+        } else if (san) {
+            if (san->buf.tag == (MBEDTLS_ASN1_CONTEXT_SPECIFIC | 2)) {
+                nm = strndup((const char *)san->buf.p, san->buf.len);
+                if (!nm) {
+                    warn("csr_names: strndup failed");
+                    goto out;
+                }
+            } else if (san->buf.tag == (MBEDTLS_ASN1_CONTEXT_SPECIFIC | 7)) {
+                int af;
+                int len = 0;
+                switch (san->buf.len) {
+                    case 4:
+                        af = AF_INET;
+                        len = INET_ADDRSTRLEN;
+                        break;
+                    case 16:
+                        af = AF_INET6;
+                        len = INET6_ADDRSTRLEN;
+                        break;
+                    default:
+                        warnx("csr_names: invalid IP addres in Subj Alt Name");
+                }
+                if (len) {
+                    nm = calloc(1, len);
+                    if (!nm) {
+                        warnx("csr_names: calloc failed");
+                        goto out;
+                    }
+                    if (!inet_ntop(af, san->buf.p, nm, len)) {
+                        warnx("csr_names: invalid IP addres in Subj Alt Name");
+                        free(nm);
+                        nm = NULL;
+                    }
+                }
+            }
+            san = san->next;
+        } else
+            break;
+
+        if (nm) {
+            for (i = 0; i < n; i++) {
+                if (strcasecmp(nm, names[i]) == 0)
+                    break;
+            }
+            if (i < n)
+                free(nm);
+            else {
+                char **tmp = realloc(names, (n + 2) * sizeof(nm));
+                if (!tmp) {
+                    warn("csr_names: realloc failed");
+                    free(nm);
+                    goto out;
+                }
+                names = tmp;
+                names[n++] = nm;
+                names[n] = NULL;
+            }
+        }
+    }
+
+    if (n > 0) {
+        ret = names;
+        names = NULL;
+    }
+
+out:
+    if (names) {
+        for (i = 0; names[i]; i++)
+            free(names[i]);
+        free(names);
+    }
+    while (sans.next) {
+        san = sans.next;
+        sans.next = san->next;
+        mbedtls_free(san);
+    }
+    return ret;
+}
+#endif
+
+char *csr_load(const char *file, char ***names)
+{
+    int r;
+    char *ret = NULL;
+    void *csrdata = NULL;
+    size_t csrsize = 0;
+#if defined(USE_GNUTLS)
+    gnutls_x509_crq_t crq = NULL;
+#elif defined(USE_MBEDTLS)
+    mbedtls_x509_csr _crq, *crq = &_crq;
+    mbedtls_x509_csr_init(crq);
+#elif defined(USE_OPENSSL)
+    X509_REQ *crq = NULL;
+#endif
+
+    msg(1, "loading certificate request from %s", file);
+
+#if defined(USE_OPENSSL)
+    FILE *f = NULL;
+    if (!(f = fopen(file, "r"))) {
+        warn("csr_load: failed to open %s", file);
+        goto out;
+    }
+    crq = PEM_read_X509_REQ(f, NULL, NULL, NULL);
+    fclose(f);
+    if (!crq) {
+        openssl_error("csr_load");
+        warnx("csr_load: failed to load %s", file);
+        goto out;
+    }
+    r = i2d_X509_REQ(crq, NULL);
+    if (r < 0) {
+        openssl_error("csr_load");
+        goto out;
+    }
+    csrsize = r;
+    csrdata = calloc(1, csrsize);
+    if (!csrdata) {
+        warn("csr_load: calloc failed");
+        goto out;
+    }
+    unsigned char *tmp = csrdata;
+    if (i2d_X509_REQ(crq, &tmp) != (int)csrsize) {
+        openssl_error("csr_load");
+        goto out;
+    }
+#else
+    csrdata = read_file(file, &csrsize);
+    if (!csrdata) {
+        warn("csr_load: failed to read %s", file);
+        goto out;
+    }
+#endif
+#if defined(USE_GNUTLS)
+    gnutls_datum_t data = {csrdata, csrsize};
+    r = gnutls_x509_crq_init(&crq);
+    if (r < 0) {
+        warnx("csr_load: gnutls_x509_crq_init: %s", gnutls_strerror(r));
+        goto out;
+    }
+    r = gnutls_x509_crq_import(crq, &data, GNUTLS_X509_FMT_PEM);
+    if (r < 0) {
+        warnx("csr_load: gnutls_x509_crq_import: %s", gnutls_strerror(r));
+        goto out;
+    }
+    free(csrdata);
+    csrdata = NULL;
+    data.data = NULL;
+    data.size = 0;
+    r = gnutls_x509_crq_export2(crq, GNUTLS_X509_FMT_DER, &data);
+    if (r != GNUTLS_E_SUCCESS) {
+        warnx("csr_load: gnutls_x509_crq_export2: %s", gnutls_strerror(r));
+        goto out;
+    }
+    csrsize = data.size;
+    csrdata = gnutls_datum_data(&data, true);
+    if (!csrdata) {
+        warnx("csr_load: gnutls_datum_data failed");
+        goto out;
+    }
+#elif defined(USE_MBEDTLS)
+    r = mbedtls_x509_csr_parse(crq, csrdata, csrsize+1);
+    if (r < 0) {
+        warnx("csr_load: mbedtls_x509_csr_parse failed: %s",
+                _mbedtls_strerror(r));
+        goto out;
+    }
+#endif
+    r = base64_ENCODED_LEN(csrsize, base64_VARIANT_URLSAFE_NO_PADDING);
+    ret = calloc(1, r);
+    if (!ret) {
+        warn("csr_load: calloc failed");
+        goto out;
+    }
+    if (!bin2base64(ret, r, csrdata, csrsize,
+                base64_VARIANT_URLSAFE_NO_PADDING)) {
+        warnx("csr_load: bin2base64 failed");
+        free(ret);
+        ret = NULL;
+        goto out;
+    }
+    if (names) {
+        char **tmp = csr_names(crq);
+        if (tmp)
+            *names = tmp;
+        else {
+            free(ret);
+            ret = NULL;
+        }
+    }
+out:
+    free(csrdata);
+#if defined(USE_GNUTLS)
+    gnutls_x509_crq_deinit(crq);
+#elif defined(USE_MBEDTLS)
+    mbedtls_x509_csr_free(crq);
+#elif defined(USE_OPENSSL)
+    X509_REQ_free(crq);
+#endif
+    return ret;
+}
+
+#if defined(USE_GNUTLS)
 static int cert_load(gnutls_x509_crt_t *crt, unsigned int crt_size,
         const char *format, ...)
 #elif defined(USE_OPENSSL)
@@ -2861,121 +3489,13 @@ static bool ocsp_check(mbedtls_x509_crt *crt)
 }
 #endif
 
-#if defined(USE_MBEDTLS)
-// Unlike the built-in mbedTLS parser this function supports IP identifiers
-int cert_san(const mbedtls_x509_crt *crt, mbedtls_x509_sequence *san)
-{
-    if (crt->v3_ext.tag !=
-            (MBEDTLS_ASN1_CONTEXT_SPECIFIC | MBEDTLS_ASN1_CONSTRUCTED | 3))
-        return MBEDTLS_ERR_ASN1_UNEXPECTED_TAG;
-
-    unsigned char *p = crt->v3_ext.p;
-    size_t len = crt->v3_ext.len;
-    unsigned char *end = p + len;
-    unsigned char *end_ext;
-    int r;
-
-    r = mbedtls_asn1_get_tag(&p, end, &len,
-            MBEDTLS_ASN1_CONSTRUCTED | MBEDTLS_ASN1_SEQUENCE);
-    if (r)
-        return MBEDTLS_ERR_X509_INVALID_EXTENSIONS + r;
-
-    if (end != p + len)
-        return MBEDTLS_ERR_X509_INVALID_EXTENSIONS +
-            MBEDTLS_ERR_ASN1_LENGTH_MISMATCH;
-
-    while (p < end) {
-        r = mbedtls_asn1_get_tag(&p, end, &len,
-            MBEDTLS_ASN1_CONSTRUCTED | MBEDTLS_ASN1_SEQUENCE);
-        if (r)
-            return MBEDTLS_ERR_X509_INVALID_EXTENSIONS + r;
-
-        end_ext = p + len;
-
-        r = mbedtls_asn1_get_tag(&p, end_ext, &len, MBEDTLS_ASN1_OID);
-        if (r)
-            return MBEDTLS_ERR_X509_INVALID_EXTENSIONS + r;
-
-        if (len != MBEDTLS_OID_SIZE(MBEDTLS_OID_SUBJECT_ALT_NAME) ||
-                memcmp(MBEDTLS_OID_SUBJECT_ALT_NAME, p, len) != 0) {
-            p = end_ext;
-            continue;
-        }
-
-        p += len;
-
-        int crit;
-        r = mbedtls_asn1_get_bool(&p, end_ext, &crit);
-        if (r && r != MBEDTLS_ERR_ASN1_UNEXPECTED_TAG)
-            return MBEDTLS_ERR_X509_INVALID_EXTENSIONS + r;
-
-        r = mbedtls_asn1_get_tag(&p, end_ext, &len, MBEDTLS_ASN1_OCTET_STRING);
-        if (r)
-            return MBEDTLS_ERR_X509_INVALID_EXTENSIONS + r;
-
-        if (p + len != end_ext)
-            return MBEDTLS_ERR_X509_INVALID_EXTENSIONS +
-                MBEDTLS_ERR_ASN1_LENGTH_MISMATCH;
-
-        r = mbedtls_asn1_get_tag(&p, end_ext, &len,
-            MBEDTLS_ASN1_CONSTRUCTED | MBEDTLS_ASN1_SEQUENCE);
-        if (r)
-            return MBEDTLS_ERR_X509_INVALID_EXTENSIONS + r;
-
-        if (p + len != end_ext)
-            return MBEDTLS_ERR_X509_INVALID_EXTENSIONS +
-                MBEDTLS_ERR_ASN1_LENGTH_MISMATCH;
-
-        while (p < end_ext) {
-            if (end_ext - p < 1)
-                return MBEDTLS_ERR_X509_INVALID_EXTENSIONS +
-                    MBEDTLS_ERR_ASN1_OUT_OF_DATA;
-
-            unsigned char tag = *p++;
-            r = mbedtls_asn1_get_len(&p, end_ext, &len);
-            if (r)
-                return MBEDTLS_ERR_X509_INVALID_EXTENSIONS + r;
-
-            if ((tag & MBEDTLS_ASN1_TAG_CLASS_MASK) !=
-                    MBEDTLS_ASN1_CONTEXT_SPECIFIC)
-                return MBEDTLS_ERR_X509_INVALID_EXTENSIONS +
-                    MBEDTLS_ERR_ASN1_UNEXPECTED_TAG;
-
-            if (san->buf.p) {
-                if (san->next)
-                    return MBEDTLS_ERR_X509_INVALID_EXTENSIONS;
-
-                san->next = calloc(1, sizeof(mbedtls_asn1_sequence));
-                if (!san->next)
-                    return MBEDTLS_ERR_X509_INVALID_EXTENSIONS +
-                        MBEDTLS_ERR_ASN1_ALLOC_FAILED;
-
-                san = san->next;
-            }
-
-            san->buf.tag = tag;
-            san->buf.len = len;
-            san->buf.p = p;
-            p += len;
-        }
-
-        san->next = NULL;
-        if (p != end_ext)
-            return MBEDTLS_ERR_X509_INVALID_EXTENSIONS +
-                MBEDTLS_ERR_ASN1_LENGTH_MISMATCH;
-    }
-
-    return 0;
-}
-#endif
-
-bool cert_valid(const char *certdir, const char * const *names, int validity,
+bool cert_valid(const char *certfile, char * const *names, int validity,
         bool status_check)
 {
     bool valid = false;
 #if defined(USE_GNUTLS)
     gnutls_x509_crt_t crt[2] = {NULL, NULL};
-    int ncrt = cert_load(crt, 2, "%s/cert.pem", certdir);
+    int ncrt = cert_load(crt, 2, "%s", certfile);
     if (ncrt <= 0)
         goto out;
 
@@ -2986,16 +3506,16 @@ bool cert_valid(const char *certdir, const char * const *names, int validity,
     }
 
     int days_left = (expiration - time(NULL))/(24*3600);
-    msg(1, "%s/cert.pem expires in %d days", certdir, days_left);
+    msg(1, "%s expires in %d days", certfile, days_left);
     if (days_left < validity) {
-        msg(1, "%s/cert.pem is due for renewal", certdir);
+        msg(1, "%s is due for renewal", certfile);
         goto out;
     }
 
     while (names && *names) {
         if (!gnutls_x509_crt_check_hostname2(crt[0], *names,
                     GNUTLS_VERIFY_DO_NOT_ALLOW_WILDCARDS)) {
-            msg(1, "%s/cert.pem does not include %s", certdir, *names);
+            msg(1, "%s does not include %s", certfile, *names);
             goto out;
         }
         names++;
@@ -3004,8 +3524,7 @@ bool cert_valid(const char *certdir, const char * const *names, int validity,
     valid = true;
     if (status_check) {
         if (ncrt < 2)
-            warn("no issuer certificate in %s/cert.pem, skipping OCSP check",
-                    certdir);
+            warn("no issuer certificate in %s, skipping OCSP check", certfile);
         else
             valid = ocsp_check(crt);
     }
@@ -3017,19 +3536,18 @@ out:
     GENERAL_NAMES *san = NULL;
     X509_NAME *sname = NULL;
     X509 *crt[2] = {NULL, NULL};
-    int ncrt = cert_load(crt, 2, "%s/cert.pem", certdir);
+    int ncrt = cert_load(crt, 2, "%s", certfile);
     if (ncrt <= 0)
         goto out;
     int days_left, sec;
     const ASN1_TIME *tm = X509_get0_notAfter(crt[0]);
     if (!tm || !ASN1_TIME_diff(&days_left, &sec, NULL, tm)) {
-        warnx("cert_valid: invalid expiration time format in %s/cert.pem",
-                certdir);
+        warnx("cert_valid: invalid expiration time format in %s", certfile);
         goto out;
     }
-    msg(1, "%s/cert.pem expires in %d days", certdir, days_left);
+    msg(1, "%s expires in %d days", certfile, days_left);
     if (days_left < validity) {
-        msg(1, "%s/cert.pem is due for renewal", certdir);
+        msg(1, "%s is due for renewal", certfile);
         goto out;
     }
 
@@ -3108,7 +3626,7 @@ out:
         }
 
         if (!found) {
-            msg(1, "%s/cert.pem does not include %s", certdir, *names);
+            msg(1, "%s does not include %s", certfile, *names);
             goto out;
         }
         names++;
@@ -3117,8 +3635,7 @@ out:
     valid = true;
     if (status_check) {
         if (ncrt < 2)
-            warn("no issuer certificate in %s/cert.pem, skipping OCSP check",
-                    certdir);
+            warn("no issuer certificate in %s, skipping OCSP check", certfile);
         else
             valid = ocsp_check(crt);
     }
@@ -3133,7 +3650,7 @@ out:
     mbedtls_x509_sequence san;
     memset(&san, 0, sizeof(san));
 
-    int ncrt = cert_load(&crt, "%s/cert.pem", certdir);
+    int ncrt = cert_load(&crt, "%s", certfile);
     if (ncrt < 1)
         goto out;
 
@@ -3154,16 +3671,16 @@ out:
     }
 
     int days_left = (expiration - time(NULL))/(24*3600);
-    msg(1, "%s/cert.pem expires in %d days", certdir, days_left);
+    msg(1, "%s expires in %d days", certfile, days_left);
     if (days_left < validity) {
-        msg(1, "%s/cert.pem is due for renewal", certdir);
+        msg(1, "%s is due for renewal", certfile);
         goto out;
     }
 
     if (crt->ext_types & MBEDTLS_X509_EXT_SUBJECT_ALT_NAME) {
-        int r = cert_san(crt, &san);
+        int r = ext_san(crt->v3_ext.p, crt->v3_ext.len, &san);
         if (r) {
-            warnx("cert_valid: cert_san failed: %s", _mbedtls_strerror(r));
+            warnx("cert_valid: ext_san failed: %s", _mbedtls_strerror(r));
             goto out;
         }
     }
@@ -3205,7 +3722,7 @@ out:
                 found = true;
         }
         if (!found) {
-            msg(1, "%s/cert.pem does not include %s", certdir, *names);
+            msg(1, "%s does not include %s", certfile, *names);
             goto out;
         }
         names++;
@@ -3214,8 +3731,7 @@ out:
     valid = true;
     if (status_check) {
         if (ncrt < 2)
-            warn("no issuer certificate in %s/cert.pem, skipping OCSP check",
-                    certdir);
+            warn("no issuer certificate in %s, skipping OCSP check", certfile);
         else
             valid = ocsp_check(crt);
     }
@@ -3227,7 +3743,7 @@ out:
     while (san.next) {
         mbedtls_x509_sequence *tmp = san.next;
         san.next = tmp->next;
-        free(tmp);
+        mbedtls_free(tmp);
     }
 #endif
     return valid;

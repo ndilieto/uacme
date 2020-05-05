@@ -2,12 +2,12 @@
 .\"     Title: uacme
 .\"    Author: [see the "AUTHOR" section]
 .\" Generator: DocBook XSL Stylesheets v1.79.1 <http://docbook.sf.net/>
-.\"      Date: 04/25/2020
+.\"      Date: 05/05/2020
 .\"    Manual: User Commands
-.\"    Source: uacme 1.2.4
+.\"    Source: uacme 1.2.4-dev
 .\"  Language: English
 .\"
-.TH "UACME" "1" "04/25/2020" "uacme 1\&.2\&.4" "User Commands"
+.TH "UACME" "1" "05/05/2020" "uacme 1\&.2\&.4\-dev" "User Commands"
 .\" -----------------------------------------------------------------
 .\" * Define some portability stuff
 .\" -----------------------------------------------------------------
@@ -31,7 +31,7 @@
 uacme \- ACMEv2 client written in plain C code with minimal dependencies
 .SH "SYNOPSIS"
 .sp
-\fBuacme\fR [\fB\-a\fR|\fB\-\-acme\-url\fR \fIURL\fR] [\fB\-b\fR|\fB\-\-bits\fR \fIBITS\fR] [\fB\-c\fR|\fB\-\-confdir\fR \fIDIR\fR] [\fB\-d\fR|\fB\-\-days\fR \fIDAYS\fR] [\fB\-f\fR|\fB\-\-force\fR] [\fB\-h\fR|\fB\-\-hook\fR \fIPROGRAM\fR] [\fB\-m\fR|\fB\-\-must\-staple\fR] [\fB\-n\fR|\fB\-\-never\-create\fR] [\fB\-o\fR|\fB\-\-no\-ocsp\fR] [\fB\-s\fR|\fB\-\-staging\fR] [\fB\-t\fR|\fB\-\-type\fR \fBRSA\fR|\fBEC\fR] [\fB\-v\fR|\fB\-\-verbose\fR \&...] [\fB\-V\fR|\fB\-\-version\fR] [\fB\-y\fR|\fB\-\-yes\fR] [\fB\-?\fR|\fB\-\-help\fR] \fBnew\fR [\fIEMAIL\fR] | \fBupdate\fR [\fIEMAIL\fR] | \fBdeactivate\fR | \fBnewkey\fR | \fBissue\fR \fIIDENTIFIER\fR [\fIALTNAME\fR \&...]] | \fBrevoke\fR \fICERTFILE\fR
+\fBuacme\fR [\fB\-a\fR|\fB\-\-acme\-url\fR \fIURL\fR] [\fB\-b\fR|\fB\-\-bits\fR \fIBITS\fR] [\fB\-c\fR|\fB\-\-confdir\fR \fIDIR\fR] [\fB\-d\fR|\fB\-\-days\fR \fIDAYS\fR] [\fB\-f\fR|\fB\-\-force\fR] [\fB\-h\fR|\fB\-\-hook\fR \fIPROGRAM\fR] [\fB\-m\fR|\fB\-\-must\-staple\fR] [\fB\-n\fR|\fB\-\-never\-create\fR] [\fB\-o\fR|\fB\-\-no\-ocsp\fR] [\fB\-s\fR|\fB\-\-staging\fR] [\fB\-t\fR|\fB\-\-type\fR \fBRSA\fR|\fBEC\fR] [\fB\-v\fR|\fB\-\-verbose\fR \&...] [\fB\-V\fR|\fB\-\-version\fR] [\fB\-y\fR|\fB\-\-yes\fR] [\fB\-?\fR|\fB\-\-help\fR] \fBnew\fR [\fIEMAIL\fR] | \fBupdate\fR [\fIEMAIL\fR] | \fBdeactivate\fR | \fBnewkey\fR | \fBissue\fR \fIIDENTIFIER\fR [\fIALTNAME\fR \&...]] | \fBissue\fR \fICSRFILE\fR | \fBrevoke\fR \fICERTFILE\fR
 .SH "DESCRIPTION"
 .sp
 \fBuacme\fR is a client for the ACMEv2 protocol described in RFC8555, written in plain C code with minimal dependencies (libcurl and one of GnuTLS, OpenSSL or mbedTLS)\&. The ACMEv2 protocol allows a Certificate Authority (https://letsencrypt\&.org is a popular one) and an applicant to automate the process of verification and certificate issuance\&. The protocol also provides facilities for other certificate management functions, such as certificate revocation\&. For more information see https://tools\&.ietf\&.org/html/rfc8555
@@ -311,6 +311,29 @@ is specified\&. Wildcard IDENTIFIERs or ALTNAMEs are dealt with correctly, as lo
 \fI*\&.test\&.com\fR
 is saved to
 \fICONFDIR/test\&.com/cert\&.pem\fR\&. IP address IDENTIFIERs and ALTNAMEs are also supported according to
+https://tools\&.ietf\&.org/html/rfc8738#section\-3
+.RE
+.PP
+\fBuacme\fR [\fIOPTIONS\fR \&...] \fBissue\fR \fICSRFILE\fR
+.RS 4
+Issue a certificate based on a RFC2986 Certificate Signing Request contained in
+\fICSRFILE\fR, which must be in PEM format\&. If a certificate file
+\fICSRBASE\-cert\&.pem\fR
+(where
+\fICSRBASE\fR
+is obtained by stripping the extension, if any, from
+\fICSRFILE\fR) is is already available in the same directory containing
+\fICSRFILE\fR, and is still valid for longer than
+\fIDAYS\fR
+no action is taken unless
+\fB\-f, \-\-force\fR
+is specified or
+\fB\-o, \-\-no\-ocsp\fR
+is
+\fBnot\fR
+specified and the certificate is reported as revoked by the OCSP server\&. If the certificate file already exists it is hardlinked to
+\fIBASENAME\-cert\-TIMESTAMP\&.pem\fR
+before overwriting\&. Wildcard domains are dealt with correctly, as long as the ACME server supports them\&. IP addresses are also supported according to
 https://tools\&.ietf\&.org/html/rfc8738#section\-3
 .RE
 .PP

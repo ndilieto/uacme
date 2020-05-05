@@ -752,7 +752,8 @@ UACME(1) Manual Page
     [<strong>-o</strong>|<strong>--no-ocsp</strong>] [<strong>-s</strong>|<strong>--staging</strong>] [<strong>-t</strong>|<strong>--type</strong> <strong>RSA</strong>|<strong>EC</strong>]
     [<strong>-v</strong>|<strong>--verbose</strong> &#8230;] [<strong>-V</strong>|<strong>--version</strong>] [<strong>-y</strong>|<strong>--yes</strong>] [<strong>-?</strong>|<strong>--help</strong>]
     <strong>new</strong> [<em>EMAIL</em>] | <strong>update</strong> [<em>EMAIL</em>] | <strong>deactivate</strong> | <strong>newkey</strong> |
-    <strong>issue</strong> <em>IDENTIFIER</em> [<em>ALTNAME</em> &#8230;]] | <strong>revoke</strong> <em>CERTFILE</em></p></div>
+    <strong>issue</strong> <em>IDENTIFIER</em> [<em>ALTNAME</em> &#8230;]] | <strong>issue</strong> <em>CSRFILE</em> |
+    <strong>revoke</strong> <em>CERTFILE</em></p></div>
 </div>
 </div>
 <div class="sect1">
@@ -1117,6 +1118,26 @@ The key authorization (for <strong>dns-01</strong> and <strong>tls-alpn-01</stro
 </p>
 </dd>
 <dt class="hdlist1">
+<strong>uacme</strong> [<em>OPTIONS</em> &#8230;] <strong>issue</strong> <em>CSRFILE</em>
+</dt>
+<dd>
+<p>
+    Issue a certificate based on a RFC2986 Certificate Signing Request
+    contained in <em>CSRFILE</em>, which must be in PEM format.
+    If a certificate file <em>CSRBASE-cert.pem</em> (where <em>CSRBASE</em> is
+    obtained by stripping the extension, if any, from <em>CSRFILE</em>) is
+    is already available in the same directory containing <em>CSRFILE</em>, and
+    is still valid for longer than <em>DAYS</em> no action is taken unless
+    <strong>-f, --force</strong> is specified or <strong>-o, --no-ocsp</strong> is <strong>not</strong> specified and
+    the certificate is reported as revoked by the OCSP server.
+    If the certificate file already exists it is hardlinked to
+    <em>BASENAME-cert-TIMESTAMP.pem</em> before overwriting.
+    Wildcard domains are dealt with correctly, as long as the ACME server
+    supports them.  IP addresses are also supported according to
+    <a href="https://tools.ietf.org/html/rfc8738#section-3">https://tools.ietf.org/html/rfc8738#section-3</a>
+</p>
+</dd>
+<dt class="hdlist1">
 <strong>uacme</strong> [<em>OPTIONS</em> &#8230;] <strong>revoke</strong> <em>CERTFILE</em>
 </dt>
 <dd>
@@ -1264,9 +1285,9 @@ along with this program.  If not, see <a href="http://www.gnu.org/licenses/">htt
 <div id="footnotes"><hr></div>
 <div id="footer">
 <div id="footer-text">
-Version 1.2.4<br>
+Version 1.2.4-dev<br>
 Last updated
- 2020-04-25 15:54:50 CEST
+ 2020-05-05 16:38:13 CEST
 </div>
 </div>
 </body>
