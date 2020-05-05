@@ -17,7 +17,7 @@ Build-Depends: debhelper-compat (= 12),
 Rules-Requires-Root: no
 Standards-Version: 4.5.0
 Homepage: https://github.com/ndilieto/uacme
-Vcs-Git: https://github.com/ndilieto/uacme
+Vcs-Git: https://github.com/ndilieto/uacme.git
 Vcs-Browser: https://github.com/ndilieto/uacme
 
 Package: uacme
