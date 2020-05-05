@@ -1,3 +1,11 @@
+uacme (1.2.4-2) unstable; urgency=medium
+
+  * Set upstream metadata fields: Bug-Database, Bug-Submit, Repository,
+    Repository-Browse.
+  * Use canonical URL in Vcs-Git.
+
+ -- Debian Janitor <janitor@jelmer.uk>  Tue, 05 May 2020 01:15:12 +0000
+
 uacme (1.2.4-1) unstable; urgency=medium
 
   * New upstream release
