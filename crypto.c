@@ -2300,7 +2300,8 @@ char *csr_gen(const char * const *names, bool status_req, privkey_t key)
     memcpy(csrdata, buf + buflen - csrsize, csrsize);
 #endif
     r = base64_ENCODED_LEN(csrsize, base64_VARIANT_URLSAFE_NO_PADDING);
-    if (!(req = calloc(1, r))) {
+    req = calloc(1, r);
+    if (!req) {
         warn("csr_gen: calloc failed");
         goto out;
     }
@@ -2322,7 +2323,7 @@ out:
 #elif defined(USE_OPENSSL)
     if (name)
         X509_NAME_free(name);
-    if (req)
+    if (crq)
         X509_REQ_free(crq);
     if (exts)
         sk_X509_EXTENSION_pop_free(exts, X509_EXTENSION_free);
