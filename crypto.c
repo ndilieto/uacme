@@ -77,6 +77,7 @@
 #include <mbedtls/pem.h>
 #include <mbedtls/pk.h>
 #include <mbedtls/platform.h>
+#include <mbedtls/sha1.h>
 #include <mbedtls/version.h>
 #include <mbedtls/x509_crt.h>
 #include <mbedtls/x509_csr.h>
@@ -3500,11 +3501,398 @@ out:
     return result;
 }
 #elif defined(USE_MBEDTLS)
+#define OID_AUTHORITY_INFO_ACCESS MBEDTLS_OID_PKIX "\x01\x01"
+#define OID_AD_OCSP MBEDTLS_OID_PKIX "\x30\x01"
+#define OID_AD_OCSP_BASIC OID_AD_OCSP "\x01"
+#define OID_AD_OCSP_NONCE OID_AD_OCSP "\x02"
+
+static int ext_parse_ocsp_uri(unsigned char *p, size_t len, const char **out)
+{
+    unsigned char *end = p + len;
+    unsigned char *end_ext;
+    unsigned char *end_ad;
+    int r;
+
+    r = mbedtls_asn1_get_tag(&p, end, &len,
+            MBEDTLS_ASN1_CONSTRUCTED | MBEDTLS_ASN1_SEQUENCE);
+    if (r)
+        return MBEDTLS_ERR_X509_INVALID_EXTENSIONS + r;
+
+    if (end != p + len)
+        return MBEDTLS_ERR_X509_INVALID_EXTENSIONS +
+            MBEDTLS_ERR_ASN1_LENGTH_MISMATCH;
+
+    while (p < end) {
+        r = mbedtls_asn1_get_tag(&p, end, &len,
+            MBEDTLS_ASN1_CONSTRUCTED | MBEDTLS_ASN1_SEQUENCE);
+        if (r)
+            return MBEDTLS_ERR_X509_INVALID_EXTENSIONS + r;
+
+        end_ext = p + len;
+
+        r = mbedtls_asn1_get_tag(&p, end_ext, &len, MBEDTLS_ASN1_OID);
+        if (r)
+            return MBEDTLS_ERR_X509_INVALID_EXTENSIONS + r;
+
+        if (len != MBEDTLS_OID_SIZE(OID_AUTHORITY_INFO_ACCESS) ||
+                memcmp(OID_AUTHORITY_INFO_ACCESS, p, len) != 0) {
+            p = end_ext;
+            continue;
+        }
+
+        p += len;
+
+        int crit;
+        r = mbedtls_asn1_get_bool(&p, end_ext, &crit);
+        if (r && r != MBEDTLS_ERR_ASN1_UNEXPECTED_TAG)
+            return MBEDTLS_ERR_X509_INVALID_EXTENSIONS + r;
+
+        r = mbedtls_asn1_get_tag(&p, end_ext, &len, MBEDTLS_ASN1_OCTET_STRING);
+        if (r)
+            return MBEDTLS_ERR_X509_INVALID_EXTENSIONS + r;
+
+        if (p + len != end_ext)
+            return MBEDTLS_ERR_X509_INVALID_EXTENSIONS +
+                MBEDTLS_ERR_ASN1_LENGTH_MISMATCH;
+
+        r = mbedtls_asn1_get_tag(&p, end_ext, &len,
+            MBEDTLS_ASN1_CONSTRUCTED | MBEDTLS_ASN1_SEQUENCE);
+        if (r)
+            return MBEDTLS_ERR_X509_INVALID_EXTENSIONS + r;
+
+        if (p + len != end_ext)
+            return MBEDTLS_ERR_X509_INVALID_EXTENSIONS +
+                MBEDTLS_ERR_ASN1_LENGTH_MISMATCH;
+
+        while (p < end_ext) {
+            r = mbedtls_asn1_get_tag(&p, end_ext, &len,
+                    MBEDTLS_ASN1_CONSTRUCTED | MBEDTLS_ASN1_SEQUENCE);
+            if (r)
+                return MBEDTLS_ERR_X509_INVALID_EXTENSIONS + r;
+
+            end_ad = p + len;
+
+            r = mbedtls_asn1_get_tag(&p, end_ad, &len, MBEDTLS_ASN1_OID);
+            if (r)
+                return MBEDTLS_ERR_X509_INVALID_EXTENSIONS + r;
+
+            if (len != MBEDTLS_OID_SIZE(OID_AD_OCSP) ||
+                    memcmp(OID_AD_OCSP, p, len) != 0) {
+                p = end_ad;
+                continue;
+            }
+
+            p += len;
+
+            r = mbedtls_asn1_get_tag(&p, end_ad, &len,
+                    MBEDTLS_ASN1_CONTEXT_SPECIFIC | 6);
+            if (r) {
+                p = end_ad;
+                continue;
+            }
+
+            *out = (const char *)p;
+            return len;
+        }
+
+        if (p != end_ext)
+            return MBEDTLS_ERR_X509_INVALID_EXTENSIONS +
+                MBEDTLS_ERR_ASN1_LENGTH_MISMATCH;
+    }
+    return 0;
+}
+
+static int ocsp_req(mbedtls_x509_crt *crt, unsigned char *req, size_t size,
+        const unsigned char **certid, size_t *certid_size)
+{
+    int ret = 0;
+    size_t ext_len = 0;
+    size_t len = 0;
+    const char *alg_oid;
+    size_t alg_oid_len = 0;
+    unsigned char hash[20];
+    unsigned char *p = req + size;
+    mbedtls_x509_crt *issuer = crt->next;
+
+    if (!issuer)
+        return MBEDTLS_ERR_X509_BAD_INPUT_DATA;
+
+    MBEDTLS_ASN1_CHK_ADD(len, mbedtls_asn1_write_raw_buffer(&p, req,
+                crt->serial.p, crt->serial.len));
+    MBEDTLS_ASN1_CHK_ADD(len, mbedtls_asn1_write_len(&p, req,
+                crt->serial.len));
+    MBEDTLS_ASN1_CHK_ADD(len, mbedtls_asn1_write_tag(&p, req,
+                crt->serial.tag));
+
+    for (size_t buf_size = 0x10; ; ) {
+        unsigned char *buf = mbedtls_calloc(1, buf_size);
+        if (!buf)
+            return MBEDTLS_ERR_X509_ALLOC_FAILED;
+        unsigned char *c = buf + buf_size;
+        ret = mbedtls_pk_write_pubkey(&c, buf, &issuer->pk);
+        if (ret >= 0)
+            ret = mbedtls_sha1_ret(buf + buf_size - ret, ret, hash);
+        mbedtls_free(buf);
+        if (ret == MBEDTLS_ERR_ASN1_BUF_TOO_SMALL) {
+            buf_size *= 2;
+            continue;
+        }
+        if (ret < 0)
+            return ret;
+        break;
+    }
+
+    MBEDTLS_ASN1_CHK_ADD(len, mbedtls_asn1_write_octet_string(&p, req,
+                hash, sizeof(hash)));
+
+    ret = mbedtls_sha1_ret(crt->issuer_raw.p, crt->issuer_raw.len, hash);
+    if (ret)
+        return ret;
+
+    MBEDTLS_ASN1_CHK_ADD(len, mbedtls_asn1_write_octet_string(&p, req,
+                hash, sizeof(hash)));
+
+    ret = mbedtls_oid_get_oid_by_md(MBEDTLS_MD_SHA1, &alg_oid, &alg_oid_len);
+    if (ret)
+        return ret;
+
+    MBEDTLS_ASN1_CHK_ADD(len, mbedtls_asn1_write_algorithm_identifier(&p, req,
+                alg_oid, alg_oid_len, 0));
+
+    if (certid)
+        *certid = p;
+    if (certid_size)
+        *certid_size = len;
+
+    MBEDTLS_ASN1_CHK_ADD(len, mbedtls_asn1_write_len(&p, req, len));
+    MBEDTLS_ASN1_CHK_ADD(len, mbedtls_asn1_write_tag(&p, req,
+                MBEDTLS_ASN1_CONSTRUCTED | MBEDTLS_ASN1_SEQUENCE));
+
+    MBEDTLS_ASN1_CHK_ADD(len, mbedtls_asn1_write_len(&p, req, len));
+    MBEDTLS_ASN1_CHK_ADD(len, mbedtls_asn1_write_tag(&p, req,
+                MBEDTLS_ASN1_CONSTRUCTED | MBEDTLS_ASN1_SEQUENCE));
+
+    MBEDTLS_ASN1_CHK_ADD(len, mbedtls_asn1_write_len(&p, req, len));
+    MBEDTLS_ASN1_CHK_ADD(len, mbedtls_asn1_write_tag(&p, req,
+                MBEDTLS_ASN1_CONSTRUCTED | MBEDTLS_ASN1_SEQUENCE));
+
+    len += ext_len;
+
+    MBEDTLS_ASN1_CHK_ADD(len, mbedtls_asn1_write_len(&p, req, len));
+    MBEDTLS_ASN1_CHK_ADD(len, mbedtls_asn1_write_tag(&p, req,
+                MBEDTLS_ASN1_CONSTRUCTED | MBEDTLS_ASN1_SEQUENCE));
+
+    MBEDTLS_ASN1_CHK_ADD(len, mbedtls_asn1_write_len(&p, req, len));
+    MBEDTLS_ASN1_CHK_ADD(len, mbedtls_asn1_write_tag(&p, req,
+                MBEDTLS_ASN1_CONSTRUCTED | MBEDTLS_ASN1_SEQUENCE));
+
+    return len;
+}
+
+static int ocsp_resp(unsigned char *p, size_t len,
+        const unsigned char *certid, size_t certid_size, int *status)
+{
+    const unsigned char *end = p + len;
+    int i, r;
+
+    r = mbedtls_asn1_get_tag(&p, end, &len,
+            MBEDTLS_ASN1_CONSTRUCTED | MBEDTLS_ASN1_SEQUENCE);
+    if (r)
+        return r;
+
+    r = mbedtls_asn1_get_tag(&p, end, &len, 10); // ASN1_ENUMERATED
+    if (r)
+        return r;
+
+    if (len == 0 || len > sizeof(int) || (*p & 0x80))
+        return MBEDTLS_ERR_ASN1_INVALID_LENGTH;
+
+    while (len--)
+        r = (r << 8) | *p++;
+    if (r)
+        return r;
+
+    r = mbedtls_asn1_get_tag(&p, end, &len,
+            MBEDTLS_ASN1_CONSTRUCTED | MBEDTLS_ASN1_CONTEXT_SPECIFIC);
+    if (r)
+        return r;
+
+    r = mbedtls_asn1_get_tag(&p, end, &len,
+            MBEDTLS_ASN1_CONSTRUCTED | MBEDTLS_ASN1_SEQUENCE);
+    if (r)
+        return r;
+    end = p + len;
+
+    r = mbedtls_asn1_get_tag(&p, end, &len, MBEDTLS_ASN1_OID);
+    if (r)
+        return r;
+
+    if (len != MBEDTLS_OID_SIZE(OID_AD_OCSP_BASIC) ||
+            memcmp(OID_AD_OCSP_BASIC, p, len) != 0)
+        return MBEDTLS_ERR_ASN1_INVALID_DATA;
+    p += len;
+
+    r = mbedtls_asn1_get_tag(&p, end, &len, MBEDTLS_ASN1_OCTET_STRING);
+    if (r)
+        return r;
+    end = p + len;
+
+    r = mbedtls_asn1_get_tag(&p, end, &len,
+            MBEDTLS_ASN1_CONSTRUCTED | MBEDTLS_ASN1_SEQUENCE);
+    if (r)
+        return r;
+    end = p + len;
+
+    r = mbedtls_asn1_get_tag(&p, end, &len,
+            MBEDTLS_ASN1_CONSTRUCTED | MBEDTLS_ASN1_SEQUENCE);
+    if (r)
+        return r;
+    end = p + len;
+
+    r = mbedtls_asn1_get_tag(&p, end, &len,
+            MBEDTLS_ASN1_CONSTRUCTED | MBEDTLS_ASN1_CONTEXT_SPECIFIC);
+    if (r && r != MBEDTLS_ERR_ASN1_UNEXPECTED_TAG)
+        return r;
+    if (r == 0) {
+        int ver = 0;
+        r = mbedtls_asn1_get_int(&p, end, &ver);
+        if (r)
+            return r;
+        if (ver)
+            return MBEDTLS_ERR_ASN1_INVALID_DATA;
+    }
+
+    for (i = 1; i < 3; i++) {
+        r = mbedtls_asn1_get_tag(&p, end, &len,
+                MBEDTLS_ASN1_CONSTRUCTED | MBEDTLS_ASN1_CONTEXT_SPECIFIC | i);
+        if (r && r != MBEDTLS_ERR_ASN1_UNEXPECTED_TAG)
+            return r;
+        if (r == 0)
+            break;
+    }
+    if (i > 2)
+        return MBEDTLS_ERR_ASN1_INVALID_DATA;
+    p += len;
+
+    r = mbedtls_asn1_get_tag(&p, end, &len, MBEDTLS_ASN1_GENERALIZED_TIME);
+    if (r)
+        return r;
+    p += len;
+
+    r = mbedtls_asn1_get_tag(&p, end, &len,
+            MBEDTLS_ASN1_CONSTRUCTED | MBEDTLS_ASN1_SEQUENCE);
+    if (r)
+        return r;
+
+    r = mbedtls_asn1_get_tag(&p, end, &len,
+            MBEDTLS_ASN1_CONSTRUCTED | MBEDTLS_ASN1_SEQUENCE);
+    if (r)
+        return r;
+
+    r = mbedtls_asn1_get_tag(&p, end, &len,
+            MBEDTLS_ASN1_CONSTRUCTED | MBEDTLS_ASN1_SEQUENCE);
+    if (r)
+        return r;
+    if (certid_size != len || memcmp(certid, p, len) != 0)
+        return MBEDTLS_ERR_ASN1_INVALID_DATA;
+    p += len;
+
+    for (i = 0; i < 3; i++) {
+        r = mbedtls_asn1_get_tag(&p, end, &len,
+                MBEDTLS_ASN1_CONSTRUCTED | MBEDTLS_ASN1_CONTEXT_SPECIFIC | i);
+        if (r && r != MBEDTLS_ERR_ASN1_UNEXPECTED_TAG)
+            return r;
+        if (r == 0)
+            break;
+
+        r = mbedtls_asn1_get_tag(&p, end, &len,
+                MBEDTLS_ASN1_CONTEXT_SPECIFIC | i);
+        if (r && r != MBEDTLS_ERR_ASN1_UNEXPECTED_TAG)
+            return r;
+        if (r == 0)
+            break;
+    }
+    if (i > 2)
+        return MBEDTLS_ERR_ASN1_INVALID_DATA;
+    else if (status)
+        *status = i;
+
+    return 0;
+}
+
 static bool ocsp_check(mbedtls_x509_crt *crt)
 {
-    (void) crt;
-    msg(1, "OCSP check not implemented when built with mbedTLS");
-    return true;
+    bool result = true;
+    char *ocsp_uri = NULL;
+    curldata_t *cd = NULL;
+
+    if (!crt->v3_ext.p || crt->v3_ext.len == 0)
+        goto out;
+
+    const char *tmp = NULL;
+    int r = ext_parse_ocsp_uri(crt->v3_ext.p, crt->v3_ext.len, &tmp);
+    if (r < 0)
+        warnx("cert_valid: ext_parse_ocsp_uri failed: %s",
+                _mbedtls_strerror(r));
+    else if (r == 0)
+        goto out;
+
+    ocsp_uri = strndup(tmp, r);
+    if (!ocsp_uri) {
+        warn("ocsp_check: strndup failed");
+        goto out;
+    }
+
+    unsigned char req[256];
+    const unsigned char *certid;
+    size_t certid_size;
+    r = ocsp_req(crt, req, sizeof(req), &certid, &certid_size);
+    if (r < 0) {
+        warnx("cert_valid: ocsp_req failed: %s", _mbedtls_strerror(r));
+        goto out;
+    }
+
+    msg(1, "querying OCSP server at %s", ocsp_uri);
+    cd = curl_post(ocsp_uri, req + sizeof(req) - r, r,
+            "Content-Type: application/ocsp-request", NULL);
+    if (!cd) {
+        warnx("ocsp_check: curl_post(\"%s\") failed", ocsp_uri);
+        goto out;
+    }
+    if (cd->headers)
+        msg(3, "ocsp_check: HTTP headers:\n%s", cd->headers);
+
+    int status;
+    r = ocsp_resp((unsigned char *)cd->body, cd->body_len, certid, certid_size,
+            &status);
+    if (r < 0) {
+        warnx("ocsp_check: ocsp_resp failed: %s",
+                _mbedtls_strerror(r));
+        goto out;
+    } else if (r > 0) {
+        warnx("OCSP response was unsuccessful (%d)", r);
+        goto out;
+    } else switch (status) {
+        case 0: // GOOD
+            msg(1, "OCSP certificate status is GOOD");
+            break;
+
+        case 1: // REVOKED
+            warnx("OCSP certificate status is REVOKED");
+            result = false;
+            break;
+
+        case 2: // UNKNOWN
+        default:
+            msg(1, "OCSP certificate status is UNKNOWN");
+            break;
+    }
+
+out:
+    free(ocsp_uri);
+    if (cd)
+        curldata_free(cd);
+    return result;
 }
 #endif
 
