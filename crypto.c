@@ -2632,10 +2632,6 @@ static int ext_san(unsigned char *p, size_t len, mbedtls_x509_sequence *san)
                 MBEDTLS_ERR_ASN1_LENGTH_MISMATCH;
 
         while (p < end_ext) {
-            if (end_ext - p < 1)
-                return MBEDTLS_ERR_X509_INVALID_EXTENSIONS +
-                    MBEDTLS_ERR_ASN1_OUT_OF_DATA;
-
             unsigned char tag = *p++;
             r = mbedtls_asn1_get_len(&p, end_ext, &len);
             if (r)
