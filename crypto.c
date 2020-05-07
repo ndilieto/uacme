@@ -2926,6 +2926,29 @@ char *csr_load(const char *file, char ***names)
                 _mbedtls_strerror(r));
         goto out;
     }
+    mbedtls_pem_context ctx;
+    mbedtls_pem_init(&ctx);
+    size_t len;
+    r = mbedtls_pem_read_buffer(&ctx,
+            "-----BEGIN CERTIFICATE REQUEST-----",
+            "-----END CERTIFICATE REQUEST-----",
+            csrdata, NULL, 0, &len);
+    if (r) {
+        warnx("csr_load: mbedtls_pem_read_buffer failed: %s",
+                _mbedtls_strerror(r));
+        mbedtls_pem_free(&ctx);
+        goto out;
+    }
+    free(csrdata);
+    csrsize = ctx.buflen;
+    csrdata = calloc(1, csrsize);
+    if (!csrdata) {
+        warn("csr_load: calloc failed");
+        mbedtls_pem_free(&ctx);
+        goto out;
+    }
+    memcpy(csrdata, ctx.buf, ctx.buflen);
+    mbedtls_pem_free(&ctx);
 #endif
     r = base64_ENCODED_LEN(csrsize, base64_VARIANT_URLSAFE_NO_PADDING);
     ret = calloc(1, r);
@@ -3814,6 +3837,7 @@ char *cert_der_base64url(const char *certfile)
         goto out;
     }
     free(certdata);
+    certsize = ctx.buflen;
     certdata = calloc(1, certsize);
     if (!certdata) {
         warn("cert_der_base64url: calloc failed");
@@ -3821,7 +3845,6 @@ char *cert_der_base64url(const char *certfile)
         goto out;
     }
     memcpy(certdata, ctx.buf, ctx.buflen);
-    certsize = ctx.buflen;
     mbedtls_pem_free(&ctx);
 #endif
     r = base64_ENCODED_LEN(certsize, base64_VARIANT_URLSAFE_NO_PADDING);
