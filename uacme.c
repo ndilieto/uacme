@@ -49,7 +49,6 @@
 
 typedef struct acme {
     privkey_t key;
-    privkey_t ckey;
     json_value_t *json;
     json_value_t *account;
     json_value_t *dir;
@@ -62,12 +61,8 @@ typedef struct acme {
     const char *directory;
     const char *hook;
     const char *email;
-    const char *ident;
-    const char * const *names;
-    const char *confdir;
-    char *keydir;
-    char *ckeydir;
-    char *certdir;
+    char *keyprefix;
+    char *certprefix;
 } acme_t;
 
 #if !HAVE_STRCASESTR
@@ -308,30 +303,44 @@ int hook_run(const char *prog, const char *method, const char *type,
 
 bool check_or_mkdir(bool allow_create, const char *dir, mode_t mode)
 {
+    bool ret = false;
+    char *tmp = strdup(dir);
+    if (!tmp) {
+        warnx("check_or_mkdir: strdup failed");
+        goto out;
+    }
+    for (size_t i = strlen(tmp); i > 1; i--) {
+        if (tmp[i - 1] != '/')
+            break;
+        tmp[i - 1] = 0;
+    }
     if (access(dir, F_OK) < 0) {
         if (!allow_create) {
             warnx("failed to access %s", dir);
-            return false;
+            goto out;
         }
         if (mkdir(dir, mode) < 0) {
             warn("failed to create %s", dir);
-            return false;
+            goto out;
         }
         msg(1, "created directory %s", dir);
     }
     struct stat st;
     if (stat(dir, &st) != 0) {
         warn("failed to stat %s", dir);
-        return false;
+        goto out;
     }
     if (!S_ISDIR(st.st_mode)) {
         warnx("%s is not a directory", dir);
-        return false;
+        goto out;
     }
-    return true;
+    ret = true;
+out:
+    free(tmp);
+    return ret;
 }
 
-char *identifiers(const char * const *names)
+char *identifiers(char * const *names)
 {
     char *ids = NULL;
     char *tmp = NULL;
@@ -500,7 +509,7 @@ bool account_retrieve(acme_t *a)
                     json_compare_string(a->json, "type",
                       "urn:ietf:params:acme:error:accountDoesNotExist") == 0) {
                 warnx("no account associated with %s/key.pem found at %s. "
-                        "Consider trying 'new'", a->keydir, url);
+                        "Consider trying 'new'", a->keyprefix, url);
                 return false;
             }
             // intentional fallthrough
@@ -589,20 +598,20 @@ bool account_keychange(acme_t *a, bool never, keytype_t type, int bits)
         goto out;
     }
 
-    if (asprintf(&keyfile, "%s/key.pem", a->keydir) < 0) {
+    if (asprintf(&keyfile, "%s/key.pem", a->keyprefix) < 0) {
         warnx("account_keychange: asprintf failed");
         keyfile = NULL;
         goto out;
     }
 
-    if (asprintf(&bakfile, "%s/key-%llu.pem", a->keydir,
+    if (asprintf(&bakfile, "%s/key-%llu.pem", a->keyprefix,
                 (unsigned long long)time(NULL)) < 0) {
         warnx("account_keychange: asprintf failed");
         bakfile = NULL;
         goto out;
     }
 
-    if (asprintf(&newkeyfile, "%s/newkey.pem", a->keydir) < 0) {
+    if (asprintf(&newkeyfile, "%s/newkey.pem", a->keyprefix) < 0) {
         warnx("account_keychange: asprintf failed");
         newkeyfile = NULL;
         goto out;
@@ -864,17 +873,16 @@ out:
     return success;
 }
 
-bool cert_issue(acme_t *a, bool status_req)
+bool cert_issue(acme_t *a, char * const *names, const char *csr)
 {
     bool success = false;
-    char *csr = NULL;
     char *orderurl = NULL;
     char *certfile = NULL;
     char *bakfile = NULL;
     char *tmpfile = NULL;
     time_t t = time(NULL);
     int fd = -1;
-    char *ids = identifiers(a->names);
+    char *ids = identifiers(names);
     if (!ids) {
         warnx("failed to process alternate names");
         goto out;
@@ -886,7 +894,7 @@ bool cert_issue(acme_t *a, bool status_req)
         goto out;
     }
 
-    msg(1, "creating new order for %s at %s", a->ident, url);
+    msg(1, "creating new order at %s", url);
     if (acme_post(a, url, ids) != 201)
     {
         warnx("failed to create new order at %s", url);
@@ -937,13 +945,6 @@ bool cert_issue(acme_t *a, bool status_req)
                 sleep(5);
             }
         }
-    }
-
-    msg(1, "generating certificate request");
-    csr = csr_gen(a->names, status_req, a->ckey);
-    if (!csr) {
-        warnx("failed to generate certificate signing request");
-        goto out;
     }
 
     const char *finalize = json_find_string(a->order, "finalize");
@@ -999,19 +1000,19 @@ bool cert_issue(acme_t *a, bool status_req)
         goto out;
     }
 
-    if (asprintf(&certfile, "%s/cert.pem", a->certdir) < 0) {
+    if (asprintf(&certfile, "%scert.pem", a->certprefix) < 0) {
         certfile = NULL;
         warnx("cert_issue: asprintf failed");
         goto out;
     }
 
-    if (asprintf(&tmpfile, "%s/cert.pem.tmp", a->certdir) < 0) {
+    if (asprintf(&tmpfile, "%scert.pem.tmp", a->certprefix) < 0) {
         tmpfile = NULL;
         warnx("cert_issue: asprintf failed");
         goto out;
     }
 
-    if (asprintf(&bakfile, "%s/cert-%llu.pem", a->certdir,
+    if (asprintf(&bakfile, "%scert-%llu.pem", a->certprefix,
                 (unsigned long long)t) < 0) {
         bakfile = NULL;
         warnx("cert_issue: asprintf failed");
@@ -1058,7 +1059,6 @@ out:
     free(bakfile);
     free(tmpfile);
     free(certfile);
-    free(csr);
     free(ids);
     free(orderurl);
     return success;
@@ -1094,13 +1094,13 @@ bool cert_revoke(acme_t *a, const char *certfile, int reason_code)
     msg(1, "revoked %s", certfile);
     certfiledup = strdup(certfile);
     if (!certfiledup) {
-        warnx("strdup failed");
+        warnx("cert_revoke: strdup failed");
         certfiledup = NULL;
         goto out;
     }
     if (asprintf(&revokedfile, "%s/revoked-%llu.pem", dirname(certfiledup),
                 (unsigned long long)time(NULL)) < 0) {
-        warnx("asprintf failed");
+        warnx("cert_revoke: asprintf failed");
         revokedfile = NULL;
         goto out;
     }
@@ -1118,6 +1118,7 @@ out:
 
 bool validate_identifier_str(const char *s)
 {
+    int dots = 0;
     size_t len = 0;
     if (is_ip(s, 0, 0))
         return true;
@@ -1128,6 +1129,7 @@ bool validate_identifier_str(const char *s)
                     warnx("'.' not allowed at beginning in %s", s);
                     return false;
                 }
+                dots++;
                 // intentional fallthrough
             case '_':
             case '-':
@@ -1151,6 +1153,10 @@ bool validate_identifier_str(const char *s)
         warnx("empty identifier is not allowed");
         return false;
     }
+    if (dots == 0) {
+        warnx("identifier '%s' has no dots", s);
+        return false;
+    }
     return true;
 }
 
@@ -1162,7 +1168,8 @@ void usage(const char *progname)
         "\t[-n|--never-create] [-o|--no-ocsp] [-s|--staging] [-t|--type RSA | EC]\n"
         "\t[-v|--verbose ...] [-V|--version] [-y|--yes] [-?|--help]\n"
         "\tnew [EMAIL] | update [EMAIL] | deactivate | newkey |\n"
-        "\tissue IDENTIFIER [ALTNAME ...]] | revoke CERTFILE\n", progname);
+        "\tissue IDENTIFIER [ALTNAME ...]] | issue CSRFILE |\n"
+        "\trevoke CERTFILE [CERTKEYFILE]\n", progname);
 }
 
 int main(int argc, char **argv)
@@ -1199,11 +1206,16 @@ int main(int argc, char **argv)
     int days = 30;
     int bits = 0;
     keytype_t type = PK_RSA;
-    const char *filename = NULL;
+    const char *ident = NULL;
+    char *filename = NULL;
+    char *csr = NULL;
+    char **names = NULL;
+    const char *confdir = DEFAULT_CONFDIR;
+    char *keyprefix = NULL;
+    privkey_t key = NULL;
     acme_t a;
     memset(&a, 0, sizeof(a));
     a.directory = PRODUCTION_URL;
-    a.confdir = DEFAULT_CONFDIR;
 
     if (argc < 2) {
         usage(basename(argv[0]));
@@ -1255,7 +1267,7 @@ int main(int argc, char **argv)
                 break;
 
             case 'c':
-                a.confdir = optarg;
+                confdir = optarg;
                 break;
 
             case 'd':
@@ -1389,26 +1401,70 @@ int main(int argc, char **argv)
             usage(basename(argv[0]));
             goto out;
         }
-        a.names = (const char * const *)argv + optind;
-        for (const char * const *name = a.names; *name; name++)
-            if (!validate_identifier_str(*name))
+        struct stat st;
+        if (stat(argv[optind], &st)) {
+            if (errno != ENOENT) {
+                warn("failed to stat %s", argv[optind]);
                 goto out;
-
-        a.ident = a.names[0];
-        if (a.ident[0] == '*' && a.ident[1] == '.')
-            a.ident += 2;
+            }
+        } else if (S_ISREG(st.st_mode)) {
+            filename = strdup(argv[optind++]);
+            if (!filename) {
+                warn("strdup failed");
+                goto out;
+            }
+            if (optind < argc) {
+                usage(basename(argv[0]));
+                goto out;
+            }
+        }
+        if (!filename) {
+            int i = 0;
+            for (i = 0; argv[optind + i]; i++)
+                if (!validate_identifier_str(argv[optind + i]))
+                    goto out;
+            if (i == 0) {
+                usage(basename(argv[0]));
+                goto out;
+            }
+            names = calloc(i + 1, sizeof(*names));
+            if (!names) {
+                warn("calloc failed");
+                goto out;
+            }
+            while (i--) {
+                names[i] = strdup(argv[optind + i]);
+                if (!names[i]) {
+                    warn("strdup failed");
+                    goto out;
+                }
+            }
+            ident = names[0];
+            if (ident[0] == '*' && ident[1] == '.')
+                ident += 2;
+        }
     } else if (strcmp(action, "revoke") == 0) {
         if (optind == argc) {
             usage(basename(argv[0]));
             goto out;
         }
-        filename = argv[optind++];
-        if (optind < argc) {
-            usage(basename(argv[0]));
+        filename = strdup(argv[optind++]);
+        if (!filename) {
+            warn("strdup failed");
             goto out;
         }
         if (access(filename, R_OK)) {
             warn("failed to read %s", filename);
+            goto out;
+        }
+        if (optind < argc) {
+            const char *keyfile = argv[optind++];
+            a.key = key_load(PK_NONE, bits, keyfile);
+            if (!a.key)
+                goto out;
+        }
+        if (optind < argc) {
+            usage(basename(argv[0]));
             goto out;
         }
     } else {
@@ -1427,37 +1483,40 @@ int main(int argc, char **argv)
         goto out;
     }
 
-    if (asprintf(&a.keydir, "%s/private", a.confdir) < 0) {
-        a.keydir = NULL;
-        warnx("asprintf failed");
-        goto out;
-    }
-
-    if (a.ident) {
-        if (asprintf(&a.ckeydir, "%s/private/%s", a.confdir, a.ident) < 0) {
-            a.ckeydir = NULL;
+    if (!a.key) {
+        if (asprintf(&a.keyprefix, "%s/private", confdir) < 0) {
+            a.keyprefix = NULL;
             warnx("asprintf failed");
             goto out;
         }
 
-        if (asprintf(&a.certdir, "%s/%s", a.confdir, a.ident) < 0) {
-            a.certdir = NULL;
-            warnx("asprintf failed");
-            goto out;
+        if (ident) {
+            if (asprintf(&keyprefix, "%s/private/%s", confdir, ident) < 0) {
+                keyprefix = NULL;
+                warnx("asprintf failed");
+                goto out;
+            }
+
+            if (asprintf(&a.certprefix, "%s/%s/", confdir, ident) < 0) {
+                a.certprefix = NULL;
+                warnx("asprintf failed");
+                goto out;
+            }
         }
+
+        bool is_new = strcmp(action, "new") == 0;
+        if (!check_or_mkdir(is_new && !never, confdir,
+                    S_IRWXU|S_IRGRP|S_IXGRP|S_IROTH|S_IXOTH))
+            goto out;
+
+        if (!check_or_mkdir(is_new && !never, a.keyprefix, S_IRWXU))
+            goto out;
+
+        a.key = key_load((!is_new || never) ? PK_NONE : type, bits,
+                "%s/key.pem", a.keyprefix);
+        if (!a.key)
+            goto out;
     }
-
-    bool is_new = strcmp(action, "new") == 0;
-    if (!check_or_mkdir(is_new && !never, a.confdir,
-                S_IRWXU|S_IRGRP|S_IXGRP|S_IROTH|S_IXOTH))
-        goto out;
-
-    if (!check_or_mkdir(is_new && !never, a.keydir, S_IRWXU))
-        goto out;
-
-    if (!(a.key = key_load((!is_new || never) ? PK_NONE : type,
-                    bits, "%s/key.pem", a.keydir)))
-        goto out;
 
     if (strcmp(action, "new") == 0) {
         if (acme_bootstrap(&a) && account_new(&a, yes))
@@ -1474,42 +1533,73 @@ int main(int argc, char **argv)
                 && account_deactivate(&a))
             ret = 0;
     } else if (strcmp(action, "issue") == 0) {
-        if (!check_or_mkdir(!never, a.ckeydir, S_IRWXU))
-            goto out;
+        if (filename) {
+            int len = strlen(filename);
+            char *dot = strrchr(filename, '.');
 
-        if (!check_or_mkdir(!never, a.certdir,
-                    S_IRWXU|S_IRGRP|S_IXGRP|S_IROTH|S_IXOTH))
-            goto out;
+            if (dot)
+                len = dot - filename;
 
-        if (!(a.ckey = key_load(never ? PK_NONE : type,
-                        bits, "%s/key.pem", a.ckeydir)))
-            goto out;
+            if (asprintf(&a.certprefix, "%.*s-", len, filename) < 0) {
+                a.certprefix = NULL;
+                warnx("asprintf failed");
+                goto out;
+            }
 
-        msg(1, "checking existence and expiration of %s/cert.pem", a.certdir);
-        if (cert_valid(a.certdir, a.names, days, status_check)) {
+            csr = csr_load(filename, &names);
+            if (!csr)
+                goto out;
+        } else {
+            if (!check_or_mkdir(!never, keyprefix, S_IRWXU))
+                goto out;
+
+            if (!check_or_mkdir(!never, a.certprefix,
+                        S_IRWXU|S_IRGRP|S_IXGRP|S_IROTH|S_IXOTH))
+                goto out;
+
+            key = key_load(never ? PK_NONE : type, bits, "%s/key.pem",
+                    keyprefix);
+            if (!key)
+                goto out;
+        }
+
+        free(filename);
+        if (asprintf(&filename, "%scert.pem", a.certprefix) < 0) {
+            filename = NULL;
+            warnx("asprintf failed");
+            goto out;
+        }
+
+        msg(1, "checking existence and expiration of %s", filename);
+        if (cert_valid(filename, names, days, status_check)) {
             if (force)
-                msg(1, "forcing reissue of %s/cert.pem", a.certdir);
+                msg(1, "forcing reissue of %s", filename);
             else {
-                msg(1, "skipping %s/cert.pem", a.certdir);
+                msg(1, "skipping %s", filename);
                 ret = 1;
                 goto out;
             }
         }
 
+        if (!csr) {
+            msg(1, "generating certificate request");
+            csr = csr_gen(names, status_req, key);
+            if (!csr) {
+                warnx("failed to generate certificate request");
+                goto out;
+            }
+        }
+
         if (acme_bootstrap(&a) && account_retrieve(&a)
-                && cert_issue(&a, status_req))
+                && cert_issue(&a, names, csr))
             ret = 0;
     } else if (strcmp(action, "revoke") == 0) {
-        if (acme_bootstrap(&a) && account_retrieve(&a) &&
+        if (acme_bootstrap(&a) && (!a.keyprefix || account_retrieve(&a)) &&
                 cert_revoke(&a, filename, 0))
             ret = 0;
     }
 
 out:
-    if (a.key)
-        privkey_deinit(a.key);
-    if (a.ckey)
-        privkey_deinit(a.ckey);
     json_free(a.json);
     json_free(a.account);
     json_free(a.dir);
@@ -1519,9 +1609,18 @@ out:
     free(a.headers);
     free(a.body);
     free(a.type);
-    free(a.keydir);
-    free(a.ckeydir);
-    free(a.certdir);
+    free(a.keyprefix);
+    free(a.certprefix);
+    if (a.key)
+        privkey_deinit(a.key);
+    if (key)
+        privkey_deinit(key);
+    free(keyprefix);
+    free(csr);
+    free(filename);
+    for (int i = 0; names && names[i]; i++)
+        free(names[i]);
+    free(names);
     crypto_deinit();
     curl_global_cleanup();
     exit(ret);

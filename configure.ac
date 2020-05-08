@@ -51,6 +51,10 @@ AC_CHECK_HEADERS([getopt.h], [],
                  AC_MSG_ERROR([uacme requires sys/wait.h]))
 AC_CHECK_HEADERS([netdb.h], [],
                  AC_MSG_ERROR([uacme requires netdb.h]))
+AC_CHECK_HEADERS([netinet/in.h], [],
+                 AC_MSG_ERROR([uacme requires netinet/in.h]))
+AC_CHECK_HEADERS([arpa/inet.h], [],
+                 AC_MSG_ERROR([uacme requires arpa/inet.h]))
 AC_CHECK_HEADERS([sys/socket.h], [],
                  AC_MSG_ERROR([uacme requires sys/socket.h]))
 AC_CHECK_HEADERS([sys/stat.h], [],
@@ -63,6 +67,8 @@ AC_CHECK_FUNCS([asprintf vasprintf], [],
                AC_MSG_ERROR([uacme requires (v)asprintf]))
 AC_CHECK_FUNCS([getopt_long], [],
                AC_MSG_ERROR([uacme requires getopt_long]))
+AC_CHECK_FUNCS([open_memstream], [],
+               AC_MSG_ERROR([uacme requires open_memstream]))
 AC_CHECK_FUNCS([strcasestr])
 AC_CHECK_FUNCS([setproctitle])
 
@@ -305,6 +311,8 @@ AS_HELP_STRING([--without-ualpn], [disable ualpn])], OPT_UALPN=$withval)
 
 if test "x$OPT_UALPN" != "xno"; then
     AM_PROG_AR
+    AC_CHECK_HEADERS([netinet/tcp.h], [],
+                     AC_MSG_ERROR([ualpn requires netinet/tcp.h]))
     AC_CHECK_HEADERS([sys/mman.h], [],
                      AC_MSG_ERROR([ualpn requires sys/mman.h]))
     AC_CHECK_HEADERS([sys/resource.h], [],
@@ -313,8 +321,6 @@ if test "x$OPT_UALPN" != "xno"; then
                      AC_MSG_ERROR([ualpn requires sys/uio.h]))
     AC_CHECK_HEADERS([sys/un.h], [],
                      AC_MSG_ERROR([ualpn requires sys/un.h]))
-    AC_CHECK_FUNCS([open_memstream], [],
-                   AC_MSG_ERROR([ualpn requires open_memstream]))
     AC_CHECK_FUNCS([mmap],[],
                    AC_MSG_ERROR([ualpn requires mmap]))
     AC_MSG_CHECKING([if mmap(MAP_ANON|MAP_SHARED) works])

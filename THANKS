@@ -12,6 +12,9 @@ Thanks are due to the following
 * Marian Vittek
     for SGLIB <http://www.xref-tech.com/sglib)
 
+* Michel Stam <michel@reverze.net>
+    for the nsupdate.sh DNS-01 challenge hook script
+
 * The authors of libcurl <https://curl.haxx.se/libcurl>
 
 * The authors of GnuTLS <https://gnutls.org>

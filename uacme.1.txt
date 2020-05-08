@@ -19,7 +19,8 @@ SYNOPSIS
     [*-o*|*--no-ocsp*] [*-s*|*--staging*] [*-t*|*--type* *RSA*|*EC*]
     [*-v*|*--verbose* ...] [*-V*|*--version*] [*-y*|*--yes*] [*-?*|*--help*]
     *new* ['EMAIL'] | *update* ['EMAIL'] | *deactivate* | *newkey* |
-    *issue* 'IDENTIFIER' ['ALTNAME' ...]] | *revoke* 'CERTFILE'
+    *issue* 'IDENTIFIER' ['ALTNAME' ...]] | *issue* 'CSRFILE' |
+    *revoke* 'CERTFILE' ['CERTKEYFILE']
 
 
 DESCRIPTION
@@ -134,8 +135,10 @@ USAGE
     account private key does not exist at 'CONFDIR/private/key.pem'
     a new key is generated unless *-n, --never-create* is specified.
     A valid account must be created *before* any other operation can
-    succeed. Any certificate issued by the ACME server is associated
-    with a single account. An account can be associated with multiple
+    succeed (with the exception of certificate revocation requests
+    signed by the certificate private key).
+    Any certificate issued by the ACME server is associated with a
+    single account. An account can be associated with multiple
     certificates, subject of course to the rate limits imposed by the
     ACME server.
 
@@ -179,10 +182,28 @@ USAGE
     IP address IDENTIFIERs and ALTNAMEs are also supported according to
     <https://tools.ietf.org/html/rfc8738#section-3>
 
-*uacme* ['OPTIONS' ...] *revoke* 'CERTFILE'::
-    Revoke the certificate stored in 'CERTFILE'. Only certificates
-    associated with the account can be revoked. If successful
-    'CERTFILE' is renamed to 'revoked-TIMESTAMP.pem'.
+*uacme* ['OPTIONS' ...] *issue* 'CSRFILE'::
+    Issue a certificate based on a RFC2986 Certificate Signing Request
+    contained in 'CSRFILE', which must be in PEM format.
+    If a certificate file 'CSRBASE-cert.pem' (where 'CSRBASE' is
+    obtained by stripping the extension, if any, from 'CSRFILE') is 
+    already available in the same directory containing 'CSRFILE', and
+    is still valid for longer than 'DAYS' no action is taken unless
+    *-f, --force* is specified or *-o, --no-ocsp* is *not* specified and
+    the certificate is reported as revoked by the OCSP server.
+    If the certificate file already exists it is hardlinked to
+    'BASENAME-cert-TIMESTAMP.pem' before overwriting.
+    Wildcard domains are dealt with correctly, as long as the ACME server
+    supports them.  IP addresses are also supported according to
+    <https://tools.ietf.org/html/rfc8738#section-3>
+
+*uacme* ['OPTIONS' ...] *revoke* 'CERTFILE' ['CERTKEYFILE']::
+    Revoke the certificate stored in 'CERTFILE'. The revocation request
+    is signed with the private key of either the certificate, when 
+    'CERTKEYFILE' is specified; or the ACME account associated with the
+    certificate, when only 'CERTFILE' is specified. In the first instance
+    the account key and the configuration directory are not required.
+    If successful 'CERTFILE' is renamed to 'revoked-TIMESTAMP.pem'.
 
 
 EXIT STATUS
