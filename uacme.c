@@ -1168,8 +1168,8 @@ void usage(const char *progname)
         "\t[-n|--never-create] [-o|--no-ocsp] [-s|--staging] [-t|--type RSA | EC]\n"
         "\t[-v|--verbose ...] [-V|--version] [-y|--yes] [-?|--help]\n"
         "\tnew [EMAIL] | update [EMAIL] | deactivate | newkey |\n"
-        "\tissue IDENTIFIER [ALTNAME ...]] | issue CSRFILE | revoke CERTFILE\n",
-        progname);
+        "\tissue IDENTIFIER [ALTNAME ...]] | issue CSRFILE |\n"
+        "\trevoke CERTFILE [CERTKEYFILE]\n", progname);
 }
 
 int main(int argc, char **argv)
