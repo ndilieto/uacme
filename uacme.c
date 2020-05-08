@@ -1407,8 +1407,7 @@ int main(int argc, char **argv)
                 warn("failed to stat %s", argv[optind]);
                 goto out;
             }
-        }
-        if (S_ISREG(st.st_mode)) {
+        } else if (S_ISREG(st.st_mode)) {
             filename = strdup(argv[optind++]);
             if (!filename) {
                 warn("strdup failed");
@@ -1418,7 +1417,8 @@ int main(int argc, char **argv)
                 usage(basename(argv[0]));
                 goto out;
             }
-        } else {
+        }
+        if (!filename) {
             int i = 0;
             for (i = 0; argv[optind + i]; i++)
                 if (!validate_identifier_str(argv[optind + i]))
