@@ -59,7 +59,7 @@ $(top_srcdir)/.version:
 dist-hook:
 	echo $(VERSION) > $(distdir)/.tarball-version
 
-dist_pkgdata_SCRIPTS = uacme.sh
+dist_pkgdata_SCRIPTS = uacme.sh nsupdate.sh
 if ENABLE_UALPN
 dist_pkgdata_SCRIPTS += ualpn.sh
 endif
@@ -104,9 +104,10 @@ valgrind: uacme
 	    --num-callers=20 --track-fds=yes --log-file=valgrind.log \
 	    $(builddir)/uacme $(VALGRIND_UACME_ARGS)
 
-EXTRA_DIST = GNUmakefile build-aux/git-version-gen uacme.sh uacme.1.txt \
-	     uacme.1 docs/uacme.html ualpn.1.txt ualpn.1 docs/ualpn.html \
-	     libev/ev_epoll.c libev/ev_iouring.c libev/ev_kqueue.c \
-	     libev/ev_linuxaio.c libev/ev_poll.c libev/ev_port.c \
-	     libev/ev_select.c libev/ev_vars.h libev/ev_wrap.h
+EXTRA_DIST = GNUmakefile build-aux/git-version-gen uacme.sh nsupdate.sh \
+	     uacme.1.txt uacme.1 docs/uacme.html ualpn.1.txt ualpn.1 \
+	     docs/ualpn.html libev/ev_epoll.c libev/ev_iouring.c \
+	     libev/ev_kqueue.c libev/ev_linuxaio.c libev/ev_poll.c \
+	     libev/ev_port.c libev/ev_select.c libev/ev_vars.h \
+	     libev/ev_wrap.h
 CLEANFILES = valgrind.log

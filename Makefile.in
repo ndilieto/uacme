@@ -171,7 +171,7 @@ ualpn_OBJECTS = $(am_ualpn_OBJECTS)
 @ENABLE_UALPN_TRUE@	$(am__append_4)
 ualpn_LINK = $(CCLD) $(ualpn_CFLAGS) $(CFLAGS) $(AM_LDFLAGS) \
 	$(LDFLAGS) -o $@
-am__dist_pkgdata_SCRIPTS_DIST = uacme.sh ualpn.sh
+am__dist_pkgdata_SCRIPTS_DIST = uacme.sh nsupdate.sh ualpn.sh
 am__vpath_adj_setup = srcdirstrip=`echo "$(srcdir)" | sed 's|.|.|g'`;
 am__vpath_adj = case $$p in \
     $(srcdir)/*) f=`echo "$$p" | sed "s|^$$srcdirstrip/||"`;; \
@@ -421,14 +421,15 @@ uacme_CFLAGS = $(CURL_CFLAGS) $(WCFLAGS)
 uacme_LDFLAGS = $(CURL_LDFLAGS)
 uacme_LDADD = $(CURL_LDADD)
 BUILT_SOURCES = $(top_srcdir)/.version
-dist_pkgdata_SCRIPTS = uacme.sh $(am__append_6)
+dist_pkgdata_SCRIPTS = uacme.sh nsupdate.sh $(am__append_6)
 @ENABLE_DOCS_TRUE@dist_man1_MANS = uacme.1 $(am__append_7)
 @ENABLE_DOCS_TRUE@dist_html_DATA = docs/uacme.html $(am__append_8)
-EXTRA_DIST = GNUmakefile build-aux/git-version-gen uacme.sh uacme.1.txt \
-	     uacme.1 docs/uacme.html ualpn.1.txt ualpn.1 docs/ualpn.html \
-	     libev/ev_epoll.c libev/ev_iouring.c libev/ev_kqueue.c \
-	     libev/ev_linuxaio.c libev/ev_poll.c libev/ev_port.c \
-	     libev/ev_select.c libev/ev_vars.h libev/ev_wrap.h
+EXTRA_DIST = GNUmakefile build-aux/git-version-gen uacme.sh nsupdate.sh \
+	     uacme.1.txt uacme.1 docs/uacme.html ualpn.1.txt ualpn.1 \
+	     docs/ualpn.html libev/ev_epoll.c libev/ev_iouring.c \
+	     libev/ev_kqueue.c libev/ev_linuxaio.c libev/ev_poll.c \
+	     libev/ev_port.c libev/ev_select.c libev/ev_vars.h \
+	     libev/ev_wrap.h
 
 CLEANFILES = valgrind.log
 all: $(BUILT_SOURCES) config.h

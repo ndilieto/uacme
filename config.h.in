@@ -1,5 +1,8 @@
 /* config.h.in.  Generated from configure.ac by autoheader.  */
 
+/* Define to 1 if you have the <arpa/inet.h> header file. */
+#undef HAVE_ARPA_INET_H
+
 /* Define to 1 if you have the `asprintf' function. */
 #undef HAVE_ASPRINTF
 
@@ -71,6 +74,12 @@
 
 /* Define to 1 if you have the <netdb.h> header file. */
 #undef HAVE_NETDB_H
+
+/* Define to 1 if you have the <netinet/in.h> header file. */
+#undef HAVE_NETINET_IN_H
+
+/* Define to 1 if you have the <netinet/tcp.h> header file. */
+#undef HAVE_NETINET_TCP_H
 
 /* Define to 1 if you have the `open_memstream' function. */
 #undef HAVE_OPEN_MEMSTREAM

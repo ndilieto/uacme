@@ -21,6 +21,8 @@
 #ifndef __MSG_H__
 #define __MSG_H__
 
+#include <stddef.h>
+
 extern int g_loglevel;
 
 #ifdef __GNUC__
@@ -29,5 +31,7 @@ void __attribute__((format (printf, 2, 3))) msg(int level,
 #else
 void msg(int level, const char *format, ...);
 #endif
+
+void msg_hd(int level, const char *prefix, const void *data, size_t len);
 
 #endif
