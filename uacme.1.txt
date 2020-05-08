@@ -185,7 +185,7 @@ USAGE
     contained in 'CSRFILE', which must be in PEM format.
     If a certificate file 'CSRBASE-cert.pem' (where 'CSRBASE' is
     obtained by stripping the extension, if any, from 'CSRFILE') is 
-    is already available in the same directory containing 'CSRFILE', and
+    already available in the same directory containing 'CSRFILE', and
     is still valid for longer than 'DAYS' no action is taken unless
     *-f, --force* is specified or *-o, --no-ocsp* is *not* specified and
     the certificate is reported as revoked by the OCSP server.
