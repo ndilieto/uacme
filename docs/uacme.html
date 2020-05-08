@@ -753,7 +753,7 @@ UACME(1) Manual Page
     [<strong>-v</strong>|<strong>--verbose</strong> &#8230;] [<strong>-V</strong>|<strong>--version</strong>] [<strong>-y</strong>|<strong>--yes</strong>] [<strong>-?</strong>|<strong>--help</strong>]
     <strong>new</strong> [<em>EMAIL</em>] | <strong>update</strong> [<em>EMAIL</em>] | <strong>deactivate</strong> | <strong>newkey</strong> |
     <strong>issue</strong> <em>IDENTIFIER</em> [<em>ALTNAME</em> &#8230;]] | <strong>issue</strong> <em>CSRFILE</em> |
-    <strong>revoke</strong> <em>CERTFILE</em></p></div>
+    <strong>revoke</strong> <em>CERTFILE</em> [<em>CERTKEYFILE</em>]</p></div>
 </div>
 </div>
 <div class="sect1">
@@ -1051,8 +1051,10 @@ The key authorization (for <strong>dns-01</strong> and <strong>tls-alpn-01</stro
     account private key does not exist at <em>CONFDIR/private/key.pem</em>
     a new key is generated unless <strong>-n, --never-create</strong> is specified.
     A valid account must be created <strong>before</strong> any other operation can
-    succeed. Any certificate issued by the ACME server is associated
-    with a single account. An account can be associated with multiple
+    succeed (with the exception of certificate revocation requests
+    signed by the certificate private key).
+    Any certificate issued by the ACME server is associated with a
+    single account. An account can be associated with multiple
     certificates, subject of course to the rate limits imposed by the
     ACME server.
 </p>
@@ -1138,13 +1140,16 @@ The key authorization (for <strong>dns-01</strong> and <strong>tls-alpn-01</stro
 </p>
 </dd>
 <dt class="hdlist1">
-<strong>uacme</strong> [<em>OPTIONS</em> &#8230;] <strong>revoke</strong> <em>CERTFILE</em>
+<strong>uacme</strong> [<em>OPTIONS</em> &#8230;] <strong>revoke</strong> <em>CERTFILE</em> [<em>CERTKEYFILE</em>]
 </dt>
 <dd>
 <p>
-    Revoke the certificate stored in <em>CERTFILE</em>. Only certificates
-    associated with the account can be revoked. If successful
-    <em>CERTFILE</em> is renamed to <em>revoked-TIMESTAMP.pem</em>.
+    Revoke the certificate stored in <em>CERTFILE</em>. The revocation request
+    is signed with the private key of either the certificate, when
+    <em>CERTKEYFILE</em> is specified; or the ACME account associated with the
+    certificate, when only <em>CERTFILE</em> is specified. In the first instance
+    the account key and the configuration directory are not required.
+    If successful <em>CERTFILE</em> is renamed to <em>revoked-TIMESTAMP.pem</em>.
 </p>
 </dd>
 </dl></div>
@@ -1287,7 +1292,7 @@ along with this program.  If not, see <a href="http://www.gnu.org/licenses/">htt
 <div id="footer-text">
 Version 1.2.4-dev<br>
 Last updated
- 2020-05-08 10:12:31 CEST
+ 2020-05-08 11:15:31 CEST
 </div>
 </div>
 </body>

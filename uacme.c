@@ -1453,12 +1453,18 @@ int main(int argc, char **argv)
             warn("strdup failed");
             goto out;
         }
-        if (optind < argc) {
-            usage(basename(argv[0]));
-            goto out;
-        }
         if (access(filename, R_OK)) {
             warn("failed to read %s", filename);
+            goto out;
+        }
+        if (optind < argc) {
+            const char *keyfile = argv[optind++];
+            a.key = key_load(PK_NONE, bits, keyfile);
+            if (!a.key)
+                goto out;
+        }
+        if (optind < argc) {
+            usage(basename(argv[0]));
             goto out;
         }
     } else {
@@ -1477,37 +1483,40 @@ int main(int argc, char **argv)
         goto out;
     }
 
-    if (asprintf(&a.keyprefix, "%s/private", confdir) < 0) {
-        a.keyprefix = NULL;
-        warnx("asprintf failed");
-        goto out;
-    }
-
-    if (ident) {
-        if (asprintf(&keyprefix, "%s/private/%s", confdir, ident) < 0) {
-            keyprefix = NULL;
+    if (!a.key) {
+        if (asprintf(&a.keyprefix, "%s/private", confdir) < 0) {
+            a.keyprefix = NULL;
             warnx("asprintf failed");
             goto out;
         }
 
-        if (asprintf(&a.certprefix, "%s/%s/", confdir, ident) < 0) {
-            a.certprefix = NULL;
-            warnx("asprintf failed");
-            goto out;
+        if (ident) {
+            if (asprintf(&keyprefix, "%s/private/%s", confdir, ident) < 0) {
+                keyprefix = NULL;
+                warnx("asprintf failed");
+                goto out;
+            }
+
+            if (asprintf(&a.certprefix, "%s/%s/", confdir, ident) < 0) {
+                a.certprefix = NULL;
+                warnx("asprintf failed");
+                goto out;
+            }
         }
+
+        bool is_new = strcmp(action, "new") == 0;
+        if (!check_or_mkdir(is_new && !never, confdir,
+                    S_IRWXU|S_IRGRP|S_IXGRP|S_IROTH|S_IXOTH))
+            goto out;
+
+        if (!check_or_mkdir(is_new && !never, a.keyprefix, S_IRWXU))
+            goto out;
+
+        a.key = key_load((!is_new || never) ? PK_NONE : type, bits,
+                "%s/key.pem", a.keyprefix);
+        if (!a.key)
+            goto out;
     }
-
-    bool is_new = strcmp(action, "new") == 0;
-    if (!check_or_mkdir(is_new && !never, confdir,
-                S_IRWXU|S_IRGRP|S_IXGRP|S_IROTH|S_IXOTH))
-        goto out;
-
-    if (!check_or_mkdir(is_new && !never, a.keyprefix, S_IRWXU))
-        goto out;
-
-    if (!(a.key = key_load((!is_new || never) ? PK_NONE : type,
-                    bits, "%s/key.pem", a.keyprefix)))
-        goto out;
 
     if (strcmp(action, "new") == 0) {
         if (acme_bootstrap(&a) && account_new(&a, yes))
@@ -1585,7 +1594,7 @@ int main(int argc, char **argv)
                 && cert_issue(&a, names, csr))
             ret = 0;
     } else if (strcmp(action, "revoke") == 0) {
-        if (acme_bootstrap(&a) && account_retrieve(&a) &&
+        if (acme_bootstrap(&a) && (!a.keyprefix || account_retrieve(&a)) &&
                 cert_revoke(&a, filename, 0))
             ret = 0;
     }

@@ -20,7 +20,7 @@ SYNOPSIS
     [*-v*|*--verbose* ...] [*-V*|*--version*] [*-y*|*--yes*] [*-?*|*--help*]
     *new* ['EMAIL'] | *update* ['EMAIL'] | *deactivate* | *newkey* |
     *issue* 'IDENTIFIER' ['ALTNAME' ...]] | *issue* 'CSRFILE' |
-    *revoke* 'CERTFILE'
+    *revoke* 'CERTFILE' ['CERTKEYFILE']
 
 
 DESCRIPTION
@@ -135,8 +135,10 @@ USAGE
     account private key does not exist at 'CONFDIR/private/key.pem'
     a new key is generated unless *-n, --never-create* is specified.
     A valid account must be created *before* any other operation can
-    succeed. Any certificate issued by the ACME server is associated
-    with a single account. An account can be associated with multiple
+    succeed (with the exception of certificate revocation requests
+    signed by the certificate private key).
+    Any certificate issued by the ACME server is associated with a
+    single account. An account can be associated with multiple
     certificates, subject of course to the rate limits imposed by the
     ACME server.
 
@@ -195,10 +197,13 @@ USAGE
     supports them.  IP addresses are also supported according to
     <https://tools.ietf.org/html/rfc8738#section-3>
 
-*uacme* ['OPTIONS' ...] *revoke* 'CERTFILE'::
-    Revoke the certificate stored in 'CERTFILE'. Only certificates
-    associated with the account can be revoked. If successful
-    'CERTFILE' is renamed to 'revoked-TIMESTAMP.pem'.
+*uacme* ['OPTIONS' ...] *revoke* 'CERTFILE' ['CERTKEYFILE']::
+    Revoke the certificate stored in 'CERTFILE'. The revocation request
+    is signed with the private key of either the certificate, when 
+    'CERTKEYFILE' is specified; or the ACME account associated with the
+    certificate, when only 'CERTFILE' is specified. In the first instance
+    the account key and the configuration directory are not required.
+    If successful 'CERTFILE' is renamed to 'revoked-TIMESTAMP.pem'.
 
 
 EXIT STATUS
