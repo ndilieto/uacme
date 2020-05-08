@@ -67,6 +67,8 @@ AC_CHECK_FUNCS([asprintf vasprintf], [],
                AC_MSG_ERROR([uacme requires (v)asprintf]))
 AC_CHECK_FUNCS([getopt_long], [],
                AC_MSG_ERROR([uacme requires getopt_long]))
+AC_CHECK_FUNCS([open_memstream], [],
+               AC_MSG_ERROR([uacme requires open_memstream]))
 AC_CHECK_FUNCS([strcasestr])
 AC_CHECK_FUNCS([setproctitle])
 
@@ -319,8 +321,6 @@ if test "x$OPT_UALPN" != "xno"; then
                      AC_MSG_ERROR([ualpn requires sys/uio.h]))
     AC_CHECK_HEADERS([sys/un.h], [],
                      AC_MSG_ERROR([ualpn requires sys/un.h]))
-    AC_CHECK_FUNCS([open_memstream], [],
-                   AC_MSG_ERROR([ualpn requires open_memstream]))
     AC_CHECK_FUNCS([mmap],[],
                    AC_MSG_ERROR([ualpn requires mmap]))
     AC_MSG_CHECKING([if mmap(MAP_ANON|MAP_SHARED) works])
