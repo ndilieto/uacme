@@ -3175,14 +3175,18 @@ static bool ocsp_check(gnutls_x509_crt_t *crt)
     gnutls_free(d.data);
 
     msg(1, "querying OCSP server at %s", ocsp_uri);
+    msg_hd(3, "ocsp_check: HTTP post:\n", req_data.data, req_data.size);
     cd = curl_post(ocsp_uri, req_data.data, req_data.size,
             "Content-Type: application/ocsp-request", NULL);
     if (!cd) {
         warnx("ocsp_check: curl_post(\"%s\") failed", ocsp_uri);
         goto out;
     }
+
     if (cd->headers)
         msg(3, "ocsp_check: HTTP headers:\n%s", cd->headers);
+    if (cd->body)
+        msg_hd(3, "ocsp_check: HTTP body:\n", cd->body, cd->body_len);
 
     rc = gnutls_ocsp_resp_init(&rsp);
     if (rc != GNUTLS_E_SUCCESS) {
@@ -3383,7 +3387,7 @@ static bool ocsp_check(X509 **crt)
         goto out;
     }
 
-    if (g_loglevel > 2) {
+    if (g_loglevel > 1) {
         BIO *out = BIO_new(BIO_s_mem());
         if (out) {
             if (OCSP_REQUEST_print(out, req, 0)) {
@@ -3396,14 +3400,18 @@ static bool ocsp_check(X509 **crt)
     }
 
     msg(1, "querying OCSP server at %s", ocsp_uri);
+    msg_hd(3, "ocsp_check: HTTP post:\n", reqdata, reqsize);
     cd = curl_post(ocsp_uri, reqdata, reqsize,
             "Content-Type: application/ocsp-request", NULL);
     if (!cd) {
         warnx("ocsp_check: curl_post(\"%s\") failed", ocsp_uri);
         goto out;
     }
+
     if (cd->headers)
         msg(3, "ocsp_check: HTTP headers:\n%s", cd->headers);
+    if (cd->body)
+        msg_hd(3, "ocsp_check: HTTP body:\n", cd->body, cd->body_len);
 
     const unsigned char *tmp2 = (const unsigned char *)cd->body;
     rsp = d2i_OCSP_RESPONSE(NULL, &tmp2, cd->body_len);
@@ -3412,7 +3420,7 @@ static bool ocsp_check(X509 **crt)
         goto out;
     }
 
-    if (g_loglevel > 2) {
+    if (g_loglevel > 1) {
         BIO *out = BIO_new(BIO_s_mem());
         if (out) {
             if (OCSP_RESPONSE_print(out, rsp, 0)) {
@@ -3459,13 +3467,13 @@ static bool ocsp_check(X509 **crt)
         goto out;
     }
 
-    int cert_status;
-    if (!OCSP_resp_find_status(brsp, id, &cert_status, NULL, NULL, NULL, NULL)) {
+    int status;
+    if (!OCSP_resp_find_status(brsp, id, &status, NULL, NULL, NULL, NULL)) {
         openssl_error("ocsp_check");
         goto out;
     }
 
-    switch (cert_status) {
+    switch (status) {
         case V_OCSP_CERTSTATUS_GOOD:
             msg(1, "OCSP certificate status is GOOD");
             break;
@@ -3624,7 +3632,7 @@ static int ocsp_req(mbedtls_x509_crt *crt, unsigned char *req, size_t size,
     MBEDTLS_ASN1_CHK_ADD(len, mbedtls_asn1_write_tag(&p, req,
                 crt->serial.tag));
 
-    for (size_t buf_size = 0x10; ; ) {
+    for (size_t buf_size = 0x400; ; ) {
         unsigned char *buf = mbedtls_calloc(1, buf_size);
         if (!buf)
             return MBEDTLS_ERR_X509_ALLOC_FAILED;
@@ -3686,6 +3694,9 @@ static int ocsp_req(mbedtls_x509_crt *crt, unsigned char *req, size_t size,
     MBEDTLS_ASN1_CHK_ADD(len, mbedtls_asn1_write_tag(&p, req,
                 MBEDTLS_ASN1_CONSTRUCTED | MBEDTLS_ASN1_SEQUENCE));
 
+    memmove(req, p, len);
+    if (certid)
+        *certid -= p - req;
     return len;
 }
 
@@ -3825,6 +3836,10 @@ static bool ocsp_check(mbedtls_x509_crt *crt)
     bool result = true;
     char *ocsp_uri = NULL;
     curldata_t *cd = NULL;
+    unsigned char *req = NULL;
+    size_t req_size = 0x100;
+    const unsigned char *certid = NULL;
+    size_t certid_size = 0;
 
     if (!crt->v3_ext.p || crt->v3_ext.len == 0)
         goto out;
@@ -3843,24 +3858,38 @@ static bool ocsp_check(mbedtls_x509_crt *crt)
         goto out;
     }
 
-    unsigned char req[256];
-    const unsigned char *certid;
-    size_t certid_size;
-    r = ocsp_req(crt, req, sizeof(req), &certid, &certid_size);
-    if (r < 0) {
-        warnx("cert_valid: ocsp_req failed: %s", _mbedtls_strerror(r));
-        goto out;
+    while (!req) {
+        req = calloc(1, req_size);
+        if (!req) {
+            warn("ocsp_check: calloc failed");
+            goto out;
+        }
+        r = ocsp_req(crt, req, req_size, &certid, &certid_size);
+        if (r == MBEDTLS_ERR_ASN1_BUF_TOO_SMALL) {
+            free(req);
+            req = NULL;
+            req_size *= 2;
+        }
+        else if (r < 0) {
+            warnx("cert_valid: ocsp_req failed: %s", _mbedtls_strerror(r));
+            goto out;
+        } else
+            req_size = r;
     }
 
     msg(1, "querying OCSP server at %s", ocsp_uri);
-    cd = curl_post(ocsp_uri, req + sizeof(req) - r, r,
+    msg_hd(3, "ocsp_check: HTTP post:\n", req, req_size);
+    cd = curl_post(ocsp_uri, req, req_size,
             "Content-Type: application/ocsp-request", NULL);
     if (!cd) {
         warnx("ocsp_check: curl_post(\"%s\") failed", ocsp_uri);
         goto out;
     }
+
     if (cd->headers)
         msg(3, "ocsp_check: HTTP headers:\n%s", cd->headers);
+    if (cd->body)
+        msg_hd(3, "ocsp_check: HTTP body:\n", cd->body, cd->body_len);
 
     int status;
     r = ocsp_resp((unsigned char *)cd->body, cd->body_len, certid, certid_size,
@@ -3890,6 +3919,7 @@ static bool ocsp_check(mbedtls_x509_crt *crt)
 
 out:
     free(ocsp_uri);
+    free(req);
     if (cd)
         curldata_free(cd);
     return result;
