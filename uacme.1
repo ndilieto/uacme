@@ -2,12 +2,12 @@
 .\"     Title: uacme
 .\"    Author: [see the "AUTHOR" section]
 .\" Generator: DocBook XSL Stylesheets v1.79.1 <http://docbook.sf.net/>
-.\"      Date: 05/08/2020
+.\"      Date: 05/11/2020
 .\"    Manual: User Commands
-.\"    Source: uacme 1.3
+.\"    Source: uacme 1.3-dev
 .\"  Language: English
 .\"
-.TH "UACME" "1" "05/08/2020" "uacme 1\&.3" "User Commands"
+.TH "UACME" "1" "05/11/2020" "uacme 1\&.3\-dev" "User Commands"
 .\" -----------------------------------------------------------------
 .\" * Define some portability stuff
 .\" -----------------------------------------------------------------
@@ -174,7 +174,7 @@ already converted to the base64\-encoded SHA256 digest format)
 .PP
 \fB\-m, \-\-must\-staple\fR
 .RS 4
-Request certificates with the RFC7633 Certificate Status Request TLS Feature Extension, informally also known as "OCSP Must\-Staple"\&.
+Request certificates with the RFC7633 Certificate Status Request TLS Feature Extension, informally also known as "OCSP Must\-Staple"\&. This option is ignored when using an externally supplied Certificate Signing Request file (see USAGE below)\&.
 .RE
 .PP
 \fB\-n, \-\-never\-create\fR
@@ -317,7 +317,9 @@ https://tools\&.ietf\&.org/html/rfc8738#section\-3
 \fBuacme\fR [\fIOPTIONS\fR \&...] \fBissue\fR \fICSRFILE\fR
 .RS 4
 Issue a certificate based on a RFC2986 Certificate Signing Request contained in
-\fICSRFILE\fR, which must be in PEM format\&. If a certificate file
+\fICSRFILE\fR, which must be in PEM format\&. In this mode of issuance
+\fBuacme\fR
+neither needs nor generates the certificate private key, but it is of course the responsibility of the user to ensure that the CSR is constructed and signed appropriately\&. If a certificate file
 \fICSRBASE\-cert\&.pem\fR
 (where
 \fICSRBASE\fR
@@ -333,7 +335,7 @@ is
 \fBnot\fR
 specified and the certificate is reported as revoked by the OCSP server\&. If the certificate file already exists it is hardlinked to
 \fIBASENAME\-cert\-TIMESTAMP\&.pem\fR
-before overwriting\&. Wildcard domains are dealt with correctly, as long as the ACME server supports them\&. IP addresses are also supported according to
+before overwriting\&. Wildcard identifiers in the CSR are dealt with correctly, as long as the ACME server supports them\&. IP addresses are also supported according to
 https://tools\&.ietf\&.org/html/rfc8738#section\-3
 .RE
 .PP

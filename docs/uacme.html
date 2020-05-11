@@ -957,6 +957,8 @@ The key authorization (for <strong>dns-01</strong> and <strong>tls-alpn-01</stro
 <p>
     Request certificates with the RFC7633 Certificate Status Request
     TLS Feature Extension, informally also known as "OCSP Must-Staple".
+    This option is ignored when using an externally supplied Certificate
+    Signing Request file (see USAGE below).
 </p>
 </dd>
 <dt class="hdlist1">
@@ -1125,18 +1127,20 @@ The key authorization (for <strong>dns-01</strong> and <strong>tls-alpn-01</stro
 <dd>
 <p>
     Issue a certificate based on a RFC2986 Certificate Signing Request
-    contained in <em>CSRFILE</em>, which must be in PEM format.
-    If a certificate file <em>CSRBASE-cert.pem</em> (where <em>CSRBASE</em> is
-    obtained by stripping the extension, if any, from <em>CSRFILE</em>) is
-    already available in the same directory containing <em>CSRFILE</em>, and
-    is still valid for longer than <em>DAYS</em> no action is taken unless
-    <strong>-f, --force</strong> is specified or <strong>-o, --no-ocsp</strong> is <strong>not</strong> specified and
-    the certificate is reported as revoked by the OCSP server.
-    If the certificate file already exists it is hardlinked to
-    <em>BASENAME-cert-TIMESTAMP.pem</em> before overwriting.
-    Wildcard domains are dealt with correctly, as long as the ACME server
-    supports them.  IP addresses are also supported according to
-    <a href="https://tools.ietf.org/html/rfc8738#section-3">https://tools.ietf.org/html/rfc8738#section-3</a>
+    contained in <em>CSRFILE</em>, which must be in PEM format. In this mode
+    of issuance <strong>uacme</strong> neither needs nor generates the certificate private
+    key, but it is of course the responsibility of the user to ensure that
+    the CSR is constructed and signed appropriately.
+    If a certificate file <em>CSRBASE-cert.pem</em> (where <em>CSRBASE</em> is obtained
+    by stripping the extension, if any, from <em>CSRFILE</em>) is already available
+    in the same directory containing <em>CSRFILE</em>, and is still valid for longer
+    than <em>DAYS</em> no action is taken unless <strong>-f, --force</strong> is specified or
+    <strong>-o, --no-ocsp</strong> is <strong>not</strong> specified and the certificate is reported as
+    revoked by the OCSP server.  If the certificate file already exists it
+    is hardlinked to <em>BASENAME-cert-TIMESTAMP.pem</em> before overwriting.
+    Wildcard identifiers in the CSR are dealt with correctly, as long as
+    the ACME server supports them.  IP addresses are also supported
+    according to <a href="https://tools.ietf.org/html/rfc8738#section-3">https://tools.ietf.org/html/rfc8738#section-3</a>
 </p>
 </dd>
 <dt class="hdlist1">
@@ -1290,9 +1294,9 @@ along with this program.  If not, see <a href="http://www.gnu.org/licenses/">htt
 <div id="footnotes"><hr></div>
 <div id="footer">
 <div id="footer-text">
-Version 1.3<br>
+Version 1.3-dev<br>
 Last updated
- 2020-05-08 17:15:54 CEST
+ 2020-05-11 21:13:57 CEST
 </div>
 </div>
 </body>
