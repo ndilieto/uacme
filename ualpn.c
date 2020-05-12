@@ -1343,7 +1343,6 @@ static void controller_handle_cmd(controller_t *c, char *line, ev_tstamp ts)
 
     memset(arpa, 0, sizeof(arpa));
     if (parse_addr(ident, AI_NUMERICHOST|AI_NUMERICSERV, AF_UNSPEC, &ai) == 0) {
-        memset(arpa, 0, sizeof(arpa));
         if (ai->ai_family == AF_INET) {
             struct sockaddr_in *ain = (struct sockaddr_in *)ai->ai_addr;
             uint32_t addr = ntohl(ain->sin_addr.s_addr);
