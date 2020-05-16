@@ -56,7 +56,7 @@ If you just want to check out the latest pristine release from github:
 ```
 git clone -b upstream/latest https://github.com/ndilieto/uacme
 ```
-Pre-built packages are available for several distributions:
+[uacme][uacme] packages are available for several distributions:
 
 * https://packages.debian.org/bullseye/uacme
 * https://packages.ubuntu.com/eoan/uacme
