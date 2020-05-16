@@ -25,6 +25,7 @@
 #include <getopt.h>
 #include <grp.h>
 #include <inttypes.h>
+#include <libgen.h>
 #include <limits.h>
 #include <netdb.h>
 #include <netinet/in.h>
