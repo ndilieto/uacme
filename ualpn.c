@@ -2554,10 +2554,10 @@ static void cb_client_rxb(EV_P_ ev_io *w, int revents)
     ev_io_start(EV_A_ &c->io_txf);
     if (!c->backend_initialized && c->state != STATE_DONE) {
         int z = 0;
-        if (setsockopt(c->fd_f, SOL_TCP, TCP_NODELAY, &z, sizeof(z)))
+        if (setsockopt(c->fd_f, IPPROTO_TCP, TCP_NODELAY, &z, sizeof(z)))
             warn("client %08x: failed to set TCP_NODELAY on frontend socket",
                     c->id);
-        if (setsockopt(c->fd_b, SOL_TCP, TCP_NODELAY, &z, sizeof(z)))
+        if (setsockopt(c->fd_b, IPPROTO_TCP, TCP_NODELAY, &z, sizeof(z)))
             warn("client %08x: failed to set TCP_NODELAY on backend socket",
                     c->id);
         c->backend_initialized = true;
@@ -2616,7 +2616,7 @@ static int connect_backend(client_t *c)
             continue;
         }
 
-        if (setsockopt(c->fd_b, SOL_TCP, TCP_NODELAY, &one, sizeof(one)))
+        if (setsockopt(c->fd_b, IPPROTO_TCP, TCP_NODELAY, &one, sizeof(one)))
             warn("client %08x: failed to set TCP_NODELAY on backend socket",
                     c->id);
 
@@ -3348,7 +3348,7 @@ static int client_new(EV_P_ int fd, uaddr_t *addr)
         return -1;
     }
 
-    if (setsockopt(fd, SOL_TCP, TCP_NODELAY, &one, sizeof(one)))
+    if (setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, &one, sizeof(one)))
         warn("client %08x: failed to set TCP_NODELAY on frontend socket",
                 c->id);
 
