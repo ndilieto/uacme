@@ -4370,6 +4370,8 @@ int main(int argc, char **argv)
             err("fork failed");
             close(g.pipefd[0]);
             g.pipefd[0] = -1;
+            close(g.pipefd[1]);
+            g.pipefd[1] = -1;
             cleanup_and_exit(0, EXIT_FAILURE);
         } else if (pid != 0) {
             // parent
@@ -4377,6 +4379,8 @@ int main(int argc, char **argv)
             n = read(g.pipefd[0], buf, sizeof(buf));
             close(g.pipefd[0]);
             g.pipefd[0] = -1;
+            close(g.pipefd[1]);
+            g.pipefd[1] = -1;
             if (n != 2 || strncmp(buf, "OK", 2) != 0) {
                 errx("daemon failed to start");
                 cleanup_and_exit(0, EXIT_FAILURE);
