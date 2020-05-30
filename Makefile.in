@@ -431,7 +431,7 @@ EXTRA_DIST = GNUmakefile build-aux/git-version-gen uacme.sh nsupdate.sh \
 	     docs/ualpn.html libev/ev_epoll.c libev/ev_iouring.c \
 	     libev/ev_kqueue.c libev/ev_linuxaio.c libev/ev_poll.c \
 	     libev/ev_port.c libev/ev_select.c libev/ev_vars.h \
-	     libev/ev_wrap.h
+	     libev/ev_wrap.h README.md
 
 CLEANFILES = valgrind.log
 all: $(BUILT_SOURCES) config.h
