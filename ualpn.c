@@ -130,7 +130,7 @@ typedef struct auth {
     ev_tstamp timestamp;
     char ident[0x100];
     char auth[0x30];
-    uint8_t key[0x80];
+    uint8_t key[0x100];
     size_t key_size;
     uint8_t crt[0x500];
     size_t crt_size;
