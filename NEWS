@@ -1,6 +1,11 @@
 uacme NEWS
 Copyright (C) 2019,2020 Nicola Di Lieto <nicola.dilieto@gmail.com>
 
+## [1.4.1] - 2020-05-30
+### Changed
+- fix SIGPIPE of parent process in daemon mode
+  https://github.com/ndilieto/uacme/issues/36
+
 ## [1.4] - 2020-05-30
 ### Changed
 - fix nsupdate.sh
