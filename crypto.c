@@ -2381,7 +2381,7 @@ static char **csr_names(gnutls_x509_crq_t crq)
                 }
                 if (!inet_ntop(size == 4 ? AF_INET : AF_INET6, buf, ip,
                             INET6_ADDRSTRLEN)) {
-                    warnx("csr_names: invalid IP addres in Subj Alt Name");
+                    warnx("csr_names: invalid IP address in Subj Alt Name");
                     free(ip);
                     ip = NULL;
                     continue;
@@ -2518,7 +2518,7 @@ static char **csr_names(X509_REQ *crq)
                         len = INET6_ADDRSTRLEN;
                         break;
                     default:
-                        warnx("csr_names: invalid IP addres in Subj Alt Name");
+                        warnx("csr_names: invalid IP address in Subj Alt Name");
                         continue;
                 }
                 nm = calloc(1, len);
@@ -2527,7 +2527,7 @@ static char **csr_names(X509_REQ *crq)
                     goto out;
                 }
                 if (!inet_ntop(af, ASN1_STRING_get0_data(value), nm, len)) {
-                    warnx("csr_names: invalid IP addres in Subj Alt Name");
+                    warnx("csr_names: invalid IP address in Subj Alt Name");
                     free(nm);
                     continue;
                 }
@@ -2780,7 +2780,7 @@ static char **csr_names(mbedtls_x509_csr *crq)
                         len = INET6_ADDRSTRLEN;
                         break;
                     default:
-                        warnx("csr_names: invalid IP addres in Subj Alt Name");
+                        warnx("csr_names: invalid IP address in Subj Alt Name");
                 }
                 if (len) {
                     nm = calloc(1, len);
@@ -2789,7 +2789,7 @@ static char **csr_names(mbedtls_x509_csr *crq)
                         goto out;
                     }
                     if (!inet_ntop(af, san->buf.p, nm, len)) {
-                        warnx("csr_names: invalid IP addres in Subj Alt Name");
+                        warnx("csr_names: invalid IP address in Subj Alt Name");
                         free(nm);
                         nm = NULL;
                     }

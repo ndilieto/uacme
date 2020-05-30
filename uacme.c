@@ -1549,6 +1549,9 @@ int main(int argc, char **argv)
             csr = csr_load(filename, &names);
             if (!csr)
                 goto out;
+
+            if (status_req)
+                warnx("-m, --must-staple is ignored when issuing with a CSR");
         } else {
             if (!check_or_mkdir(!never, keyprefix, S_IRWXU))
                 goto out;
