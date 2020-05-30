@@ -18,7 +18,8 @@ network communications without spawning external processes.
 Particularly when using mbedTLS, it is small enough to run on embedded systems
 with severe RAM and program memory restrictions (such as OpenWRT routers, for
 example).  This is in contrast to solutions based on python or shell scripts,
-which may well be a few hundred lines but require many other large applications such as python or openssl to work.
+which may well be a few hundred lines but require many other large applications
+such as python or openssl to work.
 * **Native ECC support** - Elliptic Curve keys and certificates can be
 generated with a commmand line option (-t EC)
 * **Easily extensible** - It optionally calls an external hook program
@@ -105,7 +106,7 @@ certificate and the key at:
 /path/to/uacme.d/www.your.domain.com/cert.pem
 /path/to/uacme.d/private/www.your.domain.com/key.pem
 ```
-Note other types of challenges are possible. If you type anything other than
+Note several challenge types are possible. If you type anything other than
 'y', [uacme][uacme] skips the challenge and proposes a different one. The
 easiest is http-01 but any other type can be dealt with. Keep in mind that
 challenge types may be served in random order by the server. Do not make any
@@ -176,10 +177,26 @@ not only [uacme][uacme] (check the example [ualpn.sh][ualpn.sh] hook script)
 but also other ACME clients. A [certbot plugin][plugin] is also available.
 
 To get started with [ualpn][ualpn]:
-* move your real HTTPS server to port 4443 and also enable it to accept
-the [PROXY protocol][proxy]:
+* move your real HTTPS server to port 4443 which doesn't need to be open
+to the outside (only ualpn will connect to it) and set it up to accept the
+[PROXY protocol][proxy]:
   * for nginx: https://docs.nginx.com/nginx/admin-guide/load-balancer/using-proxy-protocol
+    ```
+    server {
+        listen 127.0.0.1:4443 ssl proxy_protocol;
+        set_real_ip_from 127.0.0.0/24;
+        real_ip_header proxy_protocol;
+        proxy_set_header X-Real-IP $proxy_protocol_addr;
+        proxy_set_header X-Forwarded-For $proxy_protocol_addr;
+        ...
+    ```
   * for apache: https://httpd.apache.org/docs/2.4/mod/mod_remoteip.html#remoteipproxyprotocol
+    ```
+    Listen 4443
+    <VirtualHost *:4443>
+        RemoteIPProxyProtocol On
+        ...
+    ```
 * launch [ualpn][ualpn] as a daemon and check the logs (by default in syslog)
 ```
 sudo ualpn -v -d -u nobody:nogroup -c 127.0.0.1@4443 -S 666
