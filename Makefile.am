@@ -27,14 +27,15 @@ ualpn_SOURCES = ualpn.c base64.c base64.h log.c log.h sglib.h
 ualpn_CPPFLAGS = -DRUNSTATEDIR="\"${runstatedir}\""
 		 -DSYSCONFDIR="\"${sysconfdir}\""
 ualpn_CFLAGS = $(WCFLAGS)
-ualpn_LDADD = $(UALPN_LDADD)
 if ENABLE_LIBEV
 ualpn_SOURCES += libev/ev.h
 ualpn_CPPFLAGS += -Ilibev
-ualpn_LDADD += libev.a
+ualpn_LDADD = libev.a $(UALPN_LDADD)
 
 noinst_LIBRARIES = libev.a
 libev_a_SOURCES = libev/ev.c
+else
+ualpn_LDADD = $(UALPN_LDADD)
 endif
 endif
 
@@ -109,5 +110,5 @@ EXTRA_DIST = GNUmakefile build-aux/git-version-gen uacme.sh nsupdate.sh \
 	     docs/ualpn.html libev/ev_epoll.c libev/ev_iouring.c \
 	     libev/ev_kqueue.c libev/ev_linuxaio.c libev/ev_poll.c \
 	     libev/ev_port.c libev/ev_select.c libev/ev_vars.h \
-	     libev/ev_wrap.h
+	     libev/ev_wrap.h README.md
 CLEANFILES = valgrind.log

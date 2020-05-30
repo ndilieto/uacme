@@ -25,6 +25,7 @@
 #include <getopt.h>
 #include <grp.h>
 #include <inttypes.h>
+#include <libgen.h>
 #include <limits.h>
 #include <netdb.h>
 #include <netinet/in.h>
@@ -129,7 +130,7 @@ typedef struct auth {
     ev_tstamp timestamp;
     char ident[0x100];
     char auth[0x30];
-    uint8_t key[0x80];
+    uint8_t key[0x100];
     size_t key_size;
     uint8_t crt[0x500];
     size_t crt_size;
@@ -1343,7 +1344,6 @@ static void controller_handle_cmd(controller_t *c, char *line, ev_tstamp ts)
 
     memset(arpa, 0, sizeof(arpa));
     if (parse_addr(ident, AI_NUMERICHOST|AI_NUMERICSERV, AF_UNSPEC, &ai) == 0) {
-        memset(arpa, 0, sizeof(arpa));
         if (ai->ai_family == AF_INET) {
             struct sockaddr_in *ain = (struct sockaddr_in *)ai->ai_addr;
             uint32_t addr = ntohl(ain->sin_addr.s_addr);
@@ -2554,10 +2554,10 @@ static void cb_client_rxb(EV_P_ ev_io *w, int revents)
     ev_io_start(EV_A_ &c->io_txf);
     if (!c->backend_initialized && c->state != STATE_DONE) {
         int z = 0;
-        if (setsockopt(c->fd_f, SOL_TCP, TCP_NODELAY, &z, sizeof(z)))
+        if (setsockopt(c->fd_f, IPPROTO_TCP, TCP_NODELAY, &z, sizeof(z)))
             warn("client %08x: failed to set TCP_NODELAY on frontend socket",
                     c->id);
-        if (setsockopt(c->fd_b, SOL_TCP, TCP_NODELAY, &z, sizeof(z)))
+        if (setsockopt(c->fd_b, IPPROTO_TCP, TCP_NODELAY, &z, sizeof(z)))
             warn("client %08x: failed to set TCP_NODELAY on backend socket",
                     c->id);
         c->backend_initialized = true;
@@ -2616,7 +2616,7 @@ static int connect_backend(client_t *c)
             continue;
         }
 
-        if (setsockopt(c->fd_b, SOL_TCP, TCP_NODELAY, &one, sizeof(one)))
+        if (setsockopt(c->fd_b, IPPROTO_TCP, TCP_NODELAY, &one, sizeof(one)))
             warn("client %08x: failed to set TCP_NODELAY on backend socket",
                     c->id);
 
@@ -3348,7 +3348,7 @@ static int client_new(EV_P_ int fd, uaddr_t *addr)
         return -1;
     }
 
-    if (setsockopt(fd, SOL_TCP, TCP_NODELAY, &one, sizeof(one)))
+    if (setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, &one, sizeof(one)))
         warn("client %08x: failed to set TCP_NODELAY on frontend socket",
                 c->id);
 
@@ -3929,7 +3929,7 @@ void usage(void)
         "usage: %s [-?|--help] [-V|--version] [-4|--ipv4] [-6|--ipv6]\n"
         "\t[-b|--bind address[@port] [-c|--connect address[@port]\n"
         "\t[-d|--daemon] [-l|--logfile file] [-m|--max-auths N]\n"
-        "\t[-n|--num-workers N] [-p|--proxy N] [-P|--pidfile file]\n"
+        "\t[-n|--num-workers N] [-p|--pidfile file] [-P|--proxy N]\n"
         "\t[-r|--chroot dir] [-s|--sock path] [-S|--sock-mode mode]\n"
         "\t[-t|--terminate] [-u|--user user[:group]] [-v|--verbose ...]\n",
         g.progname);
@@ -3947,8 +3947,8 @@ int main(int argc, char **argv)
         {"logfile",     required_argument,  NULL,   'l'},
         {"max-auths",   required_argument,  NULL,   'm'},
         {"num-workers", required_argument,  NULL,   'n'},
-        {"pidfile",     required_argument,  NULL,   'P'},
-        {"proxy",       required_argument,  NULL,   'p'},
+        {"pidfile",     required_argument,  NULL,   'p'},
+        {"proxy",       required_argument,  NULL,   'P'},
         {"chroot",      required_argument,  NULL,   'r'},
         {"sock",        required_argument,  NULL,   's'},
         {"sock-mode",   required_argument,  NULL,   'S'},
@@ -4106,7 +4106,7 @@ int main(int argc, char **argv)
                 server_mode = true;
                 break;
 
-            case 'P':
+            case 'p':
                 g.pidfile = strdup(optarg);
                 if (!g.pidfile) {
                     err("strdup");
@@ -4114,11 +4114,11 @@ int main(int argc, char **argv)
                 }
                 break;
 
-            case 'p':
+            case 'P':
                 n = strtol(optarg, &endptr, 10);
                 if (*endptr != 0 || n < 0 || n > 2)
                 {
-                    warnx("-p,--proxy: must be 0 (disabled), 1 or 2");
+                    warnx("-P,--proxy: must be 0 (disabled), 1 or 2");
                     cleanup_and_exit(0, EXIT_FAILURE);
                 }
                 server_mode = true;

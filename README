@@ -20,7 +20,7 @@ A complete list of options available for configure can be found
 by running './configure --help'.
 
     cd uacme-<version>
-    ./configure --disable-maintainer-mode
+    ./configure
     make
     sudo make install
 
@@ -39,7 +39,7 @@ mbedTLS
 
 DOCUMENTATION
 -------------
-See the documentation in the manual page included in the distribution
+See README.md and the manual pages included in the distribution
 (uacme.1 or uacme.1.html and ualpn.1 or ualpn.1.html)
 
 

@@ -1,3 +1,16 @@
+2020-05-30 Nicola Di Lieto <nicola.dilieto@gmail.com>
+	* Release 1.4
+	- fix nsupdate.sh
+	  https://github.com/ndilieto/uacme/issues/32
+	- uacme: warn that --must-staple is ignored with CSRFILE
+	- ualpn: swap -p and -P command line switches
+	- ualpn: remove redundant memset
+	- ualpn: increase key buffer size as required by OpenSSL 3.x
+	- ualpn: fix minor OpenBSD portability issues
+	- ualpn: fix typo in warning message
+	- ualpn: fix library link order when using built-in libev
+	- README.md now included in distribution
+
 2020-05-08 Nicola Di Lieto <nicola.dilieto@gmail.com>
 	* Release 1.3
 	- allow signing revocation requests with certificate key
