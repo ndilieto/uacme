@@ -198,21 +198,21 @@ to the outside (only ualpn will connect to it) and set it up to accept the
         ...
     ```
 * launch [ualpn][ualpn] as a daemon and check the logs (by default in syslog)
-```
-sudo ualpn -v -d -u nobody:nogroup -c 127.0.0.1@4443 -S 666
-```
+  ```
+  sudo ualpn -v -d -u nobody:nogroup -c 127.0.0.1@4443 -S 666
+  ```
 * create an ACME account
-```
-uacme -v -s -c /path/to/uacme.d -y new
-```
+  ```
+  uacme -v -s -c /path/to/uacme.d -y new
+  ```
 * try obtaining a certificate with tls-alpn-01 challenge
-```
-uacme -v -s -c /path/to/uacme.d -h /usr/share/uacme/ualpn.sh issue www.your.domain.com
-```
-or, depending on your installation
-```
-uacme -v -s -c /path/to/uacme.d -h /usr/local/share/uacme/ualpn.sh issue www.your.domain.com
-```
+  ```
+  uacme -v -s -c /path/to/uacme.d -h /usr/share/uacme/ualpn.sh issue www.your.domain.com
+  ```
+  or, depending on your installation
+  ```
+  uacme -v -s -c /path/to/uacme.d -h /usr/local/share/uacme/ualpn.sh issue www.your.domain.com
+  ```
 
 ## Documentation
 
