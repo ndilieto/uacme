@@ -1,4 +1,9 @@
 2020-05-30 Nicola Di Lieto <nicola.dilieto@gmail.com>
+	* Release 1.4.1
+	- fix SIGPIPE of parent process in daemon mode
+	  https://github.com/ndilieto/uacme/issues/36
+
+2020-05-30 Nicola Di Lieto <nicola.dilieto@gmail.com>
 	* Release 1.4
 	- fix nsupdate.sh
 	  https://github.com/ndilieto/uacme/issues/32
