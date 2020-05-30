@@ -16,8 +16,8 @@ SYNOPSIS
 *ualpn* [*-?*|*--help*]  [*-V*|*--version*] [*-4*|*--ipv4*] [*-6*|*--ipv6*]
     [*-b*|*--bind* 'address'[@'port']] [*-c*|*--connect* 'address'[@'port']]
     [*-d*|*--daemon*] [*-l*|*--logfile* 'file'] [*-m*|*--max-auths* 'N']
-    [*-n*|*--num-workers* 'N'] [*-p*|*--proxy* 'N'] [*-P*|*--pidfile* 'file']
-    [*-r*|*--chroot dir*] [*-s*|*--sock path*] [*-S*|*--sock-mode* 'mode']
+    [*-n*|*--num-workers* 'N'] [*-p*|*--pidfile* 'file'] [*-P*|*--proxy* 'N']
+    [*-r*|*--chroot dir*] [*-s*|*--sock* 'path'] [*-S*|*--sock-mode* 'mode']
     [*-t*|*--terminate*] [*-u*|*--user* 'user'`[:`'group']] [*-v*|*--verbose* ...]
 
 
@@ -96,14 +96,14 @@ OPTIONS
     thanks to the event based implementation each can handle several
     (potentially thousands) connections concurrently.
 
-*-p, --proxy* 'N'::
+*-p, --pidfile* 'file'::
+    Specify pidfile location (default {runstatedir}/ualpn.pid)
+
+*-P, --proxy* 'N'::
     Enable server mode and disable (0) or specify (1, 2) the PROXY header
     version (default 1). The backend server needs to be configured accordingly:
     * nginx: <https://docs.nginx.com/nginx/admin-guide/load-balancer/using-proxy-protocol>
     * apache: <https://httpd.apache.org/docs/2.4/mod/mod_remoteip.html#remoteipproxyprotocol>
-
-*-P, --pidfile* 'file'::
-    Specify pidfile location (default {runstatedir}/ualpn.pid)
 
 *-r, --chroot* 'dir'::
     Enable server mode and specify a directory to 'chroot' to. If logging to
@@ -119,7 +119,7 @@ OPTIONS
 
 *-t, --terminate*::
     Try to terminate a running *ualpn* server. This is achieved by looking
-    up the process id stored by the server in the pidfile (see *-P, --pidfile*)
+    up the process id stored by the server in the pidfile (see *-p, --pidfile*)
     and signalling it to terminate.
 
 *-u, --user* 'user'`[:`'group'`]`::

@@ -3929,7 +3929,7 @@ void usage(void)
         "usage: %s [-?|--help] [-V|--version] [-4|--ipv4] [-6|--ipv6]\n"
         "\t[-b|--bind address[@port] [-c|--connect address[@port]\n"
         "\t[-d|--daemon] [-l|--logfile file] [-m|--max-auths N]\n"
-        "\t[-n|--num-workers N] [-p|--proxy N] [-P|--pidfile file]\n"
+        "\t[-n|--num-workers N] [-p|--pidfile file] [-P|--proxy N]\n"
         "\t[-r|--chroot dir] [-s|--sock path] [-S|--sock-mode mode]\n"
         "\t[-t|--terminate] [-u|--user user[:group]] [-v|--verbose ...]\n",
         g.progname);
@@ -3947,8 +3947,8 @@ int main(int argc, char **argv)
         {"logfile",     required_argument,  NULL,   'l'},
         {"max-auths",   required_argument,  NULL,   'm'},
         {"num-workers", required_argument,  NULL,   'n'},
-        {"pidfile",     required_argument,  NULL,   'P'},
-        {"proxy",       required_argument,  NULL,   'p'},
+        {"pidfile",     required_argument,  NULL,   'p'},
+        {"proxy",       required_argument,  NULL,   'P'},
         {"chroot",      required_argument,  NULL,   'r'},
         {"sock",        required_argument,  NULL,   's'},
         {"sock-mode",   required_argument,  NULL,   'S'},
@@ -4106,7 +4106,7 @@ int main(int argc, char **argv)
                 server_mode = true;
                 break;
 
-            case 'P':
+            case 'p':
                 g.pidfile = strdup(optarg);
                 if (!g.pidfile) {
                     err("strdup");
@@ -4114,11 +4114,11 @@ int main(int argc, char **argv)
                 }
                 break;
 
-            case 'p':
+            case 'P':
                 n = strtol(optarg, &endptr, 10);
                 if (*endptr != 0 || n < 0 || n > 2)
                 {
-                    warnx("-p,--proxy: must be 0 (disabled), 1 or 2");
+                    warnx("-P,--proxy: must be 0 (disabled), 1 or 2");
                     cleanup_and_exit(0, EXIT_FAILURE);
                 }
                 server_mode = true;
