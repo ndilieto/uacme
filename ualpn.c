@@ -3986,6 +3986,9 @@ int main(int argc, char **argv)
     g.logfile = stderr;
     set_log_func(log_function);
 
+    signal(SIGPIPE, SIG_IGN);
+    signal(SIGABRT, SIG_IGN);
+
     while (1)
     {
         char *endptr;
@@ -4430,9 +4433,6 @@ int main(int argc, char **argv)
             }
         }
     }
-
-    signal(SIGPIPE, SIG_IGN);
-    signal(SIGABRT, SIG_IGN);
 
 #if defined(USE_GNUTLS)
     if (!gnutls_check_version("3.3.30"))
