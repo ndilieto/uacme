@@ -106,9 +106,10 @@ static void openssl_error(const char *prefix)
 #if MBEDTLS_VERSION_NUMBER < 0x02100000
 #error mbedTLS version 2.16 or later is required
 #endif
-#if !defined(MBEDTLS_X509_ALLOW_UNSUPPORTED_CRITICAL_EXTENSION)
-#error mbedTLS was configured without \
-    MBEDTLS_X509_ALLOW_UNSUPPORTED_CRITICAL_EXTENSION
+#if !HAVE_MBEDTLS_X509_CRT_PARSE_DER_WITH_EXT_CB && \
+    !defined(MBEDTLS_X509_ALLOW_UNSUPPORTED_CRITICAL_EXTENSION)
+#error mbedtls_x509_crt_parse_der_with_ext_cb is not available and mbedTLS \
+    was configured without MBEDTLS_X509_ALLOW_UNSUPPORTED_CRITICAL_EXTENSION
 #endif
 static const char *_mbedtls_strerror(int code)
 {
@@ -2251,6 +2252,24 @@ static int sni_callback(void *p, mbedtls_ssl_context *ssl,
     return 0;
 }
 
+#if HAVE_MBEDTLS_X509_CRT_PARSE_DER_WITH_EXT_CB
+int ext_callback(void *ctx, mbedtls_x509_crt const *crt,
+        mbedtls_x509_buf const *oid, int critical, const unsigned char *p,
+        const unsigned char *end)
+{
+    (void) ctx;
+    (void) crt;
+    (void) critical;
+    (void) p;
+    (void) end;
+
+    if (MBEDTLS_OID_CMP(MBEDTLS_OID_PKIX "\x01\x1F", oid))
+        return MBEDTLS_ERR_X509_INVALID_EXTENSIONS;
+    else
+        return 0;
+}
+#endif
+
 static int do_handshake(client_t *c)
 {
     int rc = 0;
@@ -2271,6 +2290,16 @@ static int do_handshake(client_t *c)
                 }
 
                 mbedtls_x509_crt_free(&c->crt);
+#if HAVE_MBEDTLS_X509_CRT_PARSE_DER_WITH_EXT_CB
+                rc = mbedtls_x509_crt_parse_der_with_ext_cb(&c->crt, auth->crt,
+                        auth->crt_size, 1, ext_callback, NULL);
+                if (rc) {
+                    warnx("client %08x: mbedtls_x509_crt_parse_der_with_ext_cb"
+                            " for %s: %s",
+                            c->id, c->ident, _mbedtls_strerror(rc));
+                    return -1;
+                }
+#else
                 rc = mbedtls_x509_crt_parse_der(&c->crt, auth->crt,
                         auth->crt_size);
                 if (rc) {
@@ -2278,7 +2307,7 @@ static int do_handshake(client_t *c)
                             c->id, c->ident, _mbedtls_strerror(rc));
                     return -1;
                 }
-
+#endif
                 mbedtls_pk_free(&c->key);
                 rc = mbedtls_pk_parse_key(&c->key, auth->key,
                         auth->key_size, NULL, 0);
@@ -2397,6 +2426,15 @@ static int tls_session_init(client_t *c, uint8_t *buf, size_t buf_len)
     mbedtls_ssl_conf_rng(&c->cnf, mbedtls_ctr_drbg_random, &g.ctr_drbg);
     mbedtls_ssl_conf_sni(&c->cnf, sni_callback, c);
     mbedtls_x509_crt_init(&c->crt);
+#if HAVE_MBEDTLS_X509_CRT_PARSE_DER_WITH_EXT_CB
+    rc = mbedtls_x509_crt_parse_der_with_ext_cb(&c->crt, g.crt, g.crt_len,
+            1, ext_callback, NULL);
+    if (rc) {
+        warnx("client %08x: mbedtls_x509_crt_parse_der_with_ext_cb: %s", c->id,
+                _mbedtls_strerror(rc));
+        return -1;
+    }
+#else
     rc = mbedtls_x509_crt_parse_der(&c->crt, g.crt, g.crt_len);
     if (rc == MBEDTLS_ERR_X509_INVALID_EXTENSIONS +
                 MBEDTLS_ERR_ASN1_UNEXPECTED_TAG) {
@@ -2410,6 +2448,7 @@ static int tls_session_init(client_t *c, uint8_t *buf, size_t buf_len)
                 _mbedtls_strerror(rc));
         return -1;
     }
+#endif
     mbedtls_pk_init(&c->key);
     rc = mbedtls_pk_parse_key(&c->key, g.key, g.key_len, NULL, 0);
     if (rc) {
@@ -4473,16 +4512,19 @@ int main(int argc, char **argv)
         errx("mbedTLS version 2.16 or later is required");
         cleanup_and_exit(0, EXIT_FAILURE);
     }
+#if !HAVE_MBEDTLS_X509_CRT_PARSE_DER_WITH_EXT_CB
 #if defined(MBEDTLS_VERSION_FEATURES)
     if (mbedtls_version_check_feature(
                 "MBEDTLS_X509_ALLOW_UNSUPPORTED_CRITICAL_EXTENSION")) {
-        errx("mbedTLS needs to be built with "
+        errx("mbedtls_x509_crt_parse_der_with_ext_cb is not available "
+                "and mbedTLS was configured without "
                 "MBEDTLS_X509_ALLOW_UNSUPPORTED_CRITICAL_EXTENSION");
         cleanup_and_exit(0, EXIT_FAILURE);
     }
 #else
 #warning mbedTLS runtime feature check disabled. Consider reconfiguring \
     mbedTLS with MBEDTLS_VERSION_FEATURES
+#endif
 #endif
 #else
 #warning mbedTLS runtime version check disabled. Consider reconfiguring \
