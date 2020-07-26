@@ -2,12 +2,12 @@
 .\"     Title: uacme
 .\"    Author: [see the "AUTHOR" section]
 .\" Generator: DocBook XSL Stylesheets v1.79.1 <http://docbook.sf.net/>
-.\"      Date: 05/31/2020
+.\"      Date: 07/26/2020
 .\"    Manual: User Commands
-.\"    Source: uacme 1.4.1-dev
+.\"    Source: uacme 1.5
 .\"  Language: English
 .\"
-.TH "UACME" "1" "05/31/2020" "uacme 1\&.4\&.1\-dev" "User Commands"
+.TH "UACME" "1" "07/26/2020" "uacme 1\&.5" "User Commands"
 .\" -----------------------------------------------------------------
 .\" * Define some portability stuff
 .\" -----------------------------------------------------------------
@@ -31,13 +31,18 @@
 uacme \- ACMEv2 client written in plain C code with minimal dependencies
 .SH "SYNOPSIS"
 .sp
-\fBuacme\fR [\fB\-a\fR|\fB\-\-acme\-url\fR \fIURL\fR] [\fB\-b\fR|\fB\-\-bits\fR \fIBITS\fR] [\fB\-c\fR|\fB\-\-confdir\fR \fIDIR\fR] [\fB\-d\fR|\fB\-\-days\fR \fIDAYS\fR] [\fB\-f\fR|\fB\-\-force\fR] [\fB\-h\fR|\fB\-\-hook\fR \fIPROGRAM\fR] [\fB\-m\fR|\fB\-\-must\-staple\fR] [\fB\-n\fR|\fB\-\-never\-create\fR] [\fB\-o\fR|\fB\-\-no\-ocsp\fR] [\fB\-s\fR|\fB\-\-staging\fR] [\fB\-t\fR|\fB\-\-type\fR \fBRSA\fR|\fBEC\fR] [\fB\-v\fR|\fB\-\-verbose\fR \&...] [\fB\-V\fR|\fB\-\-version\fR] [\fB\-y\fR|\fB\-\-yes\fR] [\fB\-?\fR|\fB\-\-help\fR] \fBnew\fR [\fIEMAIL\fR] | \fBupdate\fR [\fIEMAIL\fR] | \fBdeactivate\fR | \fBnewkey\fR | \fBissue\fR \fIIDENTIFIER\fR [\fIALTNAME\fR \&...]] | \fBissue\fR \fICSRFILE\fR | \fBrevoke\fR \fICERTFILE\fR [\fICERTKEYFILE\fR]
+\fBuacme\fR [\fB\-?\fR|\fB\-\-help\fR] [\fB\-a\fR|\fB\-\-acme\-url\fR \fIURL\fR] [\fB\-b\fR|\fB\-\-bits\fR \fIBITS\fR] [\fB\-c\fR|\fB\-\-confdir\fR \fIDIR\fR] [\fB\-d\fR|\fB\-\-days\fR \fIDAYS\fR] [\fB\-f\fR|\fB\-\-force\fR] [\fB\-h\fR|\fB\-\-hook\fR \fIPROGRAM\fR] [\fB\-l\fR|\fB\-\-alternate\fR \fIN\fR] [\fB\-m\fR|\fB\-\-must\-staple\fR] [\fB\-n\fR|\fB\-\-never\-create\fR] [\fB\-o\fR|\fB\-\-no\-ocsp\fR] [\fB\-s\fR|\fB\-\-staging\fR] [\fB\-t\fR|\fB\-\-type\fR \fBRSA\fR|\fBEC\fR] [\fB\-v\fR|\fB\-\-verbose\fR \&...] [\fB\-V\fR|\fB\-\-version\fR] [\fB\-y\fR|\fB\-\-yes\fR] \fBnew\fR [\fIEMAIL\fR] | \fBupdate\fR [\fIEMAIL\fR] | \fBdeactivate\fR | \fBnewkey\fR | \fBissue\fR \fIIDENTIFIER\fR [\fIALTNAME\fR \&...]] | \fBissue\fR \fICSRFILE\fR | \fBrevoke\fR \fICERTFILE\fR [\fICERTKEYFILE\fR]
 .SH "DESCRIPTION"
 .sp
 \fBuacme\fR is a client for the ACMEv2 protocol described in RFC8555, written in plain C code with minimal dependencies (libcurl and one of GnuTLS, OpenSSL or mbedTLS)\&. The ACMEv2 protocol allows a Certificate Authority (https://letsencrypt\&.org is a popular one) and an applicant to automate the process of verification and certificate issuance\&. The protocol also provides facilities for other certificate management functions, such as certificate revocation\&. For more information see https://tools\&.ietf\&.org/html/rfc8555
 .SH "OPTIONS"
 .PP
-\fB\-a, \-\-acme\-url\fR=\fIURL\fR
+\fB\-?, \-\-help\fR
+.RS 4
+Print a brief usage text on stderr and exit\&.
+.RE
+.PP
+\fB\-a, \-\-acme\-url\fR \fIURL\fR
 .RS 4
 ACMEv2 server directory object
 \fIURL\fR\&. If not specified
@@ -57,14 +62,14 @@ below)
 .RE
 .RE
 .PP
-\fB\-b, \-\-bits\fR=\fIBITS\fR
+\fB\-b, \-\-bits\fR \fIBITS\fR
 .RS 4
 key bit length (default 2048 for RSA, 256 for EC)\&. Only applies to newly generated keys\&. RSA key length must be a multiple of 8 between 2048 and 8192\&. EC key length must be either 256 (\fBNID_X9_62_prime256v1\fR
 curve) or 384 (\fBNID_secp384r1\fR
 curve)\&.
 .RE
 .PP
-\fB\-c, \-\-confdir\fR=\fICONFDIR\fR
+\fB\-c, \-\-confdir\fR \fICONFDIR\fR
 .RS 4
 Use configuration directory
 \fICONFDIR\fR
@@ -91,7 +96,7 @@ certificate for
 .RE
 .RE
 .PP
-\fB\-d, \-\-days\fR=\fIDAYS\fR
+\fB\-d, \-\-days\fR \fIDAYS\fR
 .RS 4
 Do not reissue certificates that are still valid for longer than
 \fIDAYS\fR
@@ -104,7 +109,7 @@ Do not reissue certificates that are still valid for longer than
 Force certificate reissuance regardless of expiration date\&.
 .RE
 .PP
-\fB\-h, \-\-hook\fR=\fIPROGRAM\fR
+\fB\-h, \-\-hook\fR \fIPROGRAM\fR
 .RS 4
 Challenge hook program\&. If not specified
 \fBuacme\fR
@@ -172,6 +177,17 @@ already converted to the base64\-encoded SHA256 digest format)
 .RE
 .RE
 .PP
+\fB\-l, \-\-alternate\fR \fIN\fR
+.RS 4
+According to
+https://tools\&.ietf\&.org/html/rfc8555#section\-7\&.4\&.2
+the server MAY provide one or more additional certificate download URLs, each pointing to an alternative certificate chain starting with the same end\-entity certificate\&. Specifying this option makes
+\fBuacme\fR
+choose the Nth alternate link\&. If the server does not provide it or the download fails,
+\fBuacme\fR
+falls back to the main certificate URL\&.
+.RE
+.PP
 \fB\-m, \-\-must\-staple\fR
 .RS 4
 Request certificates with the RFC7633 Certificate Status Request TLS Feature Extension, informally also known as "OCSP Must\-Staple"\&. This option is ignored when using an externally supplied Certificate Signing Request file (see USAGE below)\&.
@@ -231,11 +247,6 @@ Print program version on stderr and exit\&.
 \fB\-y, \-\-yes\fR
 .RS 4
 Autoaccept ACME server terms (if any) upon new account creation\&.
-.RE
-.PP
-\fB\-?, \-\-help\fR
-.RS 4
-Print a brief usage text on stderr and exit\&.
 .RE
 .SH "USAGE"
 .PP

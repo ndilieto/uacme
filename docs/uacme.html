@@ -746,13 +746,13 @@ UACME(1) Manual Page
 <div class="sect1">
 <h2 id="_synopsis">SYNOPSIS</h2>
 <div class="sectionbody">
-<div class="paragraph"><p><strong>uacme</strong> [<strong>-a</strong>|<strong>--acme-url</strong> <em>URL</em>] [<strong>-b</strong>|<strong>--bits</strong> <em>BITS</em>]
+<div class="paragraph"><p><strong>uacme</strong> [<strong>-?</strong>|<strong>--help</strong>] [<strong>-a</strong>|<strong>--acme-url</strong> <em>URL</em>] [<strong>-b</strong>|<strong>--bits</strong> <em>BITS</em>]
     [<strong>-c</strong>|<strong>--confdir</strong> <em>DIR</em>] [<strong>-d</strong>|<strong>--days</strong> <em>DAYS</em>] [<strong>-f</strong>|<strong>--force</strong>]
-    [<strong>-h</strong>|<strong>--hook</strong> <em>PROGRAM</em>] [<strong>-m</strong>|<strong>--must-staple</strong>] [<strong>-n</strong>|<strong>--never-create</strong>]
-    [<strong>-o</strong>|<strong>--no-ocsp</strong>] [<strong>-s</strong>|<strong>--staging</strong>] [<strong>-t</strong>|<strong>--type</strong> <strong>RSA</strong>|<strong>EC</strong>]
-    [<strong>-v</strong>|<strong>--verbose</strong> &#8230;] [<strong>-V</strong>|<strong>--version</strong>] [<strong>-y</strong>|<strong>--yes</strong>] [<strong>-?</strong>|<strong>--help</strong>]
-    <strong>new</strong> [<em>EMAIL</em>] | <strong>update</strong> [<em>EMAIL</em>] | <strong>deactivate</strong> | <strong>newkey</strong> |
-    <strong>issue</strong> <em>IDENTIFIER</em> [<em>ALTNAME</em> &#8230;]] | <strong>issue</strong> <em>CSRFILE</em> |
+    [<strong>-h</strong>|<strong>--hook</strong> <em>PROGRAM</em>] [<strong>-l</strong>|<strong>--alternate</strong> <em>N</em>] [<strong>-m</strong>|<strong>--must-staple</strong>]
+    [<strong>-n</strong>|<strong>--never-create</strong>] [<strong>-o</strong>|<strong>--no-ocsp</strong>] [<strong>-s</strong>|<strong>--staging</strong>]
+    [<strong>-t</strong>|<strong>--type</strong> <strong>RSA</strong>|<strong>EC</strong>] [<strong>-v</strong>|<strong>--verbose</strong> &#8230;] [<strong>-V</strong>|<strong>--version</strong>]
+    [<strong>-y</strong>|<strong>--yes</strong>] <strong>new</strong> [<em>EMAIL</em>] | <strong>update</strong> [<em>EMAIL</em>] | <strong>deactivate</strong> |
+    <strong>newkey</strong> | <strong>issue</strong> <em>IDENTIFIER</em> [<em>ALTNAME</em> &#8230;]] | <strong>issue</strong> <em>CSRFILE</em> |
     <strong>revoke</strong> <em>CERTFILE</em> [<em>CERTKEYFILE</em>]</p></div>
 </div>
 </div>
@@ -774,7 +774,15 @@ information see <a href="https://tools.ietf.org/html/rfc8555">https://tools.ietf
 <div class="sectionbody">
 <div class="dlist"><dl>
 <dt class="hdlist1">
-<strong>-a, --acme-url</strong>=<em>URL</em>
+<strong>-?, --help</strong>
+</dt>
+<dd>
+<p>
+    Print a brief usage text on stderr and exit.
+</p>
+</dd>
+<dt class="hdlist1">
+<strong>-a, --acme-url</strong> <em>URL</em>
 </dt>
 <dd>
 <p>
@@ -801,7 +809,7 @@ production URL
 </dl></div>
 </dd>
 <dt class="hdlist1">
-<strong>-b, --bits</strong>=<em>BITS</em>
+<strong>-b, --bits</strong> <em>BITS</em>
 </dt>
 <dd>
 <p>
@@ -812,7 +820,7 @@ production URL
 </p>
 </dd>
 <dt class="hdlist1">
-<strong>-c, --confdir</strong>=<em>CONFDIR</em>
+<strong>-c, --confdir</strong> <em>CONFDIR</em>
 </dt>
 <dd>
 <p>
@@ -848,7 +856,7 @@ certificate for <em>IDENTIFIER</em>
 </dl></div>
 </dd>
 <dt class="hdlist1">
-<strong>-d, --days</strong>=<em>DAYS</em>
+<strong>-d, --days</strong> <em>DAYS</em>
 </dt>
 <dd>
 <p>
@@ -865,7 +873,7 @@ certificate for <em>IDENTIFIER</em>
 </p>
 </dd>
 <dt class="hdlist1">
-<strong>-h, --hook</strong>=<em>PROGRAM</em>
+<strong>-h, --hook</strong> <em>PROGRAM</em>
 </dt>
 <dd>
 <p>
@@ -951,6 +959,19 @@ The key authorization (for <strong>dns-01</strong> and <strong>tls-alpn-01</stro
 </dl></div>
 </dd>
 <dt class="hdlist1">
+<strong>-l, --alternate</strong> <em>N</em>
+</dt>
+<dd>
+<p>
+    According to <a href="https://tools.ietf.org/html/rfc8555#section-7.4.2">https://tools.ietf.org/html/rfc8555#section-7.4.2</a>
+    the server MAY provide one or more additional certificate download URLs,
+    each pointing to an alternative certificate chain starting with the same
+    end-entity certificate. Specifying this option makes <strong>uacme</strong> choose the
+    Nth alternate link. If the server does not provide it or the download
+    fails, <strong>uacme</strong> falls back to the main certificate URL.
+</p>
+</dd>
+<dt class="hdlist1">
 <strong>-m, --must-staple</strong>
 </dt>
 <dd>
@@ -1027,14 +1048,6 @@ The key authorization (for <strong>dns-01</strong> and <strong>tls-alpn-01</stro
 <dd>
 <p>
     Autoaccept ACME server terms (if any) upon new account creation.
-</p>
-</dd>
-<dt class="hdlist1">
-<strong>-?, --help</strong>
-</dt>
-<dd>
-<p>
-    Print a brief usage text on stderr and exit.
 </p>
 </dd>
 </dl></div>
@@ -1294,9 +1307,9 @@ along with this program.  If not, see <a href="http://www.gnu.org/licenses/">htt
 <div id="footnotes"><hr></div>
 <div id="footer">
 <div id="footer-text">
-Version 1.4.1-dev<br>
+Version 1.5<br>
 Last updated
- 2020-05-30 21:05:25 CEST
+ 2020-07-26 15:54:53 CEST
 </div>
 </div>
 </body>
