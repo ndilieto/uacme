@@ -873,13 +873,14 @@ out:
     return success;
 }
 
-bool cert_issue(acme_t *a, char * const *names, const char *csr)
+bool cert_issue(acme_t *a, char * const *names, const char *csr, int alt)
 {
     bool success = false;
     char *orderurl = NULL;
     char *certfile = NULL;
     char *bakfile = NULL;
     char *tmpfile = NULL;
+    char *cert = NULL;
     time_t t = time(NULL);
     int fd = -1;
     char *ids = identifiers(names);
@@ -999,6 +1000,46 @@ bool cert_issue(acme_t *a, char * const *names, const char *csr)
     } else if (acme_error(a)) {
         goto out;
     }
+    cert = a->body;
+    a->body = NULL;
+
+    if (alt) {
+        const char *regex = "^Link:[ \t]*<(.*)>[ \t]*.*;[ \t]*"
+            "rel[ \t]*=[ \t]*\"?alternate(\"|[ \t]*;).*\r\n";
+        regex_t reg;
+        if (regcomp(&reg, regex, REG_EXTENDED | REG_ICASE | REG_NEWLINE)) {
+            warnx("cert_issue: regcomp failed");
+            goto out;
+        } else {
+            char *h = a->headers;
+            regmatch_t m[2];
+            int i;
+            for (i = 0; i < alt && regexec(&reg, h, 2, m, 0) == 0; i++) {
+                if (i < alt - 1) {
+                    h += m[1].rm_eo;
+                    continue;
+                }
+                h[m[1].rm_eo] = '\0';
+                h += m[1].rm_so;
+            }
+            regfree(&reg);
+            if (i != alt) {
+                warnx("alternate certificate number %d not found", alt);
+                warnx("falling back to main certificate");
+            } else {
+                msg(1, "retrieving alternate certificate at %s", h);
+                if (acme_post(a, h, "") != 200) {
+                    warnx("failed to retrieve alternate certificate at %s", h);
+                    acme_error(a);
+                    warnx("falling back to main certificate");
+                } else {
+                    free(cert);
+                    cert = a->body;
+                    a->body = NULL;
+                }
+            }
+        }
+    }
 
     if (asprintf(&certfile, "%scert.pem", a->certprefix) < 0) {
         certfile = NULL;
@@ -1026,7 +1067,7 @@ bool cert_issue(acme_t *a, char * const *names, const char *csr)
         goto out;
     }
 
-    if (write(fd, a->body, strlen(a->body)) != (ssize_t)strlen(a->body)) {
+    if (write(fd, cert, strlen(cert)) != (ssize_t)strlen(cert)) {
         warn("failed to write to %s", tmpfile);
         goto out;
     }
@@ -1061,6 +1102,7 @@ out:
     free(certfile);
     free(ids);
     free(orderurl);
+    free(cert);
     return success;
 }
 
@@ -1163,10 +1205,10 @@ bool validate_identifier_str(const char *s)
 void usage(const char *progname)
 {
     fprintf(stderr,
-        "usage: %s [-a|--acme-url URL] [-b|--bits BITS] [-c|--confdir DIR]\n"
-        "\t[-d|--days DAYS] [-f|--force] [-h|--hook PROGRAM] [-m|--must-staple]\n"
-        "\t[-n|--never-create] [-o|--no-ocsp] [-s|--staging] [-t|--type RSA | EC]\n"
-        "\t[-v|--verbose ...] [-V|--version] [-y|--yes] [-?|--help]\n"
+        "usage: %s [-?|--help] [-a|--acme-url URL] [-b|--bits BITS] [-c|--confdir DIR]\n"
+        "\t[-d|--days DAYS] [-f|--force] [-h|--hook PROGRAM] [-l|--alternate N]\n"
+        "\t[-m|--must-staple] [-n|--never-create] [-o|--no-ocsp] [-s|--staging]\n"
+        "\t[-t|--type RSA | EC] [-v|--verbose ...] [-V|--version] [-y|--yes]\n"
         "\tnew [EMAIL] | update [EMAIL] | deactivate | newkey |\n"
         "\tissue IDENTIFIER [ALTNAME ...]] | issue CSRFILE |\n"
         "\trevoke CERTFILE [CERTKEYFILE]\n", progname);
@@ -1183,6 +1225,7 @@ int main(int argc, char **argv)
         {"force",        no_argument,       NULL, 'f'},
         {"help",         no_argument,       NULL, '?'},
         {"hook",         required_argument, NULL, 'h'},
+        {"alternate",    required_argument, NULL, 'l'},
         {"must-staple",  no_argument,       NULL, 'm'},
         {"never-create", no_argument,       NULL, 'n'},
         {"no-ocsp",      no_argument,       NULL, 'o'},
@@ -1203,6 +1246,7 @@ int main(int argc, char **argv)
     bool custom_directory = false;
     bool status_req = false;
     bool status_check = true;
+    int alt = 0;
     int days = 30;
     int bits = 0;
     keytype_t type = PK_RSA;
@@ -1245,7 +1289,7 @@ int main(int argc, char **argv)
     while (1) {
         char *endptr;
         int option_index;
-        int c = getopt_long(argc, argv, "a:b:c:d:f?h:mnost:vVy",
+        int c = getopt_long(argc, argv, "a:b:c:d:f?h:l:mnost:vVy",
                 options, &option_index);
         if (c == -1) break;
         switch (c) {
@@ -1284,6 +1328,14 @@ int main(int argc, char **argv)
 
             case 'h':
                 a.hook = optarg;
+                break;
+
+            case 'l':
+                alt = strtol(optarg, &endptr, 10);
+                if (*endptr != 0 || alt < 0) {
+                    warnx("-l requires a positive argument");
+                    goto out;
+                }
                 break;
 
             case 'm':
@@ -1594,7 +1646,7 @@ int main(int argc, char **argv)
         }
 
         if (acme_bootstrap(&a) && account_retrieve(&a)
-                && cert_issue(&a, names, csr))
+                && cert_issue(&a, names, csr, alt))
             ret = 0;
     } else if (strcmp(action, "revoke") == 0) {
         if (acme_bootstrap(&a) && (!a.keyprefix || account_retrieve(&a)) &&
