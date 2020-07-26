@@ -63,6 +63,10 @@
 /* if mmap("/dev/zero", MAP_SHARED) works */
 #undef HAVE_MAP_DEVZERO
 
+/* Define to 1 if you have the `mbedtls_x509_crt_parse_der_with_ext_cb'
+   function. */
+#undef HAVE_MBEDTLS_X509_CRT_PARSE_DER_WITH_EXT_CB
+
 /* Define to 1 if you have the <memory.h> header file. */
 #undef HAVE_MEMORY_H
 

@@ -301,6 +301,7 @@ if test "x$OPT_MBEDTLS" != "xno"; then
                  [AC_MSG_ERROR([mbedtls check failed])])
     if test "x$USE_MBEDTLS" = "xyes"; then
         AC_MSG_NOTICE([detected mbedTLS])
+        AC_CHECK_FUNCS([mbedtls_x509_crt_parse_der_with_ext_cb])
     fi
 fi
 
