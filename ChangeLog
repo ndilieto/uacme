@@ -1,3 +1,10 @@
+2020-07-26 Nicola Di Lieto <nicola.dilieto@gmail.com>
+	* Release 1.5
+	- uacme: add -l option to allow selecting alternate chain
+	- ualpn: move signal calls to beginning
+	- ualpn: add mbedtls_x509_crt_parse_der_with_ext_cb support
+		 fixes https://github.com/ndilieto/uacme/issues/23
+
 2020-05-30 Nicola Di Lieto <nicola.dilieto@gmail.com>
 	* Release 1.4.1
 	- fix SIGPIPE of parent process in daemon mode

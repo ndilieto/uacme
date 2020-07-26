@@ -13,13 +13,13 @@ uacme - ACMEv2 client written in plain C code with minimal dependencies
 
 SYNOPSIS
 --------
-*uacme* [*-a*|*--acme-url* 'URL'] [*-b*|*--bits* 'BITS']
+*uacme* [*-?*|*--help*] [*-a*|*--acme-url* 'URL'] [*-b*|*--bits* 'BITS']
     [*-c*|*--confdir* 'DIR'] [*-d*|*--days* 'DAYS'] [*-f*|*--force*]
-    [*-h*|*--hook* 'PROGRAM'] [*-m*|*--must-staple*] [*-n*|*--never-create*]
-    [*-o*|*--no-ocsp*] [*-s*|*--staging*] [*-t*|*--type* *RSA*|*EC*]
-    [*-v*|*--verbose* ...] [*-V*|*--version*] [*-y*|*--yes*] [*-?*|*--help*]
-    *new* ['EMAIL'] | *update* ['EMAIL'] | *deactivate* | *newkey* |
-    *issue* 'IDENTIFIER' ['ALTNAME' ...]] | *issue* 'CSRFILE' |
+    [*-h*|*--hook* 'PROGRAM'] [*-l*|*--alternate* 'N'] [*-m*|*--must-staple*]
+    [*-n*|*--never-create*] [*-o*|*--no-ocsp*] [*-s*|*--staging*]
+    [*-t*|*--type* *RSA*|*EC*] [*-v*|*--verbose* ...] [*-V*|*--version*]
+    [*-y*|*--yes*] *new* ['EMAIL'] | *update* ['EMAIL'] | *deactivate* | 
+    *newkey* | *issue* 'IDENTIFIER' ['ALTNAME' ...]] | *issue* 'CSRFILE' |
     *revoke* 'CERTFILE' ['CERTKEYFILE']
 
 
@@ -37,20 +37,23 @@ information see <https://tools.ietf.org/html/rfc8555>
 
 OPTIONS
 -------
-*-a, --acme-url*='URL'::
+*-?, --help*::
+    Print a brief usage text on stderr and exit.
+
+*-a, --acme-url* 'URL'::
     ACMEv2 server directory object 'URL'. If not specified *uacme* 
     uses one of the following:
     'https://acme-v02.api.letsencrypt.org/directory'::: production URL
     'https://acme-staging-v02.api.letsencrypt.org/directory'::: 
     staging URL (see *-s, --staging* below)
 
-*-b, --bits*='BITS'::
+*-b, --bits* 'BITS'::
     key bit length (default 2048 for RSA, 256 for EC). Only applies
     to newly generated keys. RSA key length must be a multiple of 8
     between 2048 and 8192. EC key length must be either 256
     (*NID_X9_62_prime256v1* curve) or 384 (*NID_secp384r1* curve).
 
-*-c, --confdir*='CONFDIR'::
+*-c, --confdir* 'CONFDIR'::
     Use configuration directory 'CONFDIR' (default '{sysconfdir}/ssl/uacme').
     The structure is as follows (multiple 'IDENTIFIERs' allowed)
         'CONFDIR/private/key.pem'::: ACME account private key
@@ -58,14 +61,14 @@ OPTIONS
         'IDENTIFIER'
         'CONFDIR/IDENTIFIER/cert.pem'::: certificate for 'IDENTIFIER'
 
-*-d, --days*='DAYS'::
+*-d, --days* 'DAYS'::
     Do not reissue certificates that are still valid for longer
     than 'DAYS' (default 30). See also *-o, --no-ocsp*.
 
 *-f, --force*::
     Force certificate reissuance regardless of expiration date.
 
-*-h, --hook*='PROGRAM'::
+*-h, --hook* 'PROGRAM'::
     Challenge hook program. If not specified *uacme* interacts with
     the user for every ACME challenge, printing information about the
     challenge type, token and authorization on stderr.  If specified
@@ -85,6 +88,14 @@ OPTIONS
         'TOKEN'::: The challenge token
         'AUTH'::: The key authorization (for *dns-01* and *tls-alpn-01*
            already converted to the base64-encoded SHA256 digest format)
+
+*-l, --alternate* 'N'::
+    According to <https://tools.ietf.org/html/rfc8555#section-7.4.2>
+    the server MAY provide one or more additional certificate download URLs,
+    each pointing to an alternative certificate chain starting with the same
+    end-entity certificate. Specifying this option makes *uacme* choose the
+    Nth alternate link. If the server does not provide it or the download
+    fails, *uacme* falls back to the main certificate URL.
 
 *-m, --must-staple*::
     Request certificates with the RFC7633 Certificate Status Request
@@ -124,9 +135,6 @@ OPTIONS
 
 *-y, --yes*::
     Autoaccept ACME server terms (if any) upon new account creation.
-
-*-?, --help*::
-    Print a brief usage text on stderr and exit.
 
 
 USAGE
