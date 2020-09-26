@@ -81,6 +81,8 @@ char *strcasestr(const char *haystack, const char *needle)
         for (p = _needle; *p; p++)
             *p = tolower(*p);
         ret = strstr(_haystack, _needle);
+        if (ret)
+            ret = (char *)haystack + (ret - _haystack);
     }
     free(_haystack);
     free(_needle);
