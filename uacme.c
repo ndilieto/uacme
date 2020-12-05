@@ -58,6 +58,8 @@ typedef struct acme {
     char *headers;
     char *body;
     char *type;
+    const char *eab_keyid;
+    const char *eab_key;
     const char *directory;
     const char *hook;
     const char *email;
@@ -422,6 +424,40 @@ bool acme_bootstrap(acme_t *a)
     return true;
 }
 
+char *eab_encode(acme_t *a, const char *url)
+{
+    char *protected = NULL;
+    char *payload = NULL;
+    char *jws = NULL;
+
+    protected = jws_protected_eab(256, a->eab_keyid, url);
+    if (!protected) {
+        warnx("eab_encode: jws_protected_eab failed");
+        goto out;
+    }
+
+    payload = jws_jwk(a->key, NULL, NULL);
+    if (!payload) {
+        warnx("eab_encode: jws_jwk failed");
+        goto out;
+    }
+
+    jws = jws_encode_hmac(protected, payload, 256, a->eab_key);
+    if (!jws) {
+        warnx("eab_encode: jws_encode_hmac failed");
+        goto out;
+    }
+
+    if (g_loglevel > 2)
+        warnx("eab_encode: payload=%s protected=%s jws=%s",
+                payload, protected, jws);
+
+out:
+    free(protected);
+    free(payload);
+    return jws;
+}
+
 bool account_new(acme_t *a, bool yes)
 {
     const char *url = json_find_string(a->dir, "newAccount");
@@ -447,6 +483,13 @@ bool account_new(acme_t *a, bool yes)
                     json_compare_string(a->json, "type",
                       "urn:ietf:params:acme:error:accountDoesNotExist") == 0) {
                 const json_value_t *meta = json_find(a->dir, "meta");
+                const char *ext = json_find_value(meta,
+                        "externalAccountRequired");
+                if (ext && strcasecmp(ext, "true") == 0 && !a->eab_key) {
+                    msg(0, "This ACME server requires external credentials. "
+                           "Please supply them with -e KEYID:KEY");
+                    return false;
+                }
                 const char *terms = json_find_string(meta, "termsOfService");
                 if (terms) {
                     if (yes)
@@ -460,12 +503,45 @@ bool account_new(acme_t *a, bool yes)
                         }
                     }
                 }
-                int r = 0;
-                if (a->email && strlen(a->email))
-                    r = acme_post(a, url, "{\"termsOfServiceAgreed\":true"
-                                ",\"contact\": [\"mailto:%s\"]}", a->email);
-                else
-                    r = acme_post(a, url, "{\"termsOfServiceAgreed\":true}");
+                char *payload = strdup("\"termsOfServiceAgreed\":true");
+                if (!payload) {
+                    warn("account_new: strdup failed");
+                    return false;
+                }
+                if (a->email && strlen(a->email)) {
+                    char *tmp = NULL;
+                    if (asprintf(&tmp, "%s,\"contact\": [\"mailto:%s\"]",
+                                payload, a->email) < 0) {
+                        warnx("account_new: asprintf failed");
+                        free(tmp);
+                        free(payload);
+                        return false;
+                    }
+                    free(payload);
+                    payload = tmp;
+                }
+                if (a->eab_key) {
+                    char *tmp = NULL;
+                    char *eab = eab_encode(a, url);
+                    if (!eab) {
+                        warnx("account_new: eab_encode failed");
+                        free(payload);
+                        return false;
+                    }
+                    if (asprintf(&tmp, "%s,\"externalAccountBinding\": %s",
+                                payload, eab) < 0) {
+                        warnx("account_new: asprintf failed");
+                        free(tmp);
+                        free(eab);
+                        free(payload);
+                        return false;
+                    }
+                    free(eab);
+                    free(payload);
+                    payload = tmp;
+                }
+                int r = acme_post(a, url, "{%s}", payload);
+                free(payload);
                 if (r == 201) {
                     if (acme_error(a))
                         return false;
@@ -1204,13 +1280,42 @@ bool validate_identifier_str(const char *s)
     return true;
 }
 
+bool eab_parse(acme_t *a, char *eab)
+{
+    regmatch_t m[3];
+    regex_t reg;
+    if (regcomp(&reg, "^([^:]+):([-_A-Za-z0-9]+)$",
+                REG_EXTENDED | REG_NEWLINE)) {
+        warnx("eab_parse: regcomp failed");
+        return false;
+    }
+
+    int r = regexec(&reg, eab, sizeof(m)/sizeof(m[0]), m, 0);
+    regfree(&reg);
+
+    if (r) {
+        warnx("-e credentials must be specified as 'KEYID:KEY', "
+                "with KEY bas64url encoded");
+        return false;
+    }
+
+    eab[m[1].rm_eo] = 0;
+    a->eab_keyid = eab + m[1].rm_so;
+
+    eab[m[2].rm_eo] = 0;
+    a->eab_key = eab + m[2].rm_so;
+
+    return true;
+}
+
 void usage(const char *progname)
 {
     fprintf(stderr,
-        "usage: %s [-?|--help] [-a|--acme-url URL] [-b|--bits BITS] [-c|--confdir DIR]\n"
-        "\t[-d|--days DAYS] [-f|--force] [-h|--hook PROGRAM] [-l|--alternate N]\n"
-        "\t[-m|--must-staple] [-n|--never-create] [-o|--no-ocsp] [-s|--staging]\n"
-        "\t[-t|--type RSA | EC] [-v|--verbose ...] [-V|--version] [-y|--yes]\n"
+        "usage: %s [-a|--acme-url URL] [-b|--bits BITS] [-c|--confdir DIR]\n"
+        "\t[-d|--days DAYS] [-e|--eab KEYID:KEY] [-f|--force] [-h|--hook PROG]\n"
+        "\t[-l|--alternate N] [-m|--must-staple] [-n|--never-create]\n"
+        "\t[-o|--no-ocsp] [-s|--staging] [-t|--type RSA | EC]\n"
+        "\t[-v|--verbose ...] [-V|--version] [-y|--yes] [-?|--help]\n"
         "\tnew [EMAIL] | update [EMAIL] | deactivate | newkey |\n"
         "\tissue IDENTIFIER [ALTNAME ...]] | issue CSRFILE |\n"
         "\trevoke CERTFILE [CERTKEYFILE]\n", progname);
@@ -1224,6 +1329,7 @@ int main(int argc, char **argv)
         {"bits",         required_argument, NULL, 'b'},
         {"confdir",      required_argument, NULL, 'c'},
         {"days",         required_argument, NULL, 'd'},
+        {"eab",          required_argument, NULL, 'e'},
         {"force",        no_argument,       NULL, 'f'},
         {"help",         no_argument,       NULL, '?'},
         {"hook",         required_argument, NULL, 'h'},
@@ -1291,7 +1397,7 @@ int main(int argc, char **argv)
     while (1) {
         char *endptr;
         int option_index;
-        int c = getopt_long(argc, argv, "a:b:c:d:f?h:l:mnost:vVy",
+        int c = getopt_long(argc, argv, "a:b:c:d:e:f?h:l:mnost:vVy",
                 options, &option_index);
         if (c == -1) break;
         switch (c) {
@@ -1322,6 +1428,11 @@ int main(int argc, char **argv)
                     warnx("DAYS must be a positive integer");
                     goto out;
                 }
+                break;
+
+            case 'e':
+                if (!eab_parse(&a, optarg))
+                    goto out;
                 break;
 
             case 'f':

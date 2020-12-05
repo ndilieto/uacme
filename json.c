@@ -189,6 +189,18 @@ const json_value_t *json_find(const json_value_t *haystack,
     return NULL;
 }
 
+const char *json_find_value(const json_value_t *haystack,
+        const char *needle)
+{
+    if (!haystack || haystack->type != JSON_OBJECT)
+        return NULL;
+    for (size_t i=0; i<haystack->v.object.size; i++)
+        if (haystack->v.object.values[i].type == JSON_PRIMITIVE &&
+                strcmp(haystack->v.object.names[i].v.value, needle) == 0)
+            return haystack->v.object.values[i].v.value;
+    return NULL;
+}
+
 const char *json_find_string(const json_value_t *haystack,
         const char *needle)
 {
