@@ -211,7 +211,7 @@ static int mbedtls_hash_fast(mbedtls_md_type_t md_type,
 {
     const mbedtls_md_info_t *mdi = mbedtls_md_info_from_type(md_type);
     if (!mdi) {
-        warnx("mbedtls_hash_get_len: md_info not found");
+        warnx("mbedtls_hash_fast: md_info not found");
         return MBEDTLS_ERR_MD_FEATURE_UNAVAILABLE;
     }
     return mbedtls_md(mdi, input, len, output);
@@ -235,7 +235,7 @@ char *sha2_base64url(size_t bits, const char *format, ...)
 
     hash = calloc(1, hash_len);
     if (!hash) {
-        warnx("sha2_base64url: calloc failed");
+        warn("sha2_base64url: calloc failed");
         goto out;
     }
 

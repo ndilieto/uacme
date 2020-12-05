@@ -915,7 +915,7 @@ bool cert_issue(acme_t *a, char * const *names, const char *csr, int alt)
         warnx("order location not found");
         goto out;
     }
-    msg(1, "order URL: %s", orderurl);
+    msg(1, "order location: %s", orderurl);
     a->order = a->json;
     a->json = NULL;
 
