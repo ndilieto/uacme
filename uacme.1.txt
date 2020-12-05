@@ -197,7 +197,7 @@ USAGE
     automatically removed from the configuration subdirectory name:
     for example a certificate for '*.test.com' is saved to
     'CONFDIR/test.com/cert.pem'.
-    IP address 'IDENTIFIERs' and 'ALTNAMEs'are also supported according to
+    IP address 'IDENTIFIERs' and 'ALTNAMEs' are also supported according to
     <https://tools.ietf.org/html/rfc8738#section-3>
 
 *uacme* ['OPTIONS' ...] *issue* 'CSRFILE'::
