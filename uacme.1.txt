@@ -8,26 +8,27 @@ UACME(1)
 
 NAME
 ----
-uacme - ACMEv2 client written in plain C code with minimal dependencies
+uacme - ACMEv2 client written in plain C with minimal dependencies
 
 
 SYNOPSIS
 --------
-*uacme* [*-?*|*--help*] [*-a*|*--acme-url* 'URL'] [*-b*|*--bits* 'BITS']
-    [*-c*|*--confdir* 'DIR'] [*-d*|*--days* 'DAYS'] [*-f*|*--force*]
-    [*-h*|*--hook* 'PROGRAM'] [*-l*|*--alternate* 'N'] [*-m*|*--must-staple*]
-    [*-n*|*--never-create*] [*-o*|*--no-ocsp*] [*-s*|*--staging*]
-    [*-t*|*--type* *RSA*|*EC*] [*-v*|*--verbose* ...] [*-V*|*--version*]
-    [*-y*|*--yes*] *new* ['EMAIL'] | *update* ['EMAIL'] | *deactivate* | 
-    *newkey* | *issue* 'IDENTIFIER' ['ALTNAME' ...]] | *issue* 'CSRFILE' |
+*uacme* [*-a*|*--acme-url* 'URL'] [*-b*|*--bits* 'BITS']
+    [*-c*|*--confdir* 'DIR'] [*-d*|*--days* 'DAYS'] [*-e*|*--eab* KEYID:KEY]
+    [*-f*|*--force*] [*-h*|*--hook* 'PROGRAM'] [*-l*|*--alternate* 'N']
+    [*-m*|*--must-staple*] [*-n*|*--never-create*] [*-o*|*--no-ocsp*]
+    [*-s*|*--staging*] [*-t*|*--type* *RSA*|*EC*] [*-v*|*--verbose* ...]
+    [*-V*|*--version*] [*-y*|*--yes*] [*-?*|*--help*]
+    *new* ['EMAIL'] | *update* ['EMAIL'] | *deactivate* | *newkey* |
+    *issue* 'IDENTIFIER' ['ALTNAME' ...]] | *issue* 'CSRFILE' |
     *revoke* 'CERTFILE' ['CERTKEYFILE']
 
 
 DESCRIPTION
 -----------
 *uacme* is a client for the ACMEv2 protocol described in RFC8555,
-written in plain C code with minimal dependencies (libcurl and 
-one of GnuTLS, OpenSSL or mbedTLS). The ACMEv2 protocol allows a
+written in plain C with minimal dependencies (libcurl and one of
+GnuTLS, OpenSSL or mbedTLS). The ACMEv2 protocol allows a
 Certificate Authority (<https://letsencrypt.org> is a popular one)
 and an applicant to automate the process of verification and certificate
 issuance. The protocol also provides facilities for other certificate
@@ -37,9 +38,6 @@ information see <https://tools.ietf.org/html/rfc8555>
 
 OPTIONS
 -------
-*-?, --help*::
-    Print a brief usage text on stderr and exit.
-
 *-a, --acme-url* 'URL'::
     ACMEv2 server directory object 'URL'. If not specified *uacme* 
     uses one of the following:
@@ -65,6 +63,13 @@ OPTIONS
     Do not reissue certificates that are still valid for longer
     than 'DAYS' (default 30). See also *-o, --no-ocsp*.
 
+*-e, --eab* 'KEYID:KEY'::
+    Specify RFC8555 External Account Binding credentials according
+    to <https://tools.ietf.org/html/rfc8555#section-7.3.4>, in order
+    to associate a new ACME account with an existing account in a
+    non-ACME system such as a CA customer database.
+    'KEYID' must be an ASCII string. 'KEY' must be base64url-encoded.
+
 *-f, --force*::
     Force certificate reissuance regardless of expiration date.
 
@@ -87,7 +92,7 @@ OPTIONS
         'IDENT'::: The identifier the challenge refers to
         'TOKEN'::: The challenge token
         'AUTH'::: The key authorization (for *dns-01* and *tls-alpn-01*
-           already converted to the base64-encoded SHA256 digest format)
+           already converted to the base64url-encoded SHA256 digest format)
 
 *-l, --alternate* 'N'::
     According to <https://tools.ietf.org/html/rfc8555#section-7.4.2>
@@ -120,7 +125,7 @@ OPTIONS
     Use Let's Encrypt staging URL for testing. This only works if
     *-a, --acme-url* is *NOT* specified.
 
-*-t, --type*=*RSA* | *EC*::
+*-t, --type*='RSA' | 'EC'::
     Key type, either RSA or EC. Only applies to newly generated keys.
     The bit length can be specified with *-b, --bits*.
 
@@ -135,6 +140,9 @@ OPTIONS
 
 *-y, --yes*::
     Autoaccept ACME server terms (if any) upon new account creation.
+
+*-?, --help*::
+    Print a brief usage text on stderr and exit.
 
 
 USAGE
@@ -184,12 +192,12 @@ USAGE
     overwriting.  The private key for the certificate is loaded from
     'CONFDIR/private/IDENTIFIER/key.pem'. If no such file exists,
     a new key is generated unless *-n, --never-create* is specified.
-    Wildcard IDENTIFIERs or ALTNAMEs are dealt with correctly, as long as
-    the ACME server supports them; note that any such wildcards are 
+    Wildcard 'IDENTIFIERs' or 'ALTNAMEs' are dealt with correctly, as long
+    as the ACME server supports them; note that any such wildcards are
     automatically removed from the configuration subdirectory name:
     for example a certificate for '*.test.com' is saved to
     'CONFDIR/test.com/cert.pem'.
-    IP address IDENTIFIERs and ALTNAMEs are also supported according to
+    IP address 'IDENTIFIERs' and 'ALTNAMEs'are also supported according to
     <https://tools.ietf.org/html/rfc8738#section-3>
 
 *uacme* ['OPTIONS' ...] *issue* 'CSRFILE'::

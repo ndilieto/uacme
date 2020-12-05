@@ -2,12 +2,12 @@
 .\"     Title: uacme
 .\"    Author: [see the "AUTHOR" section]
 .\" Generator: DocBook XSL Stylesheets v1.79.1 <http://docbook.sf.net/>
-.\"      Date: 07/26/2020
+.\"      Date: 12/05/2020
 .\"    Manual: User Commands
-.\"    Source: uacme 1.5
+.\"    Source: uacme 1.5-dev
 .\"  Language: English
 .\"
-.TH "UACME" "1" "07/26/2020" "uacme 1\&.5" "User Commands"
+.TH "UACME" "1" "12/05/2020" "uacme 1\&.5\-dev" "User Commands"
 .\" -----------------------------------------------------------------
 .\" * Define some portability stuff
 .\" -----------------------------------------------------------------
@@ -28,19 +28,14 @@
 .\" * MAIN CONTENT STARTS HERE *
 .\" -----------------------------------------------------------------
 .SH "NAME"
-uacme \- ACMEv2 client written in plain C code with minimal dependencies
+uacme \- ACMEv2 client written in plain C with minimal dependencies
 .SH "SYNOPSIS"
 .sp
-\fBuacme\fR [\fB\-?\fR|\fB\-\-help\fR] [\fB\-a\fR|\fB\-\-acme\-url\fR \fIURL\fR] [\fB\-b\fR|\fB\-\-bits\fR \fIBITS\fR] [\fB\-c\fR|\fB\-\-confdir\fR \fIDIR\fR] [\fB\-d\fR|\fB\-\-days\fR \fIDAYS\fR] [\fB\-f\fR|\fB\-\-force\fR] [\fB\-h\fR|\fB\-\-hook\fR \fIPROGRAM\fR] [\fB\-l\fR|\fB\-\-alternate\fR \fIN\fR] [\fB\-m\fR|\fB\-\-must\-staple\fR] [\fB\-n\fR|\fB\-\-never\-create\fR] [\fB\-o\fR|\fB\-\-no\-ocsp\fR] [\fB\-s\fR|\fB\-\-staging\fR] [\fB\-t\fR|\fB\-\-type\fR \fBRSA\fR|\fBEC\fR] [\fB\-v\fR|\fB\-\-verbose\fR \&...] [\fB\-V\fR|\fB\-\-version\fR] [\fB\-y\fR|\fB\-\-yes\fR] \fBnew\fR [\fIEMAIL\fR] | \fBupdate\fR [\fIEMAIL\fR] | \fBdeactivate\fR | \fBnewkey\fR | \fBissue\fR \fIIDENTIFIER\fR [\fIALTNAME\fR \&...]] | \fBissue\fR \fICSRFILE\fR | \fBrevoke\fR \fICERTFILE\fR [\fICERTKEYFILE\fR]
+\fBuacme\fR [\fB\-a\fR|\fB\-\-acme\-url\fR \fIURL\fR] [\fB\-b\fR|\fB\-\-bits\fR \fIBITS\fR] [\fB\-c\fR|\fB\-\-confdir\fR \fIDIR\fR] [\fB\-d\fR|\fB\-\-days\fR \fIDAYS\fR] [\fB\-e\fR|\fB\-\-eab\fR KEYID:KEY] [\fB\-f\fR|\fB\-\-force\fR] [\fB\-h\fR|\fB\-\-hook\fR \fIPROGRAM\fR] [\fB\-l\fR|\fB\-\-alternate\fR \fIN\fR] [\fB\-m\fR|\fB\-\-must\-staple\fR] [\fB\-n\fR|\fB\-\-never\-create\fR] [\fB\-o\fR|\fB\-\-no\-ocsp\fR] [\fB\-s\fR|\fB\-\-staging\fR] [\fB\-t\fR|\fB\-\-type\fR \fBRSA\fR|\fBEC\fR] [\fB\-v\fR|\fB\-\-verbose\fR \&...] [\fB\-V\fR|\fB\-\-version\fR] [\fB\-y\fR|\fB\-\-yes\fR] [\fB\-?\fR|\fB\-\-help\fR] \fBnew\fR [\fIEMAIL\fR] | \fBupdate\fR [\fIEMAIL\fR] | \fBdeactivate\fR | \fBnewkey\fR | \fBissue\fR \fIIDENTIFIER\fR [\fIALTNAME\fR \&...]] | \fBissue\fR \fICSRFILE\fR | \fBrevoke\fR \fICERTFILE\fR [\fICERTKEYFILE\fR]
 .SH "DESCRIPTION"
 .sp
-\fBuacme\fR is a client for the ACMEv2 protocol described in RFC8555, written in plain C code with minimal dependencies (libcurl and one of GnuTLS, OpenSSL or mbedTLS)\&. The ACMEv2 protocol allows a Certificate Authority (https://letsencrypt\&.org is a popular one) and an applicant to automate the process of verification and certificate issuance\&. The protocol also provides facilities for other certificate management functions, such as certificate revocation\&. For more information see https://tools\&.ietf\&.org/html/rfc8555
+\fBuacme\fR is a client for the ACMEv2 protocol described in RFC8555, written in plain C with minimal dependencies (libcurl and one of GnuTLS, OpenSSL or mbedTLS)\&. The ACMEv2 protocol allows a Certificate Authority (https://letsencrypt\&.org is a popular one) and an applicant to automate the process of verification and certificate issuance\&. The protocol also provides facilities for other certificate management functions, such as certificate revocation\&. For more information see https://tools\&.ietf\&.org/html/rfc8555
 .SH "OPTIONS"
-.PP
-\fB\-?, \-\-help\fR
-.RS 4
-Print a brief usage text on stderr and exit\&.
-.RE
 .PP
 \fB\-a, \-\-acme\-url\fR \fIURL\fR
 .RS 4
@@ -102,6 +97,16 @@ Do not reissue certificates that are still valid for longer than
 \fIDAYS\fR
 (default 30)\&. See also
 \fB\-o, \-\-no\-ocsp\fR\&.
+.RE
+.PP
+\fB\-e, \-\-eab\fR \fIKEYID:KEY\fR
+.RS 4
+Specify RFC8555 External Account Binding credentials according to
+https://tools\&.ietf\&.org/html/rfc8555#section\-7\&.3\&.4, in order to associate a new ACME account with an existing account in a non\-ACME system such as a CA customer database\&.
+\fIKEYID\fR
+must be an ASCII string\&.
+\fIKEY\fR
+must be base64url\-encoded\&.
 .RE
 .PP
 \fB\-f, \-\-force\fR
@@ -173,7 +178,7 @@ The key authorization (for
 \fBdns\-01\fR
 and
 \fBtls\-alpn\-01\fR
-already converted to the base64\-encoded SHA256 digest format)
+already converted to the base64url\-encoded SHA256 digest format)
 .RE
 .RE
 .PP
@@ -224,7 +229,7 @@ is
 specified\&.
 .RE
 .PP
-\fB\-t, \-\-type\fR=\fBRSA\fR | \fBEC\fR
+\fB\-t, \-\-type\fR=\fIRSA\fR | \fIEC\fR
 .RS 4
 Key type, either RSA or EC\&. Only applies to newly generated keys\&. The bit length can be specified with
 \fB\-b, \-\-bits\fR\&.
@@ -247,6 +252,11 @@ Print program version on stderr and exit\&.
 \fB\-y, \-\-yes\fR
 .RS 4
 Autoaccept ACME server terms (if any) upon new account creation\&.
+.RE
+.PP
+\fB\-?, \-\-help\fR
+.RS 4
+Print a brief usage text on stderr and exit\&.
 .RE
 .SH "USAGE"
 .PP
@@ -318,10 +328,16 @@ specified and the certificate is reported as revoked by the OCSP server\&. The n
 before overwriting\&. The private key for the certificate is loaded from
 \fICONFDIR/private/IDENTIFIER/key\&.pem\fR\&. If no such file exists, a new key is generated unless
 \fB\-n, \-\-never\-create\fR
-is specified\&. Wildcard IDENTIFIERs or ALTNAMEs are dealt with correctly, as long as the ACME server supports them; note that any such wildcards are automatically removed from the configuration subdirectory name: for example a certificate for
+is specified\&. Wildcard
+\fIIDENTIFIERs\fR
+or
+\fIALTNAMEs\fR
+are dealt with correctly, as long as the ACME server supports them; note that any such wildcards are automatically removed from the configuration subdirectory name: for example a certificate for
 \fI*\&.test\&.com\fR
 is saved to
-\fICONFDIR/test\&.com/cert\&.pem\fR\&. IP address IDENTIFIERs and ALTNAMEs are also supported according to
+\fICONFDIR/test\&.com/cert\&.pem\fR\&. IP address
+\fIIDENTIFIERs\fR
+and \*(AqALTNAMEs\(cqare also supported according to
 https://tools\&.ietf\&.org/html/rfc8738#section\-3
 .RE
 .PP
