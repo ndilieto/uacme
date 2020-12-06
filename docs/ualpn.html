@@ -746,12 +746,14 @@ UALPN(1) Manual Page
 <div class="sect1">
 <h2 id="_synopsis">SYNOPSIS</h2>
 <div class="sectionbody">
-<div class="paragraph"><p><strong>ualpn</strong> [<strong>-?</strong>|<strong>--help</strong>]  [<strong>-V</strong>|<strong>--version</strong>] [<strong>-4</strong>|<strong>--ipv4</strong>] [<strong>-6</strong>|<strong>--ipv6</strong>]
-    [<strong>-b</strong>|<strong>--bind</strong> <em>address</em>[@<em>port</em>]] [<strong>-c</strong>|<strong>--connect</strong> <em>address</em>[@<em>port</em>]]
-    [<strong>-d</strong>|<strong>--daemon</strong>] [<strong>-l</strong>|<strong>--logfile</strong> <em>file</em>] [<strong>-m</strong>|<strong>--max-auths</strong> <em>N</em>]
-    [<strong>-n</strong>|<strong>--num-workers</strong> <em>N</em>] [<strong>-p</strong>|<strong>--pidfile</strong> <em>file</em>] [<strong>-P</strong>|<strong>--proxy</strong> <em>N</em>]
-    [<strong>-r</strong>|<strong>--chroot dir</strong>] [<strong>-s</strong>|<strong>--sock</strong> <em>path</em>] [<strong>-S</strong>|<strong>--sock-mode</strong> <em>mode</em>]
-    [<strong>-t</strong>|<strong>--terminate</strong>] [<strong>-u</strong>|<strong>--user</strong> <em>user</em><span class="monospaced">[:</span><em>group</em>]] [<strong>-v</strong>|<strong>--verbose</strong> &#8230;]</p></div>
+<div class="paragraph"><p><strong>ualpn</strong> [<strong>-4</strong>|<strong>--ipv4</strong>] [<strong>-6</strong>|<strong>--ipv6</strong>] [<strong>-b</strong>|<strong>--bind</strong> <em>address</em>[@<em>port</em>]]
+    [<strong>-c</strong>|<strong>--connect</strong> <em>address</em>[@<em>port</em>]] [<strong>-d</strong>|<strong>--daemon</strong>]
+    [<strong>-l</strong>|<strong>--logfile</strong> <em>file</em>] [<strong>-m</strong>|<strong>--max-auths</strong> <em>N</em>]
+    [<strong>-n</strong>|<strong>--num-workers</strong> <em>N</em>] [<strong>-p</strong>|<strong>--pidfile</strong> <em>file</em>]
+    [<strong>-P</strong>|<strong>--proxy</strong> <em>N</em>] [<strong>-r</strong>|<strong>--chroot</strong> <em>dir</em>]
+    [<strong>-s</strong>|<strong>--sock</strong> <em>path</em>] [<strong>-S</strong>|<strong>--sock-mode</strong> <em>mode</em>]
+    [<strong>-t</strong>|<strong>--terminate</strong>] [<strong>-u</strong>|<strong>--user</strong> <em>user</em><span class="monospaced">[:</span><em>group</em>]]
+    [<strong>-v</strong>|<strong>--verbose</strong> &#8230;] [<strong>-V</strong>|<strong>--version</strong>] [<strong>-?</strong>|<strong>--help</strong>]</p></div>
 </div>
 </div>
 <div class="sect1">
@@ -854,8 +856,8 @@ address space.</p></div>
 </dt>
 <dd>
 <p>
-    Log to <em>file</em>. By default <strong>ualpn</strong> logs to <strong>syslog</strong> if <strong>-d, --daemon</strong>
-    was specified or <strong>stderr</strong> otherwise. See also <strong>-v, --verbose</strong>
+    Log to <em>file</em>. By default <strong>ualpn</strong> logs to syslog if <strong>-d, --daemon</strong>
+    was specified or stderr otherwise. See also <strong>-v, --verbose</strong>
 </p>
 </dd>
 <dt class="hdlist1">
@@ -912,7 +914,7 @@ apache: <a href="https://httpd.apache.org/docs/2.4/mod/mod_remoteip.html#remotei
 </dt>
 <dd>
 <p>
-    Enable server mode and specify a directory to <em>chroot</em> to. If logging to
+    Enable server mode and specify a directory to chroot to. If logging to
     syslog it is necessary to ensure that a syslogd(8) socket is available
     at /dev/log in the chroot directory, otherwise <strong>ualpn</strong> will not produce
     any log output.
@@ -1005,8 +1007,8 @@ case sensitive, line oriented, with two commands:</p></div>
     <strong>uacme</strong> software executes hook scripts with the correct <em>authorization</em>
     passed as the 5th argument).
     Upon successful invocation of the <strong>auth</strong> command <strong>ualpn</strong> generates a self
-    signed certificate as required by the tls-alpn-01 challenge, and will
-    then use it to perform tls-alpn-01 handshakes for the given <em>identifier</em>.
+    signed certificate as required by the tls-alpn-01 challenge, and then
+    uses it to perform tls-alpn-01 handshakes for the given <em>identifier</em>.
 </p>
 </dd>
 <dt class="hdlist1">
@@ -1186,9 +1188,9 @@ along with this program.  If not, see <a href="http://www.gnu.org/licenses/">htt
 <div id="footnotes"><hr></div>
 <div id="footer">
 <div id="footer-text">
-Version 1.5<br>
+Version 1.6<br>
 Last updated
- 2020-05-30 21:05:20 CEST
+ 2020-12-06 09:33:09 CET
 </div>
 </div>
 </body>

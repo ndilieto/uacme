@@ -79,7 +79,7 @@ ns_ispresent()
         IFS='.'
         set -- $($DIG ${RNDC_KEY_DIG:+-k ${RNDC_KEY_DIG}} +short "@$NS" "$fqhn" TXT 2>/dev/null)
         IFS="${OLDIFS}"
-        [ "$*" = "$expect" ] || return 1
+        { [ "$*" = "$expect" ] || [ "$*" = "\"$expect\"" ] ; } || return 1
     done
 
     return 0

@@ -1,3 +1,11 @@
+2020-12-06 Nicola Di Lieto <nicola.dilieto@gmail.com>
+	* Release 1.6
+	- uacme: add support for RFC8555 External Account Binding
+	         closes https://github.com/ndilieto/uacme/issues/40
+	- uacme: fix use after free in surrogate strcasestr function
+	- uacme: make nsupdate.sh accept quoted TXT challenge values
+	- uacme: minor cosmetic changes to log messages
+
 2020-07-26 Nicola Di Lieto <nicola.dilieto@gmail.com>
 	* Release 1.5
 	- uacme: add -l option to allow selecting alternate chain

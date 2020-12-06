@@ -68,11 +68,14 @@ typedef enum
 bool crypto_init(void);
 void crypto_deinit(void);
 char *sha2_base64url(size_t, const char *, ...);
+char *hmac_base64url(size_t, const char *, const char *, ...);
 char *jws_jwk(privkey_t key, const char **, const char **);
 char *jws_protected_jwk(const char *, const char *, privkey_t);
 char *jws_protected_kid(const char *, const char *, const char *, privkey_t);
+char *jws_protected_eab(size_t, const char *, const char *);
 char *jws_thumbprint(privkey_t);
 char *jws_encode(const char *, const char *, privkey_t);
+char *jws_encode_hmac(const char *, const char *, size_t, const char *);
 keytype_t key_type(privkey_t);
 privkey_t key_load(keytype_t, int bits, const char *, ...);
 bool is_ip(const char *, unsigned char *, size_t *);
