@@ -58,6 +58,8 @@ void json_dump(FILE *f, const json_value_t *value);
 void json_free(json_value_t *value);
 const json_value_t *json_find(const json_value_t *haystack,
         const char *needle);
+const char *json_find_value(const json_value_t *haystack,
+        const char *needle);
 const char *json_find_string(const json_value_t *haystack,
         const char *needle);
 int json_compare_string(const json_value_t *haystack,

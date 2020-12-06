@@ -59,6 +59,7 @@
 #include <openssl/engine.h>
 #include <openssl/err.h>
 #include <openssl/evp.h>
+#include <openssl/hmac.h>
 #include <openssl/ocsp.h>
 #include <openssl/opensslv.h>
 #include <openssl/pem.h>
@@ -163,7 +164,34 @@ out:
     if (emc)
         EVP_MD_CTX_destroy(emc);
     return success;
+}
 
+static bool openssl_hmac_fast(const EVP_MD *type, const void *key,
+        size_t keylen, const void *input, size_t len, unsigned char *output)
+{
+    bool success = false;
+    HMAC_CTX *hmac = HMAC_CTX_new();
+    if (!hmac) {
+        openssl_error("openssl_hmac_fast");
+        goto out;
+    }
+    if (!HMAC_Init_ex(hmac, key, keylen, type, NULL)) {
+        openssl_error("openssl_hmac_fast");
+        goto out;
+    }
+    if (!HMAC_Update(hmac, input, len)) {
+        openssl_error("openssl_hmac_fast");
+        goto out;
+    }
+    if (!HMAC_Final(hmac, output, NULL)) {
+        openssl_error("openssl_hmac_fast");
+        goto out;
+    }
+    success = true;
+out:
+    if (hmac)
+        HMAC_CTX_free(hmac);
+    return success;
 }
 #elif defined(USE_MBEDTLS)
 #if MBEDTLS_VERSION_NUMBER < 0x02100000
@@ -211,10 +239,21 @@ static int mbedtls_hash_fast(mbedtls_md_type_t md_type,
 {
     const mbedtls_md_info_t *mdi = mbedtls_md_info_from_type(md_type);
     if (!mdi) {
-        warnx("mbedtls_hash_get_len: md_info not found");
+        warnx("mbedtls_hash_fast: md_info not found");
         return MBEDTLS_ERR_MD_FEATURE_UNAVAILABLE;
     }
     return mbedtls_md(mdi, input, len, output);
+}
+
+static int mbedtls_hmac_fast(mbedtls_md_type_t md_type, const void *key,
+        size_t keylen, const void *input, size_t len, unsigned char *output)
+{
+    const mbedtls_md_info_t *mdi = mbedtls_md_info_from_type(md_type);
+    if (!mdi) {
+        warnx("mbedtls_hmac_fast: md_info not found");
+        return MBEDTLS_ERR_MD_FEATURE_UNAVAILABLE;
+    }
+    return mbedtls_md_hmac(mdi, key, keylen, input, len, output);
 }
 #endif
 
@@ -235,7 +274,7 @@ char *sha2_base64url(size_t bits, const char *format, ...)
 
     hash = calloc(1, hash_len);
     if (!hash) {
-        warnx("sha2_base64url: calloc failed");
+        warn("sha2_base64url: calloc failed");
         goto out;
     }
 
@@ -310,6 +349,126 @@ out:
     va_end(ap);
     free(input);
     free(hash);
+    return encoded_hash;
+}
+
+char *hmac_base64url(size_t bits, const char *key, const char *format, ...)
+{
+    char *input = NULL;
+    size_t encoded_hash_len;
+    char *encoded_hash = NULL;
+    const unsigned int hash_len = (bits+7)/8;
+    unsigned char *hash = NULL;
+    size_t keylen = strlen(key);
+    void *keybin = NULL;
+    va_list ap;
+    va_start(ap, format);
+    if (vasprintf(&input, format, ap) < 0) {
+        warnx("hmac_base64url: vasprintf failed");
+        input = NULL;
+        goto out;
+    }
+
+    hash = calloc(1, hash_len);
+    if (!hash) {
+        warn("hmac_base64url: calloc failed");
+        goto out;
+    }
+
+    keybin = calloc(1, keylen);
+    if (!keybin) {
+        warn("hmac_base64url: calloc failed");
+        goto out;
+    }
+
+    if (base642bin(keybin, keylen, key, keylen, NULL, &keylen, NULL,
+                    base64_VARIANT_URLSAFE_NO_PADDING)) {
+        warnx("hmac_base64url: failed to decode key");
+        goto out;
+    }
+
+#if defined(USE_GNUTLS)
+    gnutls_mac_algorithm_t type;
+#elif defined(USE_OPENSSL)
+    const EVP_MD *type;
+#elif defined(USE_MBEDTLS)
+    mbedtls_md_type_t type;
+#endif
+    switch (bits) {
+        case 256:
+#if defined(USE_GNUTLS)
+            type = GNUTLS_MAC_SHA256;
+#elif defined(USE_OPENSSL)
+            type = EVP_sha256();
+#elif defined(USE_MBEDTLS)
+            type = MBEDTLS_MD_SHA256;
+#endif
+            break;
+
+        case 384:
+#if defined(USE_GNUTLS)
+            type = GNUTLS_MAC_SHA384;
+#elif defined(USE_OPENSSL)
+            type = EVP_sha384();
+#elif defined(USE_MBEDTLS)
+            type = MBEDTLS_MD_SHA384;
+#endif
+            break;
+
+        case 512:
+#if defined(USE_GNUTLS)
+            type = GNUTLS_MAC_SHA512;
+#elif defined(USE_OPENSSL)
+            type = EVP_sha512();
+#elif defined(USE_MBEDTLS)
+            type = MBEDTLS_MD_SHA512;
+#endif
+            break;
+
+        default:
+            warnx("hmac_base64url: invalid hmac bit length");
+            goto out;
+    }
+
+#if defined(USE_GNUTLS)
+    int r = gnutls_hmac_fast(type, keybin, keylen, input, strlen(input), hash);
+    if (r != GNUTLS_E_SUCCESS) {
+        warnx("hmac_base64url: gnutls_hmac_fast failed: %s",
+                gnutls_strerror(r));
+        goto out;
+    }
+#elif defined(USE_OPENSSL)
+    if (!openssl_hmac_fast(type, keybin, keylen, input, strlen(input), hash)) {
+        warnx("hmac_base64url: openssl_hmac_fast failed");
+        goto out;
+    }
+#elif defined(USE_MBEDTLS)
+    int r = mbedtls_hmac_fast(type, keybin, keylen, input, strlen(input), hash);
+    if (r != 0) {
+        warnx("hmac_base64url: mbedtls_hmac_fast failed: %s",
+                _mbedtls_strerror(r));
+        goto out;
+    }
+#endif
+    encoded_hash_len = base64_ENCODED_LEN(hash_len,
+            base64_VARIANT_URLSAFE_NO_PADDING);
+    encoded_hash = calloc(1, encoded_hash_len);
+    if (!encoded_hash) {
+        warn("hmac_base64url: calloc failed");
+        goto out;
+    }
+    if (!bin2base64(encoded_hash, encoded_hash_len,
+                hash, hash_len, base64_VARIANT_URLSAFE_NO_PADDING)) {
+        warnx("hmac_base64url: bin2base64 failed");
+        free(encoded_hash);
+        encoded_hash = NULL;
+        goto out;
+    }
+out:
+    va_end(ap);
+    free(input);
+    free(hash);
+    free(keybin);
     return encoded_hash;
 }
 
@@ -854,6 +1013,17 @@ out:
     return ret;
 }
 
+char *jws_protected_eab(size_t bits, const char *keyid, const char *url)
+{
+    char *ret = NULL;
+    if (asprintf(&ret, "{\"alg\":\"HS%zu\",\"kid\":\"%s\",\"url\":\"%s\"}",
+            bits, keyid, url) < 0) {
+        warnx("jws_protected_eab: asprintf failed");
+        ret = NULL;
+    }
+    return ret;
+}
+
 char *jws_thumbprint(privkey_t key)
 {
     char *ret = NULL;
@@ -1365,6 +1535,42 @@ out:
     free(encoded_combined);
     free(encoded_signature);
     free(signature);
+    return jws;
+}
+
+char *jws_encode_hmac(const char *protected, const char *payload,
+    size_t bits, const char *key)
+{
+    char *jws = NULL;
+    char *encoded_payload = encode_base64url(payload);
+    char *encoded_protected = encode_base64url(protected);
+    char *encoded_signature = NULL;
+
+    if (!encoded_payload || !encoded_protected) {
+        warnx("jws_encode_hmac: encode_base64url failed");
+        goto out;
+    }
+
+    encoded_signature = hmac_base64url(bits, key, "%s.%s",
+            encoded_protected, encoded_payload);
+    if (!encoded_signature) {
+        warnx("jws_encode_hmac: hmac_base64url failed");
+        goto out;
+    }
+    if (asprintf(&jws,
+                "{\"protected\":\"%s\","
+                "\"payload\":\"%s\","
+                "\"signature\":\"%s\"}",
+                encoded_protected,
+                encoded_payload,
+                encoded_signature) < 0) {
+        warnx("jws_encode_hmac: asprintf failed");
+        jws = NULL;
+    }
+out:
+    free(encoded_payload);
+    free(encoded_protected);
+    free(encoded_signature);
     return jws;
 }
 

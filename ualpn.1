@@ -2,12 +2,12 @@
 .\"     Title: ualpn
 .\"    Author: [see the "AUTHOR" section]
 .\" Generator: DocBook XSL Stylesheets v1.79.1 <http://docbook.sf.net/>
-.\"      Date: 07/26/2020
+.\"      Date: 12/06/2020
 .\"    Manual: User Commands
-.\"    Source: ualpn 1.5
+.\"    Source: ualpn 1.6
 .\"  Language: English
 .\"
-.TH "UALPN" "1" "07/26/2020" "ualpn 1\&.5" "User Commands"
+.TH "UALPN" "1" "12/06/2020" "ualpn 1\&.6" "User Commands"
 .\" -----------------------------------------------------------------
 .\" * Define some portability stuff
 .\" -----------------------------------------------------------------
@@ -31,7 +31,7 @@
 ualpn \- lightweight proxying ACMEv2 tls\-alpn\-01 responder
 .SH "SYNOPSIS"
 .sp
-\fBualpn\fR [\fB\-?\fR|\fB\-\-help\fR] [\fB\-V\fR|\fB\-\-version\fR] [\fB\-4\fR|\fB\-\-ipv4\fR] [\fB\-6\fR|\fB\-\-ipv6\fR] [\fB\-b\fR|\fB\-\-bind\fR \fIaddress\fR[@\fIport\fR]] [\fB\-c\fR|\fB\-\-connect\fR \fIaddress\fR[@\fIport\fR]] [\fB\-d\fR|\fB\-\-daemon\fR] [\fB\-l\fR|\fB\-\-logfile\fR \fIfile\fR] [\fB\-m\fR|\fB\-\-max\-auths\fR \fIN\fR] [\fB\-n\fR|\fB\-\-num\-workers\fR \fIN\fR] [\fB\-p\fR|\fB\-\-pidfile\fR \fIfile\fR] [\fB\-P\fR|\fB\-\-proxy\fR \fIN\fR] [\fB\-r\fR|\fB\-\-chroot dir\fR] [\fB\-s\fR|\fB\-\-sock\fR \fIpath\fR] [\fB\-S\fR|\fB\-\-sock\-mode\fR \fImode\fR] [\fB\-t\fR|\fB\-\-terminate\fR] [\fB\-u\fR|\fB\-\-user\fR \fIuser\fR[:\fIgroup\fR]] [\fB\-v\fR|\fB\-\-verbose\fR \&...]
+\fBualpn\fR [\fB\-4\fR|\fB\-\-ipv4\fR] [\fB\-6\fR|\fB\-\-ipv6\fR] [\fB\-b\fR|\fB\-\-bind\fR \fIaddress\fR[@\fIport\fR]] [\fB\-c\fR|\fB\-\-connect\fR \fIaddress\fR[@\fIport\fR]] [\fB\-d\fR|\fB\-\-daemon\fR] [\fB\-l\fR|\fB\-\-logfile\fR \fIfile\fR] [\fB\-m\fR|\fB\-\-max\-auths\fR \fIN\fR] [\fB\-n\fR|\fB\-\-num\-workers\fR \fIN\fR] [\fB\-p\fR|\fB\-\-pidfile\fR \fIfile\fR] [\fB\-P\fR|\fB\-\-proxy\fR \fIN\fR] [\fB\-r\fR|\fB\-\-chroot\fR \fIdir\fR] [\fB\-s\fR|\fB\-\-sock\fR \fIpath\fR] [\fB\-S\fR|\fB\-\-sock\-mode\fR \fImode\fR] [\fB\-t\fR|\fB\-\-terminate\fR] [\fB\-u\fR|\fB\-\-user\fR \fIuser\fR[:\fIgroup\fR]] [\fB\-v\fR|\fB\-\-verbose\fR \&...] [\fB\-V\fR|\fB\-\-version\fR] [\fB\-?\fR|\fB\-\-help\fR]
 .SH "DESCRIPTION"
 .sp
 \fBualpn\fR is a lightweight proxying ACMEv2 tls\-alpn\-01 challenge responder compliant with RFC8737 (https://tools\&.ietf\&.org/html/RFC8737) and RFC8738 (https://tools\&.ietf\&.org/html/RFC8738)\&.
@@ -106,13 +106,9 @@ Enable server mode and fork in the background
 Log to
 \fIfile\fR\&. By default
 \fBualpn\fR
-logs to
-\fBsyslog\fR
-if
+logs to syslog if
 \fB\-d, \-\-daemon\fR
-was specified or
-\fBstderr\fR
-otherwise\&. See also
+was specified or stderr otherwise\&. See also
 \fB\-v, \-\-verbose\fR
 .RE
 .PP
@@ -166,9 +162,7 @@ https://httpd\&.apache\&.org/docs/2\&.4/mod/mod_remoteip\&.html#remoteipproxypro
 .PP
 \fB\-r, \-\-chroot\fR \fIdir\fR
 .RS 4
-Enable server mode and specify a directory to
-\fIchroot\fR
-to\&. If logging to syslog it is necessary to ensure that a syslogd(8) socket is available at /dev/log in the chroot directory, otherwise
+Enable server mode and specify a directory to chroot to\&. If logging to syslog it is necessary to ensure that a syslogd(8) socket is available at /dev/log in the chroot directory, otherwise
 \fBualpn\fR
 will not produce any log output\&.
 .RE
@@ -241,7 +235,7 @@ passed as the 5th argument)\&. Upon successful invocation of the
 \fBauth\fR
 command
 \fBualpn\fR
-generates a self signed certificate as required by the tls\-alpn\-01 challenge, and will then use it to perform tls\-alpn\-01 handshakes for the given
+generates a self signed certificate as required by the tls\-alpn\-01 challenge, and then uses it to perform tls\-alpn\-01 handshakes for the given
 \fIidentifier\fR\&.
 .RE
 .PP
