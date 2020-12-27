@@ -486,8 +486,8 @@ bool account_new(acme_t *a, bool yes)
                 const char *ext = json_find_value(meta,
                         "externalAccountRequired");
                 if (ext && strcasecmp(ext, "true") == 0 && !a->eab_key) {
-                    msg(0, "This ACME server requires external credentials. "
-                           "Please supply them with -e KEYID:KEY");
+                    msg(0, "this ACME server requires external credentials, "
+                           "please supply them with -e KEYID:KEY");
                     return false;
                 }
                 const char *terms = json_find_string(meta, "termsOfService");
@@ -1295,7 +1295,7 @@ bool eab_parse(acme_t *a, char *eab)
 
     if (r) {
         warnx("-e credentials must be specified as 'KEYID:KEY', "
-                "with KEY bas64url encoded");
+                "with KEY base64url encoded");
         return false;
     }
 
