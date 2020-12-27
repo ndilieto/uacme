@@ -4110,6 +4110,10 @@ int main(int argc, char **argv)
                 break;
 
             case 'l':
+                if (g.logfilename) {
+                    errx("-l,--logfile can only be specified once");
+                    cleanup_and_exit(0, EXIT_FAILURE);
+                }
                 f = fopen(optarg, "a+");
                 if (!f) {
                     err("failed to open %s", optarg);
@@ -4128,8 +4132,7 @@ int main(int argc, char **argv)
 
             case 'm':
                 n = strtol(optarg, &endptr, 10);
-                if (*endptr != 0 || n <= 0)
-                {
+                if (*endptr != 0 || n <= 0) {
                     warnx("-m,--max-auths: N must be a positive integer");
                     cleanup_and_exit(0, EXIT_FAILURE);
                 }
@@ -4139,8 +4142,7 @@ int main(int argc, char **argv)
 
             case 'n':
                 n = strtol(optarg, &endptr, 10);
-                if (*endptr != 0 || n <= 0)
-                {
+                if (*endptr != 0 || n <= 0) {
                     warnx("-n,--num-workers: N must be a positive integer");
                     cleanup_and_exit(0, EXIT_FAILURE);
                 }
@@ -4149,6 +4151,10 @@ int main(int argc, char **argv)
                 break;
 
             case 'p':
+                if (g.pidfile) {
+                    errx("-p,--pidfile can only be specified once");
+                    cleanup_and_exit(0, EXIT_FAILURE);
+                }
                 g.pidfile = strdup(optarg);
                 if (!g.pidfile) {
                     err("strdup");
@@ -4158,8 +4164,7 @@ int main(int argc, char **argv)
 
             case 'P':
                 n = strtol(optarg, &endptr, 10);
-                if (*endptr != 0 || n < 0 || n > 2)
-                {
+                if (*endptr != 0 || n < 0 || n > 2) {
                     warnx("-P,--proxy: must be 0 (disabled), 1 or 2");
                     cleanup_and_exit(0, EXIT_FAILURE);
                 }
@@ -4168,6 +4173,10 @@ int main(int argc, char **argv)
                 break;
 
             case 'r':
+                if (g.chroot) {
+                    errx("-r,--chroot can only be specified once");
+                    cleanup_and_exit(0, EXIT_FAILURE);
+                }
                 if (geteuid() != 0)
                     warnx("-r,--chroot requires running as root - ignored");
                 else {
@@ -4181,6 +4190,10 @@ int main(int argc, char **argv)
                 break;
 
             case 's':
+                if (g.socket) {
+                    errx("-s,--sock can only be specified once");
+                    cleanup_and_exit(0, EXIT_FAILURE);
+                }
                 g.socket = strdup(optarg);
                 if (!g.socket) {
                     err("strdup");
@@ -4211,6 +4224,10 @@ int main(int argc, char **argv)
                 break;
 
             case 'u':
+                if (g.user) {
+                    errx("-u,--user can only be specified once");
+                    cleanup_and_exit(0, EXIT_FAILURE);
+                }
                 if (geteuid() != 0)
                     warnx("-u,--user requires running as root - ignored");
                 else {
