@@ -63,6 +63,7 @@ git clone -b upstream/latest https://github.com/ndilieto/uacme
 * https://packages.ubuntu.com/eoan/uacme
 * https://software.opensuse.org/package/uacme
 * https://pkgs.alpinelinux.org/packages?name=uacme
+* https://aur.archlinux.org/packages/uacme
 * https://cvsweb.openbsd.org/ports/security/uacme
 * https://github.com/openwrt/packages/tree/master/net/uacme
 * https://github.com/buildroot/buildroot/tree/master/package/uacme
