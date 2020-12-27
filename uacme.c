@@ -1641,7 +1641,12 @@ int main(int argc, char **argv)
     char buf[0x100];
     setlocale(LC_TIME, "C");
     strftime(buf, sizeof(buf), "%a, %d %b %Y %H:%M:%S %z", localtime(&now));
-    msg(1, "version " PACKAGE_VERSION " starting on %s", buf);
+    if (strstr(PACKAGE_VERSION, "-dev-")) {
+        warnx("development version " PACKAGE_VERSION " starting on %s", buf);
+        warnx("please use for testing only; releases are available at "
+                "https://github.com/ndilieto/uacme/tree/upstream/latest");
+    } else
+        msg(1, "version " PACKAGE_VERSION " starting on %s", buf);
 
     if (a.hook && access(a.hook, R_OK | X_OK) < 0) {
         warn("%s", a.hook);
