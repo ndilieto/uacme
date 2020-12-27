@@ -4580,6 +4580,13 @@ int main(int argc, char **argv)
         cleanup_and_exit(1, EXIT_FAILURE);
     }
 
+    if (strstr(PACKAGE_VERSION, "-dev-")) {
+        warnx("development version " PACKAGE_VERSION " starting");
+        warnx("please use for testing only; releases are available at "
+                "https://github.com/ndilieto/uacme/tree/upstream/latest");
+    } else
+        noticex("version " PACKAGE_VERSION " starting");
+
     noticex("control interface listening to unix://%s", g.socket);
 
     g_shm_size = sizeof(struct shm) + (g.max_auths - 1)*sizeof(auth_t);
