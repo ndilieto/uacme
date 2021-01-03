@@ -58,6 +58,9 @@ typedef struct acme {
     char *headers;
     char *body;
     char *type;
+    unsigned char alt_fp[32];
+    size_t alt_fp_len;
+    size_t alt_n;
     const char *eab_keyid;
     const char *eab_key;
     const char *directory;
@@ -951,7 +954,7 @@ out:
     return success;
 }
 
-bool cert_issue(acme_t *a, char * const *names, const char *csr, int alt)
+bool cert_issue(acme_t *a, char * const *names, const char *csr)
 {
     bool success = false;
     char *orderurl = NULL;
@@ -1081,7 +1084,7 @@ bool cert_issue(acme_t *a, char * const *names, const char *csr, int alt)
     cert = a->body;
     a->body = NULL;
 
-    if (alt) {
+    if (a->alt_n) {
         const char *regex = "^Link:[ \t]*<(.*)>[ \t]*.*;[ \t]*"
             "rel[ \t]*=[ \t]*\"?alternate(\"|[ \t]*;).*\r\n";
         regex_t reg;
@@ -1089,33 +1092,50 @@ bool cert_issue(acme_t *a, char * const *names, const char *csr, int alt)
             warnx("cert_issue: regcomp failed");
             goto out;
         } else {
-            char *h = a->headers;
+            size_t i;
             regmatch_t m[2];
-            int i;
-            for (i = 0; i < alt && regexec(&reg, h, 2, m, 0) == 0; i++) {
-                if (i < alt - 1) {
-                    h += m[1].rm_eo;
-                    continue;
-                }
-                h[m[1].rm_eo] = '\0';
-                h += m[1].rm_so;
+            char *alt_cert = NULL;
+            char *h = NULL;
+            char *headers = strdup(a->headers);
+            if (!headers) {
+                warn("cert_issue: strdup failed");
+                goto out;
             }
+            a->headers = NULL;
+            h = headers;
+            for (i = 0; i < a->alt_n && regexec(&reg, h, 2, m, 0) == 0; i++) {
+                if (a->alt_fp_len > 0 || i == a->alt_n - 1) {
+                    char *alturl = strndup(h + m[1].rm_so,
+                            m[1].rm_eo - m[1].rm_so);
+                    if (!alturl) {
+                        warn("cert_issue: strndup failed");
+                        break;
+                    }
+                    msg(1, "retrieving alternate certificate at %s", alturl);
+                    if (acme_post(a, alturl, "") != 200) {
+                        warnx("failed to retrieve alternate certificate at %s",
+                                alturl);
+                        acme_error(a);
+                        free(alturl);
+                        break;
+                    }
+                    free(alturl);
+                    if (cert_match(a->body, a->alt_fp, a->alt_fp_len)) {
+                        alt_cert = a->body;
+                        a->body = NULL;
+                        break;
+                    }
+                }
+                h += m[1].rm_eo;
+            }
+            free(headers);
             regfree(&reg);
-            if (i != alt) {
-                warnx("alternate certificate number %d not found", alt);
-                warnx("falling back to main certificate");
-            } else {
-                msg(1, "retrieving alternate certificate at %s", h);
-                if (acme_post(a, h, "") != 200) {
-                    warnx("failed to retrieve alternate certificate at %s", h);
-                    acme_error(a);
-                    warnx("falling back to main certificate");
-                } else {
-                    free(cert);
-                    cert = a->body;
-                    a->body = NULL;
-                }
-            }
+            if (alt_cert) {
+                free(cert);
+                cert = alt_cert;
+            } else
+                warnx("no matching alternate certificate found, "
+                        "falling back to default");
         }
     }
 
@@ -1308,12 +1328,39 @@ bool eab_parse(acme_t *a, char *eab)
     return true;
 }
 
+bool alt_parse(acme_t *a, char *alt)
+{
+    char *endptr;
+    long l = strtol(alt, &endptr, 0);
+    if (*endptr == 0 && l > 0 && l < UINT_MAX) {
+        a->alt_n = l;
+        return true;
+    }
+
+    size_t len = 0;
+    char *tok = strtok(alt, ":");
+    while (tok && len < sizeof(a->alt_fp)) {
+        if (strlen(tok) != 2 || !isxdigit(tok[0]) || !isxdigit(tok[1]))
+            break;
+        a->alt_fp[len++] = strtol(tok, NULL, 16);
+        tok = strtok(NULL, ":");
+    }
+    if (!tok && len > 1) {
+        a->alt_fp_len = len;
+        a->alt_n = UINT_MAX;
+        return true;
+    }
+
+    warnx("-l requires a positive argument or a SHA256 fingerprint");
+    return false;
+}
+
 void usage(const char *progname)
 {
     fprintf(stderr,
         "usage: %s [-a|--acme-url URL] [-b|--bits BITS] [-c|--confdir DIR]\n"
         "\t[-d|--days DAYS] [-e|--eab KEYID:KEY] [-f|--force] [-h|--hook PROG]\n"
-        "\t[-l|--alternate N] [-m|--must-staple] [-n|--never-create]\n"
+        "\t[-l|--alternate [N | SHA256] [-m|--must-staple] [-n|--never-create]\n"
         "\t[-o|--no-ocsp] [-s|--staging] [-t|--type RSA | EC]\n"
         "\t[-v|--verbose ...] [-V|--version] [-y|--yes] [-?|--help]\n"
         "\tnew [EMAIL] | update [EMAIL] | deactivate | newkey |\n"
@@ -1354,7 +1401,6 @@ int main(int argc, char **argv)
     bool custom_directory = false;
     bool status_req = false;
     bool status_check = true;
-    int alt = 0;
     int days = 30;
     int bits = 0;
     keytype_t type = PK_RSA;
@@ -1444,11 +1490,8 @@ int main(int argc, char **argv)
                 break;
 
             case 'l':
-                alt = strtol(optarg, &endptr, 10);
-                if (*endptr != 0 || alt < 0) {
-                    warnx("-l requires a positive argument");
+                if (!alt_parse(&a, optarg))
                     goto out;
-                }
                 break;
 
             case 'm':
@@ -1764,7 +1807,7 @@ int main(int argc, char **argv)
         }
 
         if (acme_bootstrap(&a) && account_retrieve(&a)
-                && cert_issue(&a, names, csr, alt))
+                && cert_issue(&a, names, csr))
             ret = 0;
     } else if (strcmp(action, "revoke") == 0) {
         if (acme_bootstrap(&a) && (!a.keyprefix || account_retrieve(&a)) &&

@@ -15,7 +15,7 @@ SYNOPSIS
 --------
 *uacme* [*-a*|*--acme-url* 'URL'] [*-b*|*--bits* 'BITS']
     [*-c*|*--confdir* 'DIR'] [*-d*|*--days* 'DAYS'] [*-e*|*--eab* KEYID:KEY]
-    [*-f*|*--force*] [*-h*|*--hook* 'PROGRAM'] [*-l*|*--alternate* 'N']
+    [*-f*|*--force*] [*-h*|*--hook* 'PROGRAM'] [*-l*|*--alternate* 'N' | 'FP']
     [*-m*|*--must-staple*] [*-n*|*--never-create*] [*-o*|*--no-ocsp*]
     [*-s*|*--staging*] [*-t*|*--type* *RSA*|*EC*] [*-v*|*--verbose* ...]
     [*-V*|*--version*] [*-y*|*--yes*] [*-?*|*--help*]
@@ -88,19 +88,24 @@ OPTIONS
            *done*:::: is called upon successful completion of an
            accepted challenge.
            *failed*:::: is called upon failure of an accepted challenge.
-        'TYPE'::: challenge type (for example *dns-01* or *http-01*)
+        'TYPE'::: challenge type (*dns-01*, *http-01* or *tls-alpn-01*)
         'IDENT'::: The identifier the challenge refers to
         'TOKEN'::: The challenge token
         'AUTH'::: The key authorization (for *dns-01* and *tls-alpn-01*
            already converted to the base64url-encoded SHA256 digest format)
 
-*-l, --alternate* 'N'::
+*-l, --alternate* 'N' | 'FP'::
     According to <https://tools.ietf.org/html/rfc8555#section-7.4.2>
     the server MAY provide one or more additional certificate download URLs,
-    each pointing to an alternative certificate chain starting with the same
-    end-entity certificate. Specifying this option makes *uacme* choose the
-    Nth alternate link. If the server does not provide it or the download
-    fails, *uacme* falls back to the main certificate URL.
+    each pointing to alternative certificate chains starting with the same
+    end-entity certificate. This option allows selecting one such chain
+    in one of two ways. A positive integer 'N' makes *uacme* select the Nth
+    alternative chain in the order presented by the server.
+    A colon (':') separated list of two or more 2-digit hexadecimal numbers
+    'FP' makes *uacme* select the first alternative chain containing a
+    certificate whose SHA256 fingerprint begins with 'FP'.
+    In both cases *uacme* falls back to the main certificate URL if it cannot
+    match an alternative chain or the download thereof fails.
 
 *-m, --must-staple*::
     Request certificates with the RFC7633 Certificate Status Request

@@ -748,7 +748,7 @@ UACME(1) Manual Page
 <div class="sectionbody">
 <div class="paragraph"><p><strong>uacme</strong> [<strong>-a</strong>|<strong>--acme-url</strong> <em>URL</em>] [<strong>-b</strong>|<strong>--bits</strong> <em>BITS</em>]
     [<strong>-c</strong>|<strong>--confdir</strong> <em>DIR</em>] [<strong>-d</strong>|<strong>--days</strong> <em>DAYS</em>] [<strong>-e</strong>|<strong>--eab</strong> KEYID:KEY]
-    [<strong>-f</strong>|<strong>--force</strong>] [<strong>-h</strong>|<strong>--hook</strong> <em>PROGRAM</em>] [<strong>-l</strong>|<strong>--alternate</strong> <em>N</em>]
+    [<strong>-f</strong>|<strong>--force</strong>] [<strong>-h</strong>|<strong>--hook</strong> <em>PROGRAM</em>] [<strong>-l</strong>|<strong>--alternate</strong> <em>N</em> | <em>FP</em>]
     [<strong>-m</strong>|<strong>--must-staple</strong>] [<strong>-n</strong>|<strong>--never-create</strong>] [<strong>-o</strong>|<strong>--no-ocsp</strong>]
     [<strong>-s</strong>|<strong>--staging</strong>] [<strong>-t</strong>|<strong>--type</strong> <strong>RSA</strong>|<strong>EC</strong>] [<strong>-v</strong>|<strong>--verbose</strong> &#8230;]
     [<strong>-V</strong>|<strong>--version</strong>] [<strong>-y</strong>|<strong>--yes</strong>] [<strong>-?</strong>|<strong>--help</strong>]
@@ -933,7 +933,7 @@ is called upon failure of an accepted challenge.
 </dt>
 <dd>
 <p>
-challenge type (for example <strong>dns-01</strong> or <strong>http-01</strong>)
+challenge type (<strong>dns-01</strong>, <strong>http-01</strong> or <strong>tls-alpn-01</strong>)
 </p>
 </dd>
 <dt class="hdlist1">
@@ -964,16 +964,21 @@ The key authorization (for <strong>dns-01</strong> and <strong>tls-alpn-01</stro
 </dl></div>
 </dd>
 <dt class="hdlist1">
-<strong>-l, --alternate</strong> <em>N</em>
+<strong>-l, --alternate</strong> <em>N</em> | <em>FP</em>
 </dt>
 <dd>
 <p>
     According to <a href="https://tools.ietf.org/html/rfc8555#section-7.4.2">https://tools.ietf.org/html/rfc8555#section-7.4.2</a>
     the server MAY provide one or more additional certificate download URLs,
-    each pointing to an alternative certificate chain starting with the same
-    end-entity certificate. Specifying this option makes <strong>uacme</strong> choose the
-    Nth alternate link. If the server does not provide it or the download
-    fails, <strong>uacme</strong> falls back to the main certificate URL.
+    each pointing to alternative certificate chains starting with the same
+    end-entity certificate. This option allows selecting one such chain
+    in one of two ways. A positive integer <em>N</em> makes <strong>uacme</strong> select the Nth
+    alternative chain in the order presented by the server.
+    A colon (<em>:</em>) separated list of two or more 2-digit hexadecimal numbers
+    <em>FP</em> makes <strong>uacme</strong> select the first alternative chain containing a
+    certificate whose SHA256 fingerprint begins with <em>FP</em>.
+    In both cases <strong>uacme</strong> falls back to the main certificate URL if it cannot
+    match an alternative chain or the download thereof fails.
 </p>
 </dd>
 <dt class="hdlist1">
@@ -1320,9 +1325,9 @@ along with this program.  If not, see <a href="http://www.gnu.org/licenses/">htt
 <div id="footnotes"><hr></div>
 <div id="footer">
 <div id="footer-text">
-Version 1.6<br>
+Version 1.6-dev-6-4d78<br>
 Last updated
- 2020-12-06 09:33:04 CET
+ 2021-01-03 10:29:24 CET
 </div>
 </div>
 </body>
