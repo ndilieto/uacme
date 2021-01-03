@@ -1360,7 +1360,7 @@ void usage(const char *progname)
     fprintf(stderr,
         "usage: %s [-a|--acme-url URL] [-b|--bits BITS] [-c|--confdir DIR]\n"
         "\t[-d|--days DAYS] [-e|--eab KEYID:KEY] [-f|--force] [-h|--hook PROG]\n"
-        "\t[-l|--alternate [N | SHA256] [-m|--must-staple] [-n|--never-create]\n"
+        "\t[-l|--alternate [N | SHA256]] [-m|--must-staple] [-n|--never-create]\n"
         "\t[-o|--no-ocsp] [-s|--staging] [-t|--type RSA | EC]\n"
         "\t[-v|--verbose ...] [-V|--version] [-y|--yes] [-?|--help]\n"
         "\tnew [EMAIL] | update [EMAIL] | deactivate | newkey |\n"
