@@ -1368,6 +1368,21 @@ void usage(const char *progname)
         "\trevoke CERTFILE [CERTKEYFILE]\n", progname);
 }
 
+void version(const char *progname)
+{
+    fprintf(stderr, "%s: version " PACKAGE_VERSION "\n"
+            "Copyright (C) 2019-2021 Nicola Di Lieto\n\n"
+            "%s is free software: you can redistribute and/or modify\n"
+            "it under the terms of the GNU General Public License as\n"
+            "published by the Free Software Foundation, either version 3\n"
+            "of the License, or (at your option) any later version.\n\n"
+            "%s is distributed in the hope that it will be useful, but\n"
+            "WITHOUT ANY WARRANTY; without even the implied warranty of\n"
+            "MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\n\n"
+            "See https://www.gnu.org/licenses/gpl.html for more details.\n",
+            progname, progname, progname);
+}
+
 int main(int argc, char **argv)
 {
     static struct option options[] =
@@ -1395,7 +1410,6 @@ int main(int argc, char **argv)
     int ret = 2;
     bool never = false;
     bool force = false;
-    bool version = false;
     bool yes = false;
     bool staging = false;
     bool custom_directory = false;
@@ -1531,7 +1545,8 @@ int main(int argc, char **argv)
                 break;
 
              case 'V':
-                version = true;
+                version(basename(argv[0]));
+                goto out;
                 break;
 
             case 'y':
@@ -1542,11 +1557,6 @@ int main(int argc, char **argv)
                 usage(basename(argv[0]));
                 goto out;
         }
-    }
-
-    if (version) {
-        msg(0, "version " PACKAGE_VERSION);
-        goto out;
     }
 
     switch (type) {

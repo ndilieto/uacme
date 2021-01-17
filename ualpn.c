@@ -3974,6 +3974,21 @@ void usage(void)
         g.progname);
 }
 
+void version(void)
+{
+    fprintf(stderr, "%s: version " PACKAGE_VERSION "\n"
+            "Copyright (C) 2019-2021 Nicola Di Lieto\n\n"
+            "%s is free software: you can redistribute and/or modify\n"
+            "it under the terms of the GNU General Public License as\n"
+            "published by the Free Software Foundation, either version 3\n"
+            "of the License, or (at your option) any later version.\n\n"
+            "%s is distributed in the hope that it will be useful, but\n"
+            "WITHOUT ANY WARRANTY; without even the implied warranty of\n"
+            "MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\n\n"
+            "See https://www.gnu.org/licenses/gpl.html for more details.\n",
+            g.progname, g.progname, g.progname);
+}
+
 int main(int argc, char **argv)
 {
     static struct option options[] =
@@ -4263,8 +4278,7 @@ int main(int argc, char **argv)
                 break;
 
             case 'V':
-                fprintf(stderr, "%s: version %s\n", basename(argv[0]),
-                        PACKAGE_VERSION);
+                version();
                 cleanup_and_exit(0, EXIT_FAILURE);
                 break;
 
