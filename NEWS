@@ -1,5 +1,19 @@
 uacme NEWS
-Copyright (C) 2019,2020 Nicola Di Lieto <nicola.dilieto@gmail.com>
+Copyright (C) 2019-2021 Nicola Di Lieto <nicola.dilieto@gmail.com>
+
+## [1.7] - 2021-01-17
+### Added
+- uacme: alternate chain selection by certificate fingerprint
+- uacme: print copyright with version
+- ualpn: print copyright with version
+- ualpn: add notice with version on startup
+
+### Changed
+- ualpn: reject duplicate options where appropriate
+- ualpn: make ualpn.sh always outputs to stderr
+- ualpn: fix compilation warning
+- minor changes (typos)
+- update copyright years
 
 ## [1.6] - 2020-12-06
 ### Added

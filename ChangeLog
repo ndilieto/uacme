@@ -1,3 +1,16 @@
+2021-01-17 Nicola Di Lieto <nicola.dilieto@gmail.com>
+	* Release 1.7
+	- uacme: alternate chain selection by certificate fingerprint
+	- uacme: print copyright with version
+	- ualpn: print copyright with version
+	- ualpn: add notice with version on startup
+	- ualpn: reject duplicate options where appropriate
+	- ualpn: make ualpn.sh always outputs to stderr
+	- ualpn: fix compilation warning
+	- minor changes (typos)
+	- master branch builds must autoreconf
+	- update copyright year
+
 2020-12-06 Nicola Di Lieto <nicola.dilieto@gmail.com>
 	* Release 1.6
 	- uacme: add support for RFC8555 External Account Binding
