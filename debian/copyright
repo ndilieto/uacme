@@ -4,7 +4,7 @@ Upstream-Contact: nicola.dilieto@gmail.com
 Source: https://github.com/ndilieto/uacme
 
 Files: *
-Copyright: 2019,2020 Nicola Di Lieto <nicola.dilieto@gmail.com>
+Copyright: 2019,2021 Nicola Di Lieto <nicola.dilieto@gmail.com>
 License: GPL-3.0+
 
 Files: read-file.*
@@ -12,7 +12,7 @@ Copyright: 2006, 2009-2015 Free Software Foundation, Inc.
 License: GPL-3.0+
 
 Files: base64.*
-Copyright: 2019,2020 Nicola Di Lieto <nicola.dilieto@gmail.com>
+Copyright: 2019,2021 Nicola Di Lieto <nicola.dilieto@gmail.com>
            2013-2017 Frank Denis <j@pureftpd.org>
 License: GPL-3.0+ and ISC
 

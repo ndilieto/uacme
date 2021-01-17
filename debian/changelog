@@ -1,3 +1,10 @@
+uacme (1.7-1) unstable; urgency=medium
+
+  * New upstream release
+  - refresh debian/patches/remove-gnumakefile.patch
+
+ -- Nicola Di Lieto <nicola.dilieto@gmail.com>  Sun, 17 Jan 2021 17:03:31 +0100
+
 uacme (1.6-1) unstable; urgency=medium
 
   * New upstream release
