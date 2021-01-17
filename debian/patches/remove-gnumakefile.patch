@@ -3,7 +3,7 @@ believing that ./configure does not need running. It's ok to remove because
 it's only used upstream to maintain the version number.
 --- a/GNUmakefile
 +++ /dev/null
-@@ -1,112 +0,0 @@
+@@ -1,131 +0,0 @@
 -# This makefile is used only if you run GNU Make.
 -# It is necessary if you want to build targets usually of interest
 -# only to the maintainer.
@@ -26,6 +26,7 @@ it's only used upstream to maintain the version number.
 -# If the user runs GNU make but has not yet run ./configure,
 -# give them a diagnostic.
 -_gl-Makefile := $(wildcard [M]akefile)
+-_gl-configure := $(wildcard [c]onfigure)
 -ifneq ($(_gl-Makefile),)
 -
 -# Make tar archive easier to reproduce.
@@ -82,8 +83,12 @@ it's only used upstream to maintain the version number.
 -	$(MAKE) $(AM_MAKEFLAGS) Makefile
 -
 -else
--
+-ifneq ($(_gl-configure),)
 -.DEFAULT_GOAL := abort-due-to-no-makefile
+-else
+-.DEFAULT_GOAL := abort-due-to-no-configure
+-endif
+-
 -srcdir = .
 -
 -_build-aux ?= build-aux
@@ -93,9 +98,23 @@ it's only used upstream to maintain the version number.
 -$(MAKECMDGOALS): abort-due-to-no-makefile
 -endif
 -
+-_have-git := $(shell command -v git >/dev/null 2>&1 && echo yes)
+-ifeq ($(_have-git),yes)
+-    REPO := $(shell git remote get-url origin)
+-else
+-    REPO := https://github.com/ndilieto/uacme
+-endif
+-
 -abort-due-to-no-makefile:
 -	@echo There seems to be no Makefile in this directory.   1>&2
 -	@echo "You must run ./configure before running 'make'." 1>&2
+-	@exit 1
+-
+-abort-due-to-no-configure:
+-	@echo There seems to be no configure in this directory.   1>&2
+-	@echo "You must run 'autoreconf' and ./configure before running 'make'." 1>&2
+-	@echo "Alternatively consider checking out the latest release:" 1>&2
+-	@echo "  git clone -b upstream/latest $(REPO)" 1>&2
 -	@exit 1
 -
 -endif
