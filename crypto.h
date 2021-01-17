@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2019,2020 Nicola Di Lieto <nicola.dilieto@gmail.com>
+ * Copyright (C) 2019-2021 Nicola Di Lieto <nicola.dilieto@gmail.com>
  *
  * This file is part of uacme.
  *
@@ -83,6 +83,7 @@ char *csr_gen(char * const *, bool, privkey_t);
 char *csr_load(const char *, char ***);
 char *cert_der_base64url(const char *);
 bool cert_valid(const char *, char * const *, int, bool);
+bool cert_match(const char *, unsigned char *, size_t);
 
 #endif
 

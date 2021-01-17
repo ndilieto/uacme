@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2019,2020 Nicola Di Lieto <nicola.dilieto@gmail.com>
+ * Copyright (C) 2019-2021 Nicola Di Lieto <nicola.dilieto@gmail.com>
  *
  * This file is part of uacme.
  *
@@ -3793,7 +3793,7 @@ static void spawn_worker(ev_tstamp timestamp)
         ev_signal_start(EV_DEFAULT_ &worker->sigterm);
 
         ev_timer_init(&worker->timer, cb_worker_timer,
-                1.0 + (float)random()/RAND_MAX, 1.0);
+                1.0 + (float)random()/(float)RAND_MAX, 1.0);
         ev_set_priority(&worker->timer, +2);
         ev_timer_start(EV_DEFAULT_ &worker->timer);
 
@@ -3974,6 +3974,21 @@ void usage(void)
         g.progname);
 }
 
+void version(void)
+{
+    fprintf(stderr, "%s: version " PACKAGE_VERSION "\n"
+            "Copyright (C) 2019-2021 Nicola Di Lieto\n\n"
+            "%s is free software: you can redistribute and/or modify\n"
+            "it under the terms of the GNU General Public License as\n"
+            "published by the Free Software Foundation, either version 3\n"
+            "of the License, or (at your option) any later version.\n\n"
+            "%s is distributed in the hope that it will be useful, but\n"
+            "WITHOUT ANY WARRANTY; without even the implied warranty of\n"
+            "MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\n\n"
+            "See https://www.gnu.org/licenses/gpl.html for more details.\n",
+            g.progname, g.progname, g.progname);
+}
+
 int main(int argc, char **argv)
 {
     static struct option options[] =
@@ -4110,6 +4125,10 @@ int main(int argc, char **argv)
                 break;
 
             case 'l':
+                if (g.logfilename) {
+                    errx("-l,--logfile can only be specified once");
+                    cleanup_and_exit(0, EXIT_FAILURE);
+                }
                 f = fopen(optarg, "a+");
                 if (!f) {
                     err("failed to open %s", optarg);
@@ -4128,8 +4147,7 @@ int main(int argc, char **argv)
 
             case 'm':
                 n = strtol(optarg, &endptr, 10);
-                if (*endptr != 0 || n <= 0)
-                {
+                if (*endptr != 0 || n <= 0) {
                     warnx("-m,--max-auths: N must be a positive integer");
                     cleanup_and_exit(0, EXIT_FAILURE);
                 }
@@ -4139,8 +4157,7 @@ int main(int argc, char **argv)
 
             case 'n':
                 n = strtol(optarg, &endptr, 10);
-                if (*endptr != 0 || n <= 0)
-                {
+                if (*endptr != 0 || n <= 0) {
                     warnx("-n,--num-workers: N must be a positive integer");
                     cleanup_and_exit(0, EXIT_FAILURE);
                 }
@@ -4149,6 +4166,10 @@ int main(int argc, char **argv)
                 break;
 
             case 'p':
+                if (g.pidfile) {
+                    errx("-p,--pidfile can only be specified once");
+                    cleanup_and_exit(0, EXIT_FAILURE);
+                }
                 g.pidfile = strdup(optarg);
                 if (!g.pidfile) {
                     err("strdup");
@@ -4158,8 +4179,7 @@ int main(int argc, char **argv)
 
             case 'P':
                 n = strtol(optarg, &endptr, 10);
-                if (*endptr != 0 || n < 0 || n > 2)
-                {
+                if (*endptr != 0 || n < 0 || n > 2) {
                     warnx("-P,--proxy: must be 0 (disabled), 1 or 2");
                     cleanup_and_exit(0, EXIT_FAILURE);
                 }
@@ -4168,6 +4188,10 @@ int main(int argc, char **argv)
                 break;
 
             case 'r':
+                if (g.chroot) {
+                    errx("-r,--chroot can only be specified once");
+                    cleanup_and_exit(0, EXIT_FAILURE);
+                }
                 if (geteuid() != 0)
                     warnx("-r,--chroot requires running as root - ignored");
                 else {
@@ -4181,6 +4205,10 @@ int main(int argc, char **argv)
                 break;
 
             case 's':
+                if (g.socket) {
+                    errx("-s,--sock can only be specified once");
+                    cleanup_and_exit(0, EXIT_FAILURE);
+                }
                 g.socket = strdup(optarg);
                 if (!g.socket) {
                     err("strdup");
@@ -4211,6 +4239,10 @@ int main(int argc, char **argv)
                 break;
 
             case 'u':
+                if (g.user) {
+                    errx("-u,--user can only be specified once");
+                    cleanup_and_exit(0, EXIT_FAILURE);
+                }
                 if (geteuid() != 0)
                     warnx("-u,--user requires running as root - ignored");
                 else {
@@ -4246,8 +4278,7 @@ int main(int argc, char **argv)
                 break;
 
             case 'V':
-                fprintf(stderr, "%s: version %s\n", basename(argv[0]),
-                        PACKAGE_VERSION);
+                version();
                 cleanup_and_exit(0, EXIT_FAILURE);
                 break;
 
@@ -4579,6 +4610,13 @@ int main(int argc, char **argv)
         err("failed to listen to unix://%s", g.socket);
         cleanup_and_exit(1, EXIT_FAILURE);
     }
+
+    if (strstr(PACKAGE_VERSION, "-dev-")) {
+        warnx("development version " PACKAGE_VERSION " starting");
+        warnx("please use for testing only; releases are available at "
+                "https://github.com/ndilieto/uacme/tree/upstream/latest");
+    } else
+        noticex("version " PACKAGE_VERSION " starting");
 
     noticex("control interface listening to unix://%s", g.socket);
 

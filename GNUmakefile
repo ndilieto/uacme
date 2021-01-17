@@ -20,6 +20,7 @@
 # If the user runs GNU make but has not yet run ./configure,
 # give them a diagnostic.
 _gl-Makefile := $(wildcard [M]akefile)
+_gl-configure := $(wildcard [c]onfigure)
 ifneq ($(_gl-Makefile),)
 
 # Make tar archive easier to reproduce.
@@ -76,8 +77,12 @@ _version:
 	$(MAKE) $(AM_MAKEFLAGS) Makefile
 
 else
-
+ifneq ($(_gl-configure),)
 .DEFAULT_GOAL := abort-due-to-no-makefile
+else
+.DEFAULT_GOAL := abort-due-to-no-configure
+endif
+
 srcdir = .
 
 _build-aux ?= build-aux
@@ -87,9 +92,23 @@ ifeq ($(.DEFAULT_GOAL),abort-due-to-no-makefile)
 $(MAKECMDGOALS): abort-due-to-no-makefile
 endif
 
+_have-git := $(shell command -v git >/dev/null 2>&1 && echo yes)
+ifeq ($(_have-git),yes)
+    REPO := $(shell git remote get-url origin)
+else
+    REPO := https://github.com/ndilieto/uacme
+endif
+
 abort-due-to-no-makefile:
 	@echo There seems to be no Makefile in this directory.   1>&2
 	@echo "You must run ./configure before running 'make'." 1>&2
+	@exit 1
+
+abort-due-to-no-configure:
+	@echo There seems to be no configure in this directory.   1>&2
+	@echo "You must run 'autoreconf' and ./configure before running 'make'." 1>&2
+	@echo "Alternatively consider checking out the latest release:" 1>&2
+	@echo "  git clone -b upstream/latest $(REPO)" 1>&2
 	@exit 1
 
 endif
