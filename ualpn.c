@@ -3793,7 +3793,7 @@ static void spawn_worker(ev_tstamp timestamp)
         ev_signal_start(EV_DEFAULT_ &worker->sigterm);
 
         ev_timer_init(&worker->timer, cb_worker_timer,
-                1.0 + (float)random()/RAND_MAX, 1.0);
+                1.0 + (float)random()/(float)RAND_MAX, 1.0);
         ev_set_priority(&worker->timer, +2);
         ev_timer_start(EV_DEFAULT_ &worker->timer);
 
