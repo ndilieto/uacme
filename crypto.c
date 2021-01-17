@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2019,2020 Nicola Di Lieto <nicola.dilieto@gmail.com>
+ * Copyright (C) 2019-2021 Nicola Di Lieto <nicola.dilieto@gmail.com>
  *
  * This file is part of uacme.
  *
@@ -3296,6 +3296,78 @@ out:
     return ret;
 }
 
+bool cert_match(const char *cert, unsigned char *fingerprint,
+        size_t fingerprint_len)
+{
+    size_t certsize = strlen(cert);
+    bool ret = false;
+
+#if defined(USE_GNUTLS)
+    gnutls_x509_crt_t *crt = NULL;
+    unsigned int crt_size = 0;
+    gnutls_datum_t data = {(unsigned char *)cert, certsize};
+    int r = gnutls_x509_crt_list_import2(&crt, &crt_size, &data,
+            GNUTLS_X509_FMT_PEM, GNUTLS_X509_CRT_LIST_FAIL_IF_UNSORTED);
+    if (r < 0) {
+        warnx("cert_match: gnutls_x509_crt_list_import2: %s",
+                gnutls_strerror(r));
+        return ret;
+    }
+    for (unsigned int i = 0; i < crt_size; i++) {
+        unsigned char fp[32];
+        size_t s = sizeof(fp);
+        r = gnutls_x509_crt_get_fingerprint(crt[i], GNUTLS_DIG_SHA256, fp, &s);
+        if (r == 0 && fingerprint_len <= s &&
+                memcmp(fp, fingerprint, fingerprint_len) == 0)
+            ret = true;
+        gnutls_x509_crt_deinit(crt[i]);
+    }
+    gnutls_free(crt);
+#elif defined(USE_OPENSSL)
+    BIO *bio = BIO_new_mem_buf(cert, certsize);
+    if (!bio) {
+        openssl_error("cert_match");
+        return ret;
+    }
+    while (!BIO_eof(bio) && !ret) {
+        unsigned char fp[32];
+        unsigned int s = sizeof(fp);
+        X509 *crt = PEM_read_bio_X509(bio, NULL, NULL, NULL);
+        if (!crt)
+            break;
+        if (X509_digest(crt, EVP_sha256(), fp, &s) &&
+                fingerprint_len <= s &&
+                memcmp(fp, fingerprint, fingerprint_len) == 0)
+            ret = true;
+        X509_free(crt);
+    }
+    BIO_free(bio);
+#elif defined(USE_MBEDTLS)
+    mbedtls_x509_crt crt;
+    mbedtls_x509_crt_init(&crt);
+    int r = mbedtls_x509_crt_parse(&crt, (unsigned char *)cert, certsize+1);
+    if (r < 0) {
+        warnx("cert_match: mbedtls_x509_crt_parse failed: %s",
+                _mbedtls_strerror(r));
+        mbedtls_x509_crt_free(&crt);
+        return ret;
+    }
+    if (r > 0) {
+        warnx("cert_load: failed to parse %d certificates", r);
+        mbedtls_x509_crt_free(&crt);
+        return ret;
+    }
+    for (mbedtls_x509_crt *c = &crt; c; c = c->next) {
+        unsigned char fp[32];
+        r = mbedtls_hash_fast(MBEDTLS_MD_SHA256, c->raw.p, c->raw.len, fp);
+        if (r == 0 && fingerprint_len <= sizeof(fp) &&
+                memcmp(fp, fingerprint, fingerprint_len) == 0)
+            ret = true;
+    }
+    mbedtls_x509_crt_free(&crt);
+#endif
+    return ret;
+}
 #if defined(USE_GNUTLS)
 static bool ocsp_check(gnutls_x509_crt_t *crt)
 {
@@ -4053,7 +4125,7 @@ static bool ocsp_check(mbedtls_x509_crt *crt)
     const char *tmp = NULL;
     int r = ext_parse_ocsp_uri(crt->v3_ext.p, crt->v3_ext.len, &tmp);
     if (r < 0)
-        warnx("cert_valid: ext_parse_ocsp_uri failed: %s",
+        warnx("ocsp_check: ext_parse_ocsp_uri failed: %s",
                 _mbedtls_strerror(r));
     else if (r == 0)
         goto out;
@@ -4077,7 +4149,7 @@ static bool ocsp_check(mbedtls_x509_crt *crt)
             req_size *= 2;
         }
         else if (r < 0) {
-            warnx("cert_valid: ocsp_req failed: %s", _mbedtls_strerror(r));
+            warnx("ocsp_check: ocsp_req failed: %s", _mbedtls_strerror(r));
             goto out;
         } else
             req_size = r;

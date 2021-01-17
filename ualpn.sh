@@ -1,5 +1,5 @@
 #!/bin/sh
-# Copyright (C) 2019,2020 Nicola Di Lieto <nicola.dilieto@gmail.com>
+# Copyright (C) 2019-2021 Nicola Di Lieto <nicola.dilieto@gmail.com>
 #
 # This file is part of uacme.
 #
@@ -32,7 +32,7 @@ TOKEN=$4
 AUTH=$5
 
 if [ "$TYPE" != "tls-alpn-01" ]; then
-    echo "skipping $TYPE"
+    echo "skipping $TYPE" 1>&2
     exit 1
 fi
 
