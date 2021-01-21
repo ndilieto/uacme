@@ -59,8 +59,8 @@ git clone -b upstream/latest https://github.com/ndilieto/uacme
 ```
 [uacme][uacme] packages are available for several distributions:
 
-* https://packages.debian.org/bullseye/uacme
-* https://packages.ubuntu.com/eoan/uacme
+* https://packages.debian.org/uacme
+* https://packages.ubuntu.com/uacme
 * https://software.opensuse.org/package/uacme
 * https://pkgs.alpinelinux.org/packages?name=uacme
 * https://aur.archlinux.org/packages/uacme
