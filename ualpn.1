@@ -2,12 +2,12 @@
 .\"     Title: ualpn
 .\"    Author: [see the "AUTHOR" section]
 .\" Generator: DocBook XSL Stylesheets v1.79.1 <http://docbook.sf.net/>
-.\"      Date: 01/17/2021
+.\"      Date: 01/21/2021
 .\"    Manual: User Commands
 .\"    Source: ualpn 1.7
 .\"  Language: English
 .\"
-.TH "UALPN" "1" "01/17/2021" "ualpn 1\&.7" "User Commands"
+.TH "UALPN" "1" "01/21/2021" "ualpn 1\&.7" "User Commands"
 .\" -----------------------------------------------------------------
 .\" * Define some portability stuff
 .\" -----------------------------------------------------------------
@@ -86,14 +86,14 @@ Only listen to IPv6 connections
 \fB\-b, \-\-bind\fR \fIaddress\fR[@\fIport\fR]
 .RS 4
 Enable server mode and listen to
-\fIaddress\fR\&. The address must be specified in numeric format using the standard IPv4 or IPv6 notation)\&. Optionally, a port number can be given (default is 443)\&. This flag can be specified multiple times to listen to multiple IP addresses\&. If this flag is not specified and server mode was enabled by some other option,
+\fIaddress\fR\&. The address must be specified in numeric format using the standard IPv4 or IPv6 notation\&. Optionally, a port number can be given (default is 443)\&. This flag can be specified multiple times to listen to multiple IP addresses\&. If this flag is not specified and server mode was enabled by some other option,
 \fBualpn\fR
 listens to the wildcard interface; otherwise it runs in client mode (see CLIENT MODE below)\&.
 .RE
 .PP
 \fB\-c, \-\-connect\fR \fIaddress\fR[@\fIport\fR]
 .RS 4
-Enable server mode and add a new backend\&. The backend address must be specified in numeric format using the standard IPv4 or IPv6 notation)\&. Optionally, a port number can be given (default is 443)\&. This flag can be specified multiple times to add multiple backends\&. This flag must be specified at least once in server mode\&.
+Enable server mode and add a new backend\&. The backend address must be specified in numeric format using the standard IPv4 or IPv6 notation\&. Optionally, a port number can be given (default is 443)\&. This flag can be specified multiple times to add multiple backends\&. This flag must be specified at least once in server mode\&.
 .RE
 .PP
 \fB\-d, \-\-daemon\fR
