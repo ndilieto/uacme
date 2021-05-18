@@ -77,7 +77,7 @@ char *strcasestr(const char *haystack, const char *needle)
     char *_haystack = strdup(haystack);
     char *_needle = strdup(needle);
 
-    if (!_haystack || !needle)
+    if (!_haystack || !_needle)
         warn("strcasestr: strdup failed");
     else {
         char *p;
