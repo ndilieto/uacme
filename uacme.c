@@ -1621,7 +1621,7 @@ int main(int argc, char **argv)
         }
         struct stat st;
         if (stat(argv[optind], &st)) {
-            if (errno != ENOENT) {
+            if (errno != ENOENT && errno != EACCES) {
                 warn("failed to stat %s", argv[optind]);
                 goto out;
             }
