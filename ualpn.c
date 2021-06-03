@@ -4266,6 +4266,15 @@ int main(int argc, char **argv)
                         cleanup_and_exit(0, EXIT_FAILURE);
                     }
                     g.uid = pwd->pw_uid;
+                    if (g.group == NULL) {
+                        g.gid = pwd->pw_gid;
+                        grp = getgrgid(g.gid);
+                        if (!grp) {
+                            errx("getgrgid(%d) failed", g.gid);
+                            cleanup_and_exit(0, EXIT_FAILURE);
+                        }
+                        g.group = grp->gr_name;
+                    }
                     server_mode = true;
                 }
                 break;
