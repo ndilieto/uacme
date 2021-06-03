@@ -3991,8 +3991,7 @@ void version(void)
 
 int main(int argc, char **argv)
 {
-    static struct option options[] =
-    {
+    static struct option options[] = {
         {"ipv4",        no_argument,        NULL,   '4'},
         {"ipv6",        no_argument,        NULL,   '6'},
         {"bind",        required_argument,  NULL,   'b'},
@@ -4043,16 +4042,14 @@ int main(int argc, char **argv)
     signal(SIGPIPE, SIG_IGN);
     signal(SIGABRT, SIG_IGN);
 
-    while (1)
-    {
+    while (1) {
         char *endptr;
         int option_index;
         int c = getopt_long(argc, argv, "46b:c:dl:m:n:p:P:r:s:S:tu:vVh?",
                 options, &option_index);
         if (c == -1)
             break;
-        switch (c)
-        {
+        switch (c) {
             case '4':
                 server_mode = true;
                 if (g.family == AF_INET6)
