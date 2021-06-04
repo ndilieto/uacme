@@ -77,7 +77,7 @@ char *strcasestr(const char *haystack, const char *needle)
     char *_haystack = strdup(haystack);
     char *_needle = strdup(needle);
 
-    if (!_haystack || !needle)
+    if (!_haystack || !_needle)
         warn("strcasestr: strdup failed");
     else {
         char *p;
@@ -1385,8 +1385,7 @@ void version(const char *progname)
 
 int main(int argc, char **argv)
 {
-    static struct option options[] =
-    {
+    static struct option options[] = {
         {"acme-url",     required_argument, NULL, 'a'},
         {"bits",         required_argument, NULL, 'b'},
         {"confdir",      required_argument, NULL, 'c'},
@@ -1609,8 +1608,7 @@ int main(int argc, char **argv)
         }
     } else if (strcmp(action, "newkey") == 0
             || strcmp(action, "deactivate") == 0) {
-        if (optind < argc)
-        {
+        if (optind < argc) {
             usage(basename(argv[0]));
             goto out;
         }
@@ -1621,7 +1619,7 @@ int main(int argc, char **argv)
         }
         struct stat st;
         if (stat(argv[optind], &st)) {
-            if (errno != ENOENT) {
+            if (errno != ENOENT && errno != EACCES) {
                 warn("failed to stat %s", argv[optind]);
                 goto out;
             }
