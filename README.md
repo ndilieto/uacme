@@ -127,6 +127,12 @@ This will use the example [uacme.sh][uacme.sh] hook script included in the
 distribution to manage http-01 challenges. You might need to edit the script
 to match your webserver's environment.
 
+If you are using Openwrt with uhttpd as webserver, you need to add
+```
+CHALLENGE_PATH="/www/.well-known/acme-challenge"
+```
+to the first line.
+
 Once everything works correctly you can also set up cron, for example
 ```
 6 15 * * * /usr/bin/uacme -c /path/to/uacme.d -h /usr/share/uacme/uacme.sh issue www.your.domain.com 
