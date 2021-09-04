@@ -31,7 +31,7 @@ with all tokens and information required to complete any challenge type
 but leaves the task of setting up and cleaning up the challenge environment
 to the user or hook. Example shell scripts to handle [http-01][uacme.sh],
 [dns-01][nsupdate.sh] and [tls-alpn-01][ualpn.sh] challenges are provided.
-* **Zero downtime [tls-alpn-01 support][tls-alpn-01]** - The distrubution also
+* **Zero downtime [tls-alpn-01 support][tls-alpn-01]** - The distribution also
 includes [ualpn][ualpn], a lightweight proxying tls-alpn-01 challenge responder
 compliant with [RFC8737][RFC8737] and [RFC8738][RFC8738].
 * **Can run as a cron job** - to renew certificates automatically 
@@ -154,6 +154,9 @@ name server supports [RFC2136][RFC2136] ([bind][bind] does, [nsd][nsd] doesn't).
 https://gitlab.alpinelinux.org/alpine/infra/docker/uacme-nsd-wildcard
 is another example that works with [nsd][nsd].
 
+https://gist.github.com/Gowee/e756f925cfcbd5ab32d564ee3c795786 shows how
+to integrate with [Cloudflare API][Cloudflare].
+
 ## tls-alpn-01 challenge support
 
 [ualpn][ualpn] is a lightweight proxying [tls-alpn-01][RFC8737] challenge
@@ -247,6 +250,7 @@ If you have any suggestions for improvements, pull requests are welcome.
 [nsupdate]: https://linux.die.net/man/1/nsupdate
 [bind]: https://www.isc.org/bind
 [nsd]: https://www.nlnetlabs.nl/projects/nsd
+[Cloudflare]: https://api.cloudflare.com/#dns-records-for-a-zone-create-dns-record
 [libev]: http://libev.schmorp.de
 [splice]: https://en.wikipedia.org/wiki/Splice_%28system_call%29
 [proxy]: http://www.haproxy.org/download/1.8/doc/proxy-protocol.txt
