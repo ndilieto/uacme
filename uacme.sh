@@ -36,7 +36,7 @@ case "$METHOD" in
     "begin")
         case "$TYPE" in
             http-01)
-                echo -n "${AUTH}" > "${CHALLENGE_PATH}/${TOKEN}"
+                printf "%s" "${AUTH}" > "${CHALLENGE_PATH}/${TOKEN}"
                 exit $?
                 ;;
             *)
