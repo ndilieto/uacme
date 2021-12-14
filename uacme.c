@@ -1361,7 +1361,7 @@ void usage(const char *progname)
         "usage: %s [-a|--acme-url URL] [-b|--bits BITS] [-c|--confdir DIR]\n"
         "\t[-d|--days DAYS] [-e|--eab KEYID:KEY] [-f|--force] [-h|--hook PROG]\n"
         "\t[-l|--alternate [N | SHA256]] [-m|--must-staple] [-n|--never-create]\n"
-        "\t[-o|--no-ocsp] [-s|--staging] [-t|--type RSA | EC]\n"
+        "\t[-o|--no-ocsp] [-r|--reason CODE] [-s|--staging] [-t|--type RSA | EC]\n"
         "\t[-v|--verbose ...] [-V|--version] [-y|--yes] [-?|--help]\n"
         "\tnew [EMAIL] | update [EMAIL] | deactivate | newkey |\n"
         "\tissue IDENTIFIER [ALTNAME ...]] | issue CSRFILE |\n"
@@ -1398,6 +1398,7 @@ int main(int argc, char **argv)
         {"must-staple",  no_argument,       NULL, 'm'},
         {"never-create", no_argument,       NULL, 'n'},
         {"no-ocsp",      no_argument,       NULL, 'o'},
+        {"reason",       required_argument, NULL, 'r'},
         {"staging",      no_argument,       NULL, 's'},
         {"type",         required_argument, NULL, 't'},
         {"verbose",      no_argument,       NULL, 'v'},
@@ -1416,6 +1417,7 @@ int main(int argc, char **argv)
     bool status_check = true;
     int days = 30;
     int bits = 0;
+    int reason = 0;
     keytype_t type = PK_RSA;
     const char *ident = NULL;
     char *filename = NULL;
@@ -1456,7 +1458,7 @@ int main(int argc, char **argv)
     while (1) {
         char *endptr;
         int option_index;
-        int c = getopt_long(argc, argv, "a:b:c:d:e:f?h:l:mnost:vVy",
+        int c = getopt_long(argc, argv, "a:b:c:d:e:f?h:l:mnor:st:vVy",
                 options, &option_index);
         if (c == -1) break;
         switch (c) {
@@ -1521,6 +1523,14 @@ int main(int argc, char **argv)
 
             case 'v':
                 g_loglevel++;
+                break;
+
+            case 'r':
+                reason = strtol(optarg, &endptr, 0);
+                if (*endptr != 0 || reason < 0) {
+                    warnx("CODE must be a non-negative integer");
+                    goto out;
+                }
                 break;
 
             case 's':
@@ -1819,7 +1829,7 @@ int main(int argc, char **argv)
             ret = 0;
     } else if (strcmp(action, "revoke") == 0) {
         if (acme_bootstrap(&a) && (!a.keyprefix || account_retrieve(&a)) &&
-                cert_revoke(&a, filename, 0))
+                cert_revoke(&a, filename, reason))
             ret = 0;
     }
 

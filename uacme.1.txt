@@ -17,8 +17,8 @@ SYNOPSIS
     [*-c*|*--confdir* 'DIR'] [*-d*|*--days* 'DAYS'] [*-e*|*--eab* KEYID:KEY]
     [*-f*|*--force*] [*-h*|*--hook* 'PROGRAM'] [*-l*|*--alternate* 'N' | 'FP']
     [*-m*|*--must-staple*] [*-n*|*--never-create*] [*-o*|*--no-ocsp*]
-    [*-s*|*--staging*] [*-t*|*--type* *RSA*|*EC*] [*-v*|*--verbose* ...]
-    [*-V*|*--version*] [*-y*|*--yes*] [*-?*|*--help*]
+    [*-r*|*--reason CODE] [*-s*|*--staging*] [*-t*|*--type* *RSA*|*EC*]
+    [*-v*|*--verbose* ...] [*-V*|*--version*] [*-y*|*--yes*] [*-?*|*--help*]
     *new* ['EMAIL'] | *update* ['EMAIL'] | *deactivate* | *newkey* |
     *issue* 'IDENTIFIER' ['ALTNAME' ...]] | *issue* 'CSRFILE' |
     *revoke* 'CERTFILE' ['CERTKEYFILE']
@@ -126,6 +126,10 @@ OPTIONS
     reported as revoked *uacme* forces reissuance regardless of the
     expiration date. See also *-d, --days*.
 
+*-r, --reason* 'CODE'::
+    Use 'CODE' (default 0) as reason code in revocation requests. A list
+    of values is at <https://tools.ietf.org/html/rfc5280#section-5.3.1>.
+
 *-s, --staging*::
     Use Let's Encrypt staging URL for testing. This only works if
     *-a, --acme-url* is *NOT* specified.
@@ -229,6 +233,8 @@ USAGE
     certificate, when only 'CERTFILE' is specified. In the first instance
     the account key and the configuration directory are not required.
     If successful 'CERTFILE' is renamed to 'revoked-TIMESTAMP.pem'.
+    The reason code in the revocation request defaults to 0 but it
+    can be specified by the user with *-r, --reason*.
 
 
 EXIT STATUS
