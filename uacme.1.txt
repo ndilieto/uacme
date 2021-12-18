@@ -17,7 +17,7 @@ SYNOPSIS
     [*-c*|*--confdir* 'DIR'] [*-d*|*--days* 'DAYS'] [*-e*|*--eab* KEYID:KEY]
     [*-f*|*--force*] [*-h*|*--hook* 'PROGRAM'] [*-l*|*--alternate* 'N' | 'FP']
     [*-m*|*--must-staple*] [*-n*|*--never-create*] [*-o*|*--no-ocsp*]
-    [*-r*|*--reason CODE] [*-s*|*--staging*] [*-t*|*--type* *RSA*|*EC*]
+    [*-r*|*--reason* CODE] [*-s*|*--staging*] [*-t*|*--type* *RSA*|*EC*]
     [*-v*|*--verbose* ...] [*-V*|*--version*] [*-y*|*--yes*] [*-?*|*--help*]
     *new* ['EMAIL'] | *update* ['EMAIL'] | *deactivate* | *newkey* |
     *issue* 'IDENTIFIER' ['ALTNAME' ...]] | *issue* 'CSRFILE' |
