@@ -32,6 +32,7 @@
 #include <sys/stat.h>
 #include <sys/socket.h>
 #include <sys/types.h>
+#include <time.h>
 #include <unistd.h>
 
 #include "base64.h"
@@ -544,18 +545,21 @@ static bool rsa_params(privkey_t key, char **m, char **e)
     }
 #elif defined(USE_OPENSSL)
     unsigned char *data = NULL;
+    const BIGNUM *bm = NULL;
+    const BIGNUM *be = NULL;
     RSA *rsa = EVP_PKEY_get0_RSA(key);
     if (!rsa) {
         openssl_error("rsa_params");
         goto out;
     }
-    r = BN_num_bytes(RSA_get0_n(rsa));
+    RSA_get0_key(rsa, &bm, &be, NULL);
+    r = BN_num_bytes(bm);
     data = calloc(1, r);
     if (!data) {
         warn("rsa_params: calloc failed");
         goto out;
     }
-    if (BN_bn2bin(RSA_get0_n(rsa), data) != r) {
+    if (BN_bn2bin(bm, data) != r) {
         openssl_error("rsa_params");
         goto out;
     }
@@ -565,13 +569,13 @@ static bool rsa_params(privkey_t key, char **m, char **e)
         goto out;
     }
     free(data);
-    r = BN_num_bytes(RSA_get0_e(rsa));
+    r = BN_num_bytes(be);
     data = calloc(1, r);
     if (!data) {
         warn("rsa_params: calloc failed");
         goto out;
     }
-    if (BN_bn2bin(RSA_get0_e(rsa), data) != r) {
+    if (BN_bn2bin(be, data) != r) {
         openssl_error("rsa_params");
         goto out;
     }
@@ -1230,18 +1234,21 @@ bool ec_decode(size_t hash_size, unsigned char **sig, size_t *sig_size)
 #endif
 #elif defined(USE_OPENSSL)
     const unsigned char *p = *sig;
+    const BIGNUM *br = NULL;
+    const BIGNUM *bs = NULL;
     ECDSA_SIG *s = d2i_ECDSA_SIG(NULL, &p, *sig_size);
     if (!s) {
         openssl_error("ec_decode");
         return false;
     }
+    ECDSA_SIG_get0(s, &br, &bs);
     unsigned char *tmp = calloc(1, 2*hash_size);
     if (!tmp) {
         warn("ec_decode: calloc failed");
         ECDSA_SIG_free(s);
         return false;
     }
-    r = BN_num_bytes(ECDSA_SIG_get0_r(s));
+    r = BN_num_bytes(br);
     unsigned char *data = calloc(1, r);
     if (!data) {
         warn("ec_decode: calloc failed");
@@ -1249,7 +1256,7 @@ bool ec_decode(size_t hash_size, unsigned char **sig, size_t *sig_size)
         free(tmp);
         return false;
     }
-    if (BN_bn2bin(ECDSA_SIG_get0_r(s), data) != r) {
+    if (BN_bn2bin(br, data) != r) {
         openssl_error("ec_decode");
         ECDSA_SIG_free(s);
         free(data);
@@ -1262,7 +1269,7 @@ bool ec_decode(size_t hash_size, unsigned char **sig, size_t *sig_size)
         memcpy(tmp + hash_size - r, data, r);
     free(data);
 
-    r = BN_num_bytes(ECDSA_SIG_get0_s(s));
+    r = BN_num_bytes(bs);
     data = calloc(1, r);
     if (!data) {
         warn("ec_decode: calloc failed");
@@ -1270,7 +1277,7 @@ bool ec_decode(size_t hash_size, unsigned char **sig, size_t *sig_size)
         free(tmp);
         return false;
     }
-    if (BN_bn2bin(ECDSA_SIG_get0_s(s), data) != r) {
+    if (BN_bn2bin(bs, data) != r) {
         openssl_error("ec_decode");
         ECDSA_SIG_free(s);
         free(data);
@@ -2283,6 +2290,11 @@ char *csr_gen(char * const *names, bool status_req, privkey_t key)
     }
     sk_X509_EXTENSION_push(exts, ext);
     if (status_req) {
+#if defined(LIBRESSL_VERSION_NUMBER)
+        warnx("csr_gen: -m, --must-staple is not supported by LibreSSL "
+                "- consider recompiling with OpenSSL");
+        goto out;
+#endif
         ext = X509V3_EXT_conf_nid(NULL, NULL, NID_tlsfeature,
                 "status_request");
         if (!ext) {
@@ -4254,9 +4266,24 @@ out:
     int ncrt = cert_load(crt, 2, "%s", certfile);
     if (ncrt <= 0)
         goto out;
-    int days_left, sec;
+    int days_left;
     const ASN1_TIME *tm = X509_get0_notAfter(crt[0]);
+#if defined(LIBRESSL_VERSION_NUMBER)
+    struct tm tcrt;
+    if (tm && ASN1_time_parse((const char *)tm->data, tm->length, &tcrt,
+                tm->type) != -1) {
+        time_t now = time(NULL);
+        struct tm *tnow = gmtime(&now);
+        if (!tnow) {
+            warnx("cert_valid: gmtime overflow");
+            goto out;
+        }
+        days_left = difftime(mktime(&tcrt), mktime(tnow))/(3600*24);
+    } else {
+#else
+    int sec;
     if (!tm || !ASN1_TIME_diff(&days_left, &sec, NULL, tm)) {
+#endif
         warnx("cert_valid: invalid expiration time format in %s", certfile);
         goto out;
     }
