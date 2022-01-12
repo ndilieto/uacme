@@ -157,6 +157,8 @@ is another example that works with [nsd][nsd].
 https://gist.github.com/Gowee/e756f925cfcbd5ab32d564ee3c795786 shows how
 to integrate with [Cloudflare API][Cloudflare].
 
+https://github.com/tdy91/uacme-gandi-hook works with [gandi.net][gandi].
+
 ## tls-alpn-01 challenge support
 
 [ualpn][ualpn] is a lightweight proxying [tls-alpn-01][RFC8737] challenge
@@ -251,6 +253,7 @@ If you have any suggestions for improvements, pull requests are welcome.
 [bind]: https://www.isc.org/bind
 [nsd]: https://www.nlnetlabs.nl/projects/nsd
 [Cloudflare]: https://api.cloudflare.com/#dns-records-for-a-zone-create-dns-record
+[gandi]: https://api.gandi.net/docs/livedns
 [libev]: http://libev.schmorp.de
 [splice]: https://en.wikipedia.org/wiki/Splice_%28system_call%29
 [proxy]: http://www.haproxy.org/download/1.8/doc/proxy-protocol.txt
