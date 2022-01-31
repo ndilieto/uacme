@@ -68,6 +68,7 @@ git clone -b upstream/latest https://github.com/ndilieto/uacme
 * https://www.freshports.org/security/uacme
 * https://github.com/openwrt/packages/tree/master/net/uacme
 * https://github.com/buildroot/buildroot/tree/master/package/uacme
+* https://copr.fedorainfracloud.org/coprs/hugorodrigues/uacme/
 
 ## Getting started
 
