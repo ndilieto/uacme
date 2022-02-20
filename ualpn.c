@@ -106,10 +106,10 @@ static void openssl_error(const char *prefix)
 #if MBEDTLS_VERSION_NUMBER < 0x02100000
 #error mbedTLS version 2.16 or later is required
 #endif
-#if !HAVE_MBEDTLS_X509_CRT_PARSE_DER_WITH_EXT_CB && \
+#if MBEDTLS_VERSION_NUMBER < 0x02170000 && \
     !defined(MBEDTLS_X509_ALLOW_UNSUPPORTED_CRITICAL_EXTENSION)
-#error mbedtls_x509_crt_parse_der_with_ext_cb is not available and mbedTLS \
-    was configured without MBEDTLS_X509_ALLOW_UNSUPPORTED_CRITICAL_EXTENSION
+#error mbedTLS earlier than version 2.23 needs to be configured with \
+    MBEDTLS_X509_ALLOW_UNSUPPORTED_CRITICAL_EXTENSION
 #endif
 static const char *_mbedtls_strerror(int code)
 {
@@ -2252,7 +2252,7 @@ static int sni_callback(void *p, mbedtls_ssl_context *ssl,
     return 0;
 }
 
-#if HAVE_MBEDTLS_X509_CRT_PARSE_DER_WITH_EXT_CB
+#if MBEDTLS_VERSION_NUMBER >= 0x02170000
 int ext_callback(void *ctx, mbedtls_x509_crt const *crt,
         mbedtls_x509_buf const *oid, int critical, const unsigned char *p,
         const unsigned char *end)
@@ -2290,7 +2290,7 @@ static int do_handshake(client_t *c)
                 }
 
                 mbedtls_x509_crt_free(&c->crt);
-#if HAVE_MBEDTLS_X509_CRT_PARSE_DER_WITH_EXT_CB
+#if MBEDTLS_VERSION_NUMBER >= 0x02170000
                 rc = mbedtls_x509_crt_parse_der_with_ext_cb(&c->crt, auth->crt,
                         auth->crt_size, 1, ext_callback, NULL);
                 if (rc) {
@@ -2426,7 +2426,7 @@ static int tls_session_init(client_t *c, uint8_t *buf, size_t buf_len)
     mbedtls_ssl_conf_rng(&c->cnf, mbedtls_ctr_drbg_random, &g.ctr_drbg);
     mbedtls_ssl_conf_sni(&c->cnf, sni_callback, c);
     mbedtls_x509_crt_init(&c->crt);
-#if HAVE_MBEDTLS_X509_CRT_PARSE_DER_WITH_EXT_CB
+#if MBEDTLS_VERSION_NUMBER >= 0x02170000
     rc = mbedtls_x509_crt_parse_der_with_ext_cb(&c->crt, g.crt, g.crt_len,
             1, ext_callback, NULL);
     if (rc) {
@@ -4549,12 +4549,11 @@ int main(int argc, char **argv)
         errx("mbedTLS version 2.16 or later is required");
         cleanup_and_exit(0, EXIT_FAILURE);
     }
-#if !HAVE_MBEDTLS_X509_CRT_PARSE_DER_WITH_EXT_CB
+#if MBEDTLS_VERSION_NUMBER < 0x02170000
 #if defined(MBEDTLS_VERSION_FEATURES)
     if (mbedtls_version_check_feature(
                 "MBEDTLS_X509_ALLOW_UNSUPPORTED_CRITICAL_EXTENSION")) {
-        errx("mbedtls_x509_crt_parse_der_with_ext_cb is not available "
-                "and mbedTLS was configured without "
+        errx("mbedTLS earlier than version 2.23 configured without "
                 "MBEDTLS_X509_ALLOW_UNSUPPORTED_CRITICAL_EXTENSION");
         cleanup_and_exit(0, EXIT_FAILURE);
     }
