@@ -31,6 +31,7 @@
 #include <stdarg.h>
 #include <stdbool.h>
 #include <stdio.h>
+#include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
@@ -1332,7 +1333,7 @@ bool alt_parse(acme_t *a, char *alt)
 {
     char *endptr;
     long l = strtol(alt, &endptr, 0);
-    if (*endptr == 0 && l > 0 && l < UINT_MAX) {
+    if (*endptr == 0 && l > 0 && (unsigned long)l < SIZE_MAX) {
         a->alt_n = l;
         return true;
     }
