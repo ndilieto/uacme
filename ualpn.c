@@ -111,6 +111,10 @@ static void openssl_error(const char *prefix)
 #error mbedTLS earlier than version 2.23 needs to be configured with \
     MBEDTLS_X509_ALLOW_UNSUPPORTED_CRITICAL_EXTENSION
 #endif
+#if !defined(MBEDTLS_PRIVATE)
+#define MBEDTLS_PRIVATE(member) member
+#endif
+
 static const char *_mbedtls_strerror(int code)
 {
     static char buf[0x100];
@@ -2273,13 +2277,13 @@ int ext_callback(void *ctx, mbedtls_x509_crt const *crt,
 static int do_handshake(client_t *c)
 {
     int rc = 0;
-    while (c->ssl.state != MBEDTLS_SSL_HANDSHAKE_OVER) {
+    while (c->ssl.MBEDTLS_PRIVATE(state) != MBEDTLS_SSL_HANDSHAKE_OVER) {
         rc = mbedtls_ssl_handshake_step(&c->ssl);
         if (rc)
             break;
         if (c->state == STATE_ACME)
             continue;
-        if (c->ssl.state > MBEDTLS_SSL_CLIENT_HELLO) {
+        if (c->ssl.MBEDTLS_PRIVATE(state) > MBEDTLS_SSL_CLIENT_HELLO) {
             const char *proto = mbedtls_ssl_get_alpn_protocol(&c->ssl);
             if (proto && strcmp(proto, "acme-tls/1") == 0) {
                 auth_t *auth = get_auth(c->ident);
@@ -2310,7 +2314,11 @@ static int do_handshake(client_t *c)
 #endif
                 mbedtls_pk_free(&c->key);
                 rc = mbedtls_pk_parse_key(&c->key, auth->key,
-                        auth->key_size, NULL, 0);
+                        auth->key_size, NULL, 0
+#if MBEDTLS_VERSION_NUMBER >= 0x03000000
+                        , mbedtls_ctr_drbg_random, &g.ctr_drbg
+#endif
+                        );
                 if (rc) {
                     warnx("client %08x: mbedtls_pk_parse_key for %s: %s",
                             c->id, c->ident, _mbedtls_strerror(rc));
@@ -2450,7 +2458,11 @@ static int tls_session_init(client_t *c, uint8_t *buf, size_t buf_len)
     }
 #endif
     mbedtls_pk_init(&c->key);
-    rc = mbedtls_pk_parse_key(&c->key, g.key, g.key_len, NULL, 0);
+    rc = mbedtls_pk_parse_key(&c->key, g.key, g.key_len, NULL, 0
+#if MBEDTLS_VERSION_NUMBER >= 0x03000000
+            , mbedtls_ctr_drbg_random, &g.ctr_drbg
+#endif
+            );
     if (rc) {
         warnx("client %08x: mbedtls_pk_parse_key: %s", c->id,
                 _mbedtls_strerror(rc));
