@@ -3,7 +3,7 @@
 # uacme
 lightweight client for the [RFC8555][RFC8555] ACMEv2 protocol, written in
 plain C with minimal dependencies ([libcurl][libcurl] and one of
-[GnuTLS][GnuTLS], [OpenSSL][OpenSSL] or [mbedTLS][mbedTLS].
+[GnuTLS][GnuTLS], [OpenSSL][OpenSSL] or [mbedTLS][mbedTLS]).
 The ACMEv2 protocol allows a Certificate Authority ([Let's Encrypt][le]
 is a popular one) and an applicant to automate the process of verification
 and certificate issuance. The protocol also provides facilities for other
