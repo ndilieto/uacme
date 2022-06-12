@@ -199,10 +199,6 @@ out:
 #error mbedTLS version 2.16 or later is required
 #endif
 
-#if !defined(MBEDTLS_PRIVATE)
-#define MBEDTLS_PRIVATE(member) member
-#endif
-
 static mbedtls_entropy_context entropy;
 static mbedtls_ctr_drbg_context ctr_drbg;
 
@@ -787,12 +783,40 @@ static size_t ec_params(privkey_t key, char **x, char **y)
 #elif defined(USE_MBEDTLS)
     unsigned char *data = NULL;
     size_t len, olen, plen;
+    mbedtls_ecp_group grp;
+    mbedtls_ecp_point Q;
+    mbedtls_ecp_group_init(&grp);
+    mbedtls_ecp_point_init(&Q);
     if (!mbedtls_pk_can_do(key, MBEDTLS_PK_ECKEY)) {
         warnx("ec_params: not a EC key");
         goto out;
     }
     const mbedtls_ecp_keypair *ec = mbedtls_pk_ec(*key);
-    switch (ec->MBEDTLS_PRIVATE(grp).id) {
+#if MBEDTLS_VERSION_NUMBER >= 0x03000000
+    mbedtls_mpi d;
+    mbedtls_mpi_init(&d);
+    r = mbedtls_ecp_export(ec, &grp, &d, &Q);
+    mbedtls_mpi_free(&d);
+    if (r) {
+        warnx("ec_params: mbedtls_ecp_export failed: %s",
+                _mbedtls_strerror(r));
+        goto out;
+    }
+#else
+    r = mbedtls_ecp_group_copy(&grp, &ec->grp);
+    if (r) {
+        warnx("ec_params: mbedtls_ecp_group_copy failed: %s",
+                _mbedtls_strerror(r));
+        goto out;
+    }
+    r = mbedtls_ecp_copy(&Q, &ec->Q);
+    if (r) {
+        warnx("ec_params: mbedtls_ecp_copy failed: %s",
+                _mbedtls_strerror(r));
+        goto out;
+    }
+#endif
+    switch (grp.id) {
         case MBEDTLS_ECP_DP_SECP256R1:
             bits = 256;
             break;
@@ -806,15 +830,14 @@ static size_t ec_params(privkey_t key, char **x, char **y)
                     "Elliptic Curves supported");
             goto out;
     }
-    plen = mbedtls_mpi_size(&ec->MBEDTLS_PRIVATE(grp).P);
+    plen = mbedtls_mpi_size(&grp.P);
     len = 1 + 2 * plen;
     data = calloc(1, len);
     if (!data) {
         warnx("ec_params: calloc failed");
         goto out;
     }
-    r = mbedtls_ecp_point_write_binary(&ec->MBEDTLS_PRIVATE(grp),
-            &ec->MBEDTLS_PRIVATE(Q), MBEDTLS_ECP_PF_UNCOMPRESSED,
+    r = mbedtls_ecp_point_write_binary(&grp, &Q, MBEDTLS_ECP_PF_UNCOMPRESSED,
             &olen, data, len);
     if (r) {
         warnx("ec_params: mbedtls_ecp_point_write_binary failed: %s",
@@ -852,6 +875,8 @@ out:
     free(data);
 #elif defined(USE_MBEDTLS)
     free(data);
+    mbedtls_ecp_group_free(&grp);
+    mbedtls_ecp_point_free(&Q);
 #endif
     if (_x && _y) {
         if (x)
@@ -3187,14 +3212,23 @@ char *csr_load(const char *file, char ***names)
         goto out;
     }
     free(csrdata);
-    csrsize = ctx.MBEDTLS_PRIVATE(buflen);
+#if MBEDTLS_VERSION_NUMBER >= 0x03000000
+    const unsigned char *csrbuf = mbedtls_pem_get_buffer(&ctx, &csrsize);
+    if (!csrbuf) {
+        warn("csr_load: mbedtls_pem_get_buffer failed");
+        goto out;
+    }
+#else
+    const unsigned char *csrbuf = ctx.buf;
+    csrsize = ctx.buflen;
+#endif
     csrdata = calloc(1, csrsize);
     if (!csrdata) {
         warn("csr_load: calloc failed");
         mbedtls_pem_free(&ctx);
         goto out;
     }
-    memcpy(csrdata, ctx.MBEDTLS_PRIVATE(buf), ctx.MBEDTLS_PRIVATE(buflen));
+    memcpy(csrdata, csrbuf, csrsize);
     mbedtls_pem_free(&ctx);
 #endif
     r = base64_ENCODED_LEN(csrsize, base64_VARIANT_URLSAFE_NO_PADDING);
@@ -4455,7 +4489,11 @@ out:
         goto out;
     }
 
-    if (crt->MBEDTLS_PRIVATE(ext_types) & MBEDTLS_X509_EXT_SUBJECT_ALT_NAME) {
+#if MBEDTLS_VERSION_NUMBER >= 0x03000000
+    if (mbedtls_x509_crt_has_ext_type(crt, MBEDTLS_X509_EXT_SUBJECT_ALT_NAME)) {
+#else
+    if (crt->ext_types & MBEDTLS_X509_EXT_SUBJECT_ALT_NAME) {
+#endif
         int r = ext_san(crt->v3_ext.p, crt->v3_ext.len, &san);
         if (r) {
             warnx("cert_valid: ext_san failed: %s", _mbedtls_strerror(r));
@@ -4596,14 +4634,23 @@ char *cert_der_base64url(const char *certfile)
         goto out;
     }
     free(certdata);
-    certsize = ctx.MBEDTLS_PRIVATE(buflen);
+#if MBEDTLS_VERSION_NUMBER >= 0x03000000
+    const unsigned char *certbuf = mbedtls_pem_get_buffer(&ctx, &certsize);
+    if (!certbuf) {
+        warn("csr_der_base64url: mbedtls_pem_get_buffer failed");
+        goto out;
+    }
+#else
+    const unsigned char *certbuf = ctx.buf;
+    certsize = ctx.buflen;
+#endif
     certdata = calloc(1, certsize);
     if (!certdata) {
         warn("cert_der_base64url: calloc failed");
         mbedtls_pem_free(&ctx);
         goto out;
     }
-    memcpy(certdata, ctx.MBEDTLS_PRIVATE(buf), ctx.MBEDTLS_PRIVATE(buflen));
+    memcpy(certdata, certbuf, certsize);
     mbedtls_pem_free(&ctx);
 #endif
     r = base64_ENCODED_LEN(certsize, base64_VARIANT_URLSAFE_NO_PADDING);

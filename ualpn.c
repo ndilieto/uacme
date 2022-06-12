@@ -111,9 +111,6 @@ static void openssl_error(const char *prefix)
 #error mbedTLS earlier than version 2.23 needs to be configured with \
     MBEDTLS_X509_ALLOW_UNSUPPORTED_CRITICAL_EXTENSION
 #endif
-#if !defined(MBEDTLS_PRIVATE)
-#define MBEDTLS_PRIVATE(member) member
-#endif
 
 static const char *_mbedtls_strerror(int code)
 {
@@ -2274,78 +2271,102 @@ int ext_callback(void *ctx, mbedtls_x509_crt const *crt,
 }
 #endif
 
+int cert_select(client_t *c)
+{
+    const char *proto = mbedtls_ssl_get_alpn_protocol(&c->ssl);
+    if (proto && strcmp(proto, "acme-tls/1") == 0) {
+        int rc;
+        auth_t *auth = get_auth(c->ident);
+        if (!auth) {
+            infox("client %08x: acme-tls/1 handshake: no auth for %s",
+                    c->id, c->ident);
+            return MBEDTLS_ERR_SSL_HANDSHAKE_FAILURE;
+        }
+
+        mbedtls_x509_crt_free(&c->crt);
+#if MBEDTLS_VERSION_NUMBER >= 0x02170000
+        rc = mbedtls_x509_crt_parse_der_with_ext_cb(&c->crt, auth->crt,
+                auth->crt_size, 1, ext_callback, NULL);
+        if (rc) {
+            warnx("client %08x: mbedtls_x509_crt_parse_der_with_ext_cb"
+                    " for %s: %s",
+                    c->id, c->ident, _mbedtls_strerror(rc));
+            return MBEDTLS_ERR_SSL_HANDSHAKE_FAILURE;
+        }
+#else
+        rc = mbedtls_x509_crt_parse_der(&c->crt, auth->crt,
+                auth->crt_size);
+        if (rc) {
+            warnx("client %08x: mbedtls_x509_crt_parse_der for %s: %s",
+                    c->id, c->ident, _mbedtls_strerror(rc));
+            return MBEDTLS_ERR_SSL_HANDSHAKE_FAILURE;
+        }
+#endif
+        mbedtls_pk_free(&c->key);
+        rc = mbedtls_pk_parse_key(&c->key, auth->key,
+                auth->key_size, NULL, 0
+#if MBEDTLS_VERSION_NUMBER >= 0x03000000
+                , mbedtls_ctr_drbg_random, &g.ctr_drbg
+#endif
+                );
+        if (rc) {
+            warnx("client %08x: mbedtls_pk_parse_key for %s: %s",
+                    c->id, c->ident, _mbedtls_strerror(rc));
+            return MBEDTLS_ERR_SSL_HANDSHAKE_FAILURE;
+        }
+
+        rc = mbedtls_ssl_set_hs_own_cert(&c->ssl, &c->crt, &c->key);
+        if (rc) {
+            warnx("client %08x: mbedtls_ssl_set_hs_own_cert for %s: %s",
+                    c->id, c->ident, _mbedtls_strerror(rc));
+            return MBEDTLS_ERR_SSL_HANDSHAKE_FAILURE;
+        }
+
+        safe_strncpy(c->auth, auth->auth, sizeof(c->auth));
+#if HAVE_SPLICE
+        c->n_f2b = 0;
+#else
+        c->buf_f2b.n = 0;
+        c->buf_f2b.rp = 0;
+        c->buf_f2b.wp = 0;
+#endif
+        c->state = STATE_ACME;
+        return 0;
+    } else
+        return MBEDTLS_ERR_SSL_HANDSHAKE_FAILURE;
+}
+
+#if MBEDTLS_VERSION_NUMBER >= 0x03000000
+int cert_callback(mbedtls_ssl_context *ssl)
+{
+    client_t *c = (client_t *)mbedtls_ssl_get_user_data_p(ssl);
+    if (!c || ssl != &c->ssl)
+        return -1;
+
+    return cert_select(c);
+}
+#endif
+
 static int do_handshake(client_t *c)
 {
+#if MBEDTLS_VERSION_NUMBER >= 0x03000000
+    return mbedtls_ssl_handshake(&c->ssl);
+#else
     int rc = 0;
-    while (c->ssl.MBEDTLS_PRIVATE(state) != MBEDTLS_SSL_HANDSHAKE_OVER) {
+    while (c->ssl.state != MBEDTLS_SSL_HANDSHAKE_OVER) {
         rc = mbedtls_ssl_handshake_step(&c->ssl);
         if (rc)
             break;
         if (c->state == STATE_ACME)
             continue;
-        if (c->ssl.MBEDTLS_PRIVATE(state) > MBEDTLS_SSL_CLIENT_HELLO) {
-            const char *proto = mbedtls_ssl_get_alpn_protocol(&c->ssl);
-            if (proto && strcmp(proto, "acme-tls/1") == 0) {
-                auth_t *auth = get_auth(c->ident);
-                if (!auth) {
-                    infox("client %08x: acme-tls/1 handshake: no auth for %s",
-                            c->id, c->ident);
-                    return -1;
-                }
-
-                mbedtls_x509_crt_free(&c->crt);
-#if MBEDTLS_VERSION_NUMBER >= 0x02170000
-                rc = mbedtls_x509_crt_parse_der_with_ext_cb(&c->crt, auth->crt,
-                        auth->crt_size, 1, ext_callback, NULL);
-                if (rc) {
-                    warnx("client %08x: mbedtls_x509_crt_parse_der_with_ext_cb"
-                            " for %s: %s",
-                            c->id, c->ident, _mbedtls_strerror(rc));
-                    return -1;
-                }
-#else
-                rc = mbedtls_x509_crt_parse_der(&c->crt, auth->crt,
-                        auth->crt_size);
-                if (rc) {
-                    warnx("client %08x: mbedtls_x509_crt_parse_der for %s: %s",
-                            c->id, c->ident, _mbedtls_strerror(rc));
-                    return -1;
-                }
-#endif
-                mbedtls_pk_free(&c->key);
-                rc = mbedtls_pk_parse_key(&c->key, auth->key,
-                        auth->key_size, NULL, 0
-#if MBEDTLS_VERSION_NUMBER >= 0x03000000
-                        , mbedtls_ctr_drbg_random, &g.ctr_drbg
-#endif
-                        );
-                if (rc) {
-                    warnx("client %08x: mbedtls_pk_parse_key for %s: %s",
-                            c->id, c->ident, _mbedtls_strerror(rc));
-                    return -1;
-                }
-
-                rc = mbedtls_ssl_conf_own_cert(&c->cnf, &c->crt, &c->key);
-                if (rc) {
-                    warnx("client %08x: mbedtls_ssl_conf_own_cert for %s: %s",
-                            c->id, c->ident, _mbedtls_strerror(rc));
-                    return -1;
-                }
-
-                safe_strncpy(c->auth, auth->auth, sizeof(c->auth));
-#if HAVE_SPLICE
-                c->n_f2b = 0;
-#else
-                c->buf_f2b.n = 0;
-                c->buf_f2b.rp = 0;
-                c->buf_f2b.wp = 0;
-#endif
-                c->state = STATE_ACME;
-            } else
-                return -1;
+        if (c->ssl.state > MBEDTLS_SSL_CLIENT_HELLO) {
+            rc = cert_select(c);
+            if (rc)
+                break;
         }
     }
     return rc;
+#endif
 }
 #endif
 
@@ -2433,6 +2454,9 @@ static int tls_session_init(client_t *c, uint8_t *buf, size_t buf_len)
     }
     mbedtls_ssl_conf_rng(&c->cnf, mbedtls_ctr_drbg_random, &g.ctr_drbg);
     mbedtls_ssl_conf_sni(&c->cnf, sni_callback, c);
+#if MBEDTLS_VERSION_NUMBER >= 0x03000000
+    mbedtls_ssl_conf_cert_cb(&c->cnf, cert_callback);
+#endif
     mbedtls_x509_crt_init(&c->crt);
 #if MBEDTLS_VERSION_NUMBER >= 0x02170000
     rc = mbedtls_x509_crt_parse_der_with_ext_cb(&c->crt, g.crt, g.crt_len,
@@ -2475,6 +2499,9 @@ static int tls_session_init(client_t *c, uint8_t *buf, size_t buf_len)
         return -1;
     }
     mbedtls_ssl_init(&c->ssl);
+#if MBEDTLS_VERSION_NUMBER >= 0x03000000
+    mbedtls_ssl_set_user_data_p(&c->ssl, c);
+#endif
     rc = mbedtls_ssl_setup(&c->ssl, &c->cnf);
     if (rc) {
         warnx("client %08x: mbedtls_ssl_setup: %s", c->id,
