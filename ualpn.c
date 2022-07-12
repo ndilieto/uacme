@@ -2443,8 +2443,12 @@ static int tls_session_init(client_t *c, uint8_t *buf, size_t buf_len)
                 _mbedtls_strerror(rc));
         return -1;
     }
+#if MBEDTLS_VERSION_NUMBER >= 0x03000000
+    mbedtls_ssl_conf_min_tls_version(&c->cnf, MBEDTLS_SSL_VERSION_TLS1_2);
+#else
     mbedtls_ssl_conf_min_version(&c->cnf, MBEDTLS_SSL_MAJOR_VERSION_3,
             MBEDTLS_SSL_MINOR_VERSION_3);
+#endif
     static const char *protos[] = { "acme-tls/1", NULL };
     rc = mbedtls_ssl_conf_alpn_protocols(&c->cnf, protos);
     if (rc) {

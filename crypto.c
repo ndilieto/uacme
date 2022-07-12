@@ -196,7 +196,10 @@ out:
 }
 #elif defined(USE_MBEDTLS)
 #if MBEDTLS_VERSION_NUMBER < 0x02100000
-#error mbedTLS version 2.16 or later is required
+#error mbedTLS 2.x version 2.16 or later is required
+#endif
+#if MBEDTLS_VERSION_NUMBER >= 0x03000000 && MBEDTLS_VERSION_NUMBER < 0x03020000
+#error mbedTLS 3.x version 3.2 or later is required
 #endif
 
 static mbedtls_entropy_context entropy;
@@ -212,8 +215,13 @@ static const char *_mbedtls_strerror(int code)
 bool crypto_init(void)
 {
 #if defined(MBEDTLS_VERSION_C)
-    if (mbedtls_version_get_number() < 0x02100000) {
-        warnx("crypto_init: mbedTLS version 2.16 or later is required");
+    unsigned int version = mbedtls_version_get_number();
+    if (version < 0x02100000) {
+        warnx("crypto_init: mbedTLS 2.x version 2.16 or later is required");
+        return false;
+    }
+    if (version >= 0x03000000 && version < 0x03020000) {
+        warnx("crypto_init: mbedTLS 3.x version 3.2 or later is required");
         return false;
     }
 #endif
