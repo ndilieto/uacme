@@ -908,7 +908,7 @@ bool authorize(acme_t *a)
                 if (acme_post(a, url, "{}") != 200) {
                     warnx("failed to start challenge at %s", url);
                     acme_error(a);
-                } else while (!chlg_done) {
+                } else for (unsigned u = 5; !chlg_done; u *= 2) {
                     msg(1, "polling challenge status at %s", url);
                     if (acme_post(a, url, "") != 200) {
                         warnx("failed to poll challenge status at %s", url);
@@ -924,9 +924,13 @@ bool authorize(acme_t *a)
                                 url, status ? status : "unknown");
                         acme_error(a);
                         break;
+                    } else if (u < 5*512) {
+                        msg(u > 40 ? 1 : 2, "%s, waiting %u seconds",
+                                status, u);
+                        sleep(u);
                     } else {
-                        msg(2, "challenge %s, waiting 5 seconds", status);
-                        sleep(5);
+                        warnx("timeout, giving up");
+                        break;
                     }
                 }
                 if (a->hook && strlen(a->hook) > 0) {
@@ -1004,7 +1008,7 @@ bool cert_issue(acme_t *a, char * const *names, const char *csr)
             warnx("failed to authorize order at %s", orderurl);
             goto out;
         }
-        while (1) {
+        for (unsigned u = 5; true; u *= 2) {
             msg(1, "polling order status at %s", orderurl);
             if (acme_post(a, orderurl, "") != 200) {
                 warnx("failed to poll order status at %s", orderurl);
@@ -1023,9 +1027,12 @@ bool cert_issue(acme_t *a, char * const *names, const char *csr)
                         status ? status : "unknown", orderurl);
                 acme_error(a);
                 goto out;
+            } else if (u < 5*512) {
+                msg(u > 40 ? 1 : 2, "waiting %u seconds", u);
+                sleep(u);
             } else {
-                msg(2, "order pending, waiting 5 seconds");
-                sleep(5);
+                warnx("timeout, giving up");
+                break;
             }
         }
     }
@@ -1044,7 +1051,7 @@ bool cert_issue(acme_t *a, char * const *names, const char *csr)
     } else if (acme_error(a))
         goto out;
 
-    while (1) {
+    for (unsigned u = 5; true; u *= 2) {
         msg(1, "polling order status at %s", orderurl);
         if (acme_post(a, orderurl, "") != 200) {
             warnx("failed to poll order status at %s", orderurl);
@@ -1062,9 +1069,12 @@ bool cert_issue(acme_t *a, char * const *names, const char *csr)
                     status ? status : "unknown", orderurl);
             acme_error(a);
             goto out;
+        } else if (u < 5*512) {
+            msg(u > 40 ? 1 : 2, "waiting %u seconds", u);
+            sleep(u);
         } else {
-            msg(2, "order processing, waiting 5 seconds");
-            sleep(5);
+            warnx("timeout, giving up");
+            break;
         }
     }
 
