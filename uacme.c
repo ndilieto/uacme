@@ -929,7 +929,8 @@ bool authorize(acme_t *a)
                                 status, u);
                         sleep(u);
                     } else {
-                        warnx("timeout, giving up");
+                        warnx("timeout while polling challenge status at %s, "
+                                "giving up", url);
                         break;
                     }
                 }
@@ -1031,7 +1032,8 @@ bool cert_issue(acme_t *a, char * const *names, const char *csr)
                 msg(u > 40 ? 1 : 2, "waiting %u seconds", u);
                 sleep(u);
             } else {
-                warnx("timeout, giving up");
+                warnx("timeout while polling order status at %s, giving up",
+                        orderurl);
                 break;
             }
         }
@@ -1073,7 +1075,8 @@ bool cert_issue(acme_t *a, char * const *names, const char *csr)
             msg(u > 40 ? 1 : 2, "waiting %u seconds", u);
             sleep(u);
         } else {
-            warnx("timeout, giving up");
+            warnx("timeout while polling order status at %s, giving up",
+                    orderurl);
             break;
         }
     }
