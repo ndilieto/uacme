@@ -1,5 +1,5 @@
 #!/bin/sh
-# Copyright (C) 2019-2021 Nicola Di Lieto <nicola.dilieto@gmail.com>
+# Copyright (C) 2019-2022 Nicola Di Lieto <nicola.dilieto@gmail.com>
 #
 # This file is part of uacme.
 #
@@ -36,7 +36,7 @@ case "$METHOD" in
     "begin")
         case "$TYPE" in
             http-01)
-                echo -n "${AUTH}" > "${CHALLENGE_PATH}/${TOKEN}"
+                printf "%s" "${AUTH}" > "${CHALLENGE_PATH}/${TOKEN}"
                 exit $?
                 ;;
             *)

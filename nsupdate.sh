@@ -133,7 +133,7 @@ ns_update()
         res=$?
     done
 
-    return $?
+    return $res
 }
 
 ARGS=5

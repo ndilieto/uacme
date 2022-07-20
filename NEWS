@@ -1,5 +1,24 @@
 uacme NEWS
-Copyright (C) 2019-2021 Nicola Di Lieto <nicola.dilieto@gmail.com>
+Copyright (C) 2019-2022 Nicola Di Lieto <nicola.dilieto@gmail.com>
+
+## [1.7.2] - 2022-07-20
+### Added
+- uacme: exponential backoff for status polling instead of
+         constant 5s delay, to reduce load on server
+- uacme: -r option to allow specifying revocation code
+- compatibility with mbedTLS v3.2
+- compatibility with LibreSSL (with some limitations,
+  see https://github.com/ndilieto/uacme/commit/32546c7c
+
+### Changed
+- uacme: fix silent failure in nsupdate.sh
+         closes https://github.com/ndilieto/uacme/issues/45
+- uacme: replace 'echo' with 'printf' in uacme.sh
+         closes https://github.com/ndilieto/uacme/issues/48
+- uacme: fix compilation warning
+- embed ax_check_compile_flag.m4 from autoconf-archive as
+  requested in https://github.com/ndilieto/uacme/pull/57
+- minor documentation changes including copyright year
 
 ## [1.7.1] - 2021-06-04
 ### Changed

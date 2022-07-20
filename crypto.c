@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2019-2021 Nicola Di Lieto <nicola.dilieto@gmail.com>
+ * Copyright (C) 2019-2022 Nicola Di Lieto <nicola.dilieto@gmail.com>
  *
  * This file is part of uacme.
  *
@@ -32,6 +32,7 @@
 #include <sys/stat.h>
 #include <sys/socket.h>
 #include <sys/types.h>
+#include <time.h>
 #include <unistd.h>
 
 #include "base64.h"
@@ -195,7 +196,10 @@ out:
 }
 #elif defined(USE_MBEDTLS)
 #if MBEDTLS_VERSION_NUMBER < 0x02100000
-#error mbedTLS version 2.16 or later is required
+#error mbedTLS 2.x version 2.16 or later is required
+#endif
+#if MBEDTLS_VERSION_NUMBER >= 0x03000000 && MBEDTLS_VERSION_NUMBER < 0x03020000
+#error mbedTLS 3.x version 3.2 or later is required
 #endif
 
 static mbedtls_entropy_context entropy;
@@ -211,8 +215,13 @@ static const char *_mbedtls_strerror(int code)
 bool crypto_init(void)
 {
 #if defined(MBEDTLS_VERSION_C)
-    if (mbedtls_version_get_number() < 0x02100000) {
-        warnx("crypto_init: mbedTLS version 2.16 or later is required");
+    unsigned int version = mbedtls_version_get_number();
+    if (version < 0x02100000) {
+        warnx("crypto_init: mbedTLS 2.x version 2.16 or later is required");
+        return false;
+    }
+    if (version >= 0x03000000 && version < 0x03020000) {
+        warnx("crypto_init: mbedTLS 3.x version 3.2 or later is required");
         return false;
     }
 #endif
@@ -544,18 +553,21 @@ static bool rsa_params(privkey_t key, char **m, char **e)
     }
 #elif defined(USE_OPENSSL)
     unsigned char *data = NULL;
+    const BIGNUM *bm = NULL;
+    const BIGNUM *be = NULL;
     RSA *rsa = EVP_PKEY_get0_RSA(key);
     if (!rsa) {
         openssl_error("rsa_params");
         goto out;
     }
-    r = BN_num_bytes(RSA_get0_n(rsa));
+    RSA_get0_key(rsa, &bm, &be, NULL);
+    r = BN_num_bytes(bm);
     data = calloc(1, r);
     if (!data) {
         warn("rsa_params: calloc failed");
         goto out;
     }
-    if (BN_bn2bin(RSA_get0_n(rsa), data) != r) {
+    if (BN_bn2bin(bm, data) != r) {
         openssl_error("rsa_params");
         goto out;
     }
@@ -565,13 +577,13 @@ static bool rsa_params(privkey_t key, char **m, char **e)
         goto out;
     }
     free(data);
-    r = BN_num_bytes(RSA_get0_e(rsa));
+    r = BN_num_bytes(be);
     data = calloc(1, r);
     if (!data) {
         warn("rsa_params: calloc failed");
         goto out;
     }
-    if (BN_bn2bin(RSA_get0_e(rsa), data) != r) {
+    if (BN_bn2bin(be, data) != r) {
         openssl_error("rsa_params");
         goto out;
     }
@@ -583,18 +595,27 @@ static bool rsa_params(privkey_t key, char **m, char **e)
 #elif defined(USE_MBEDTLS)
     unsigned char *data = NULL;
     size_t len;
+    mbedtls_mpi mn, me;
+    mbedtls_mpi_init(&mn);
+    mbedtls_mpi_init(&me);
     if (!mbedtls_pk_can_do(key, MBEDTLS_PK_RSA)) {
         warnx("rsa_params: not a RSA key");
         goto out;
     }
     const mbedtls_rsa_context *rsa = mbedtls_pk_rsa(*key);
-    len = mbedtls_mpi_size(&rsa->N);
+    r = mbedtls_rsa_export(rsa, &mn, NULL, NULL, NULL, &me);
+    if (r) {
+        warnx("rsa_params: mbedtls_rsa_export failed: %s",
+                _mbedtls_strerror(r));
+        goto out;
+    }
+    len = mbedtls_mpi_size(&mn);
     data = calloc(1, len);
     if (!data) {
         warnx("rsa_params: calloc failed");
         goto out;
     }
-    r = mbedtls_mpi_write_binary(&rsa->N, data, len);
+    r = mbedtls_mpi_write_binary(&mn, data, len);
     if (r) {
         warnx("rsa_params: mbedtls_mpi_write_binary failed: %s",
                 _mbedtls_strerror(r));
@@ -606,13 +627,13 @@ static bool rsa_params(privkey_t key, char **m, char **e)
         goto out;
     }
     free(data);
-    len = mbedtls_mpi_size(&rsa->E);
+    len = mbedtls_mpi_size(&me);
     data = calloc(1, len);
     if (!data) {
         warnx("rsa_params: calloc failed");
         goto out;
     }
-    r = mbedtls_mpi_write_binary(&rsa->E, data, len);
+    r = mbedtls_mpi_write_binary(&me, data, len);
     if (r) {
         warnx("rsa_params: mbedtls_mpi_write_binary failed: %s",
                 _mbedtls_strerror(r));
@@ -632,6 +653,8 @@ out:
     free(data);
 #elif defined(USE_MBEDTLS)
     free(data);
+    mbedtls_mpi_free(&mn);
+    mbedtls_mpi_free(&me);
 #endif
     if (_e && _m) {
         if (e)
@@ -767,13 +790,41 @@ static size_t ec_params(privkey_t key, char **x, char **y)
     }
 #elif defined(USE_MBEDTLS)
     unsigned char *data = NULL;
-    size_t len;
+    size_t len, olen, plen;
+    mbedtls_ecp_group grp;
+    mbedtls_ecp_point Q;
+    mbedtls_ecp_group_init(&grp);
+    mbedtls_ecp_point_init(&Q);
     if (!mbedtls_pk_can_do(key, MBEDTLS_PK_ECKEY)) {
         warnx("ec_params: not a EC key");
         goto out;
     }
     const mbedtls_ecp_keypair *ec = mbedtls_pk_ec(*key);
-    switch (ec->grp.id) {
+#if MBEDTLS_VERSION_NUMBER >= 0x03000000
+    mbedtls_mpi d;
+    mbedtls_mpi_init(&d);
+    r = mbedtls_ecp_export(ec, &grp, &d, &Q);
+    mbedtls_mpi_free(&d);
+    if (r) {
+        warnx("ec_params: mbedtls_ecp_export failed: %s",
+                _mbedtls_strerror(r));
+        goto out;
+    }
+#else
+    r = mbedtls_ecp_group_copy(&grp, &ec->grp);
+    if (r) {
+        warnx("ec_params: mbedtls_ecp_group_copy failed: %s",
+                _mbedtls_strerror(r));
+        goto out;
+    }
+    r = mbedtls_ecp_copy(&Q, &ec->Q);
+    if (r) {
+        warnx("ec_params: mbedtls_ecp_copy failed: %s",
+                _mbedtls_strerror(r));
+        goto out;
+    }
+#endif
+    switch (grp.id) {
         case MBEDTLS_ECP_DP_SECP256R1:
             bits = 256;
             break;
@@ -787,37 +838,34 @@ static size_t ec_params(privkey_t key, char **x, char **y)
                     "Elliptic Curves supported");
             goto out;
     }
-    len = mbedtls_mpi_size(&ec->Q.X);
+    plen = mbedtls_mpi_size(&grp.P);
+    len = 1 + 2 * plen;
     data = calloc(1, len);
     if (!data) {
         warnx("ec_params: calloc failed");
         goto out;
     }
-    r = mbedtls_mpi_write_binary(&ec->Q.X, data, len);
+    r = mbedtls_ecp_point_write_binary(&grp, &Q, MBEDTLS_ECP_PF_UNCOMPRESSED,
+            &olen, data, len);
     if (r) {
-        warnx("ec_params: mbedtls_mpi_write_binary failed: %s",
+        warnx("ec_params: mbedtls_ecp_point_write_binary failed: %s",
                 _mbedtls_strerror(r));
         goto out;
     }
-    _x = bn2str(data, len, (bits+7)/8);
+    if (olen != len) {
+        warnx("ec_params: wrong length (actual %zu, expected %zu)", olen, len);
+        goto out;
+    }
+    if (data[0] != 0x04) {
+        warnx("ec_params: key data corruption");
+        goto out;
+    }
+    _x = bn2str(data + 1, plen, (bits+7)/8);
     if (!_x) {
         warnx("ec_params: bn2str failed");
         goto out;
     }
-    free(data);
-    len = mbedtls_mpi_size(&ec->Q.Y);
-    data = calloc(1, len);
-    if (!data) {
-        warnx("ec_params: calloc failed");
-        goto out;
-    }
-    r = mbedtls_mpi_write_binary(&ec->Q.Y, data, len);
-    if (r) {
-        warnx("ec_params: mbedtls_mpi_write_binary failed: %s",
-                _mbedtls_strerror(r));
-        goto out;
-    }
-    _y = bn2str(data, len, (bits+7)/8);
+    _y = bn2str(data + 1 + plen, plen, (bits+7)/8);
     if (!_y) {
         warnx("ec_params: bn2str failed");
         goto out;
@@ -835,6 +883,8 @@ out:
     free(data);
 #elif defined(USE_MBEDTLS)
     free(data);
+    mbedtls_ecp_group_free(&grp);
+    mbedtls_ecp_point_free(&Q);
 #endif
     if (_x && _y) {
         if (x)
@@ -1230,18 +1280,21 @@ bool ec_decode(size_t hash_size, unsigned char **sig, size_t *sig_size)
 #endif
 #elif defined(USE_OPENSSL)
     const unsigned char *p = *sig;
+    const BIGNUM *br = NULL;
+    const BIGNUM *bs = NULL;
     ECDSA_SIG *s = d2i_ECDSA_SIG(NULL, &p, *sig_size);
     if (!s) {
         openssl_error("ec_decode");
         return false;
     }
+    ECDSA_SIG_get0(s, &br, &bs);
     unsigned char *tmp = calloc(1, 2*hash_size);
     if (!tmp) {
         warn("ec_decode: calloc failed");
         ECDSA_SIG_free(s);
         return false;
     }
-    r = BN_num_bytes(ECDSA_SIG_get0_r(s));
+    r = BN_num_bytes(br);
     unsigned char *data = calloc(1, r);
     if (!data) {
         warn("ec_decode: calloc failed");
@@ -1249,7 +1302,7 @@ bool ec_decode(size_t hash_size, unsigned char **sig, size_t *sig_size)
         free(tmp);
         return false;
     }
-    if (BN_bn2bin(ECDSA_SIG_get0_r(s), data) != r) {
+    if (BN_bn2bin(br, data) != r) {
         openssl_error("ec_decode");
         ECDSA_SIG_free(s);
         free(data);
@@ -1262,7 +1315,7 @@ bool ec_decode(size_t hash_size, unsigned char **sig, size_t *sig_size)
         memcpy(tmp + hash_size - r, data, r);
     free(data);
 
-    r = BN_num_bytes(ECDSA_SIG_get0_s(s));
+    r = BN_num_bytes(bs);
     data = calloc(1, r);
     if (!data) {
         warn("ec_decode: calloc failed");
@@ -1270,7 +1323,7 @@ bool ec_decode(size_t hash_size, unsigned char **sig, size_t *sig_size)
         free(tmp);
         return false;
     }
-    if (BN_bn2bin(ECDSA_SIG_get0_s(s), data) != r) {
+    if (BN_bn2bin(bs, data) != r) {
         openssl_error("ec_decode");
         ECDSA_SIG_free(s);
         free(data);
@@ -1473,11 +1526,13 @@ char *jws_encode(const char *protected, const char *payload,
     }
     switch (mbedtls_pk_get_type(key)) {
         case MBEDTLS_PK_RSA:
-            signature = calloc(1, mbedtls_pk_get_len(key));
+            signature_size = mbedtls_pk_get_len(key);
+            signature = calloc(1, signature_size);
             break;
 
         case MBEDTLS_PK_ECKEY:
-            signature = calloc(1, 9+2*mbedtls_pk_get_len(key));
+            signature_size = 9+2*mbedtls_pk_get_len(key);
+            signature = calloc(1, signature_size);
             break;
 
         default:
@@ -1489,6 +1544,9 @@ char *jws_encode(const char *protected, const char *payload,
         goto out;
     }
     r = mbedtls_pk_sign(key, hash_type, hash, hash_size, signature,
+#if MBEDTLS_VERSION_NUMBER >= 0x03000000
+            signature_size,
+#endif
             &signature_size, mbedtls_ctr_drbg_random, &ctr_drbg);
     if (r != 0) {
         warnx("jws_encode: mbedtls_pk_sign failed: %s",
@@ -1940,7 +1998,11 @@ privkey_t key_load(keytype_t type, int bits, const char *format, ...)
         goto out;
     }
     mbedtls_pk_init(key);
-    r = mbedtls_pk_parse_key(key, keydata, keysize+1, NULL, 0);
+    r = mbedtls_pk_parse_key(key, keydata, keysize+1, NULL, 0
+#if MBEDTLS_VERSION_NUMBER >= 0x03000000
+                , mbedtls_ctr_drbg_random, &ctr_drbg
+#endif
+            );
     if (r) {
         warnx("key_load: mbedtls_pk_parse failed: %s",
                 _mbedtls_strerror(r));
@@ -2283,6 +2345,11 @@ char *csr_gen(char * const *names, bool status_req, privkey_t key)
     }
     sk_X509_EXTENSION_push(exts, ext);
     if (status_req) {
+#if defined(LIBRESSL_VERSION_NUMBER)
+        warnx("csr_gen: -m, --must-staple is not supported by LibreSSL "
+                "- consider recompiling with OpenSSL");
+        goto out;
+#endif
         ext = X509V3_EXT_conf_nid(NULL, NULL, NID_tlsfeature,
                 "status_request");
         if (!ext) {
@@ -2424,6 +2491,9 @@ char *csr_gen(char * const *names, bool status_req, privkey_t key)
         r = mbedtls_x509write_csr_set_extension(&csr,
                 MBEDTLS_OID_SUBJECT_ALT_NAME,
                 MBEDTLS_OID_SIZE(MBEDTLS_OID_SUBJECT_ALT_NAME),
+#if MBEDTLS_VERSION_NUMBER >= 0x03000000
+                0,
+#endif
                 buf + buflen - len, len);
         if (r) {
             warnx("csr_gen: mbedtls_x509write_csr_set_extension failed: %s",
@@ -2471,6 +2541,9 @@ char *csr_gen(char * const *names, bool status_req, privkey_t key)
                 // pe(1) id-pe-tlsfeature(24)
                 MBEDTLS_OID_PKIX "\x01\x18",
                 MBEDTLS_OID_SIZE(MBEDTLS_OID_PKIX "\x01\x18"),
+#if MBEDTLS_VERSION_NUMBER >= 0x03000000
+                0,
+#endif
                 buf + buflen - len, len);
         if (r) {
             warnx("csr_gen: mbedtls_x509write_csr_set_extension failed: %s",
@@ -3147,14 +3220,23 @@ char *csr_load(const char *file, char ***names)
         goto out;
     }
     free(csrdata);
+#if MBEDTLS_VERSION_NUMBER >= 0x03000000
+    const unsigned char *csrbuf = mbedtls_pem_get_buffer(&ctx, &csrsize);
+    if (!csrbuf) {
+        warn("csr_load: mbedtls_pem_get_buffer failed");
+        goto out;
+    }
+#else
+    const unsigned char *csrbuf = ctx.buf;
     csrsize = ctx.buflen;
+#endif
     csrdata = calloc(1, csrsize);
     if (!csrdata) {
         warn("csr_load: calloc failed");
         mbedtls_pem_free(&ctx);
         goto out;
     }
-    memcpy(csrdata, ctx.buf, ctx.buflen);
+    memcpy(csrdata, csrbuf, csrsize);
     mbedtls_pem_free(&ctx);
 #endif
     r = base64_ENCODED_LEN(csrsize, base64_VARIANT_URLSAFE_NO_PADDING);
@@ -3917,7 +3999,11 @@ static int ocsp_req(mbedtls_x509_crt *crt, unsigned char *req, size_t size,
         unsigned char *c = buf + buf_size;
         ret = mbedtls_pk_write_pubkey(&c, buf, &issuer->pk);
         if (ret >= 0)
+#if MBEDTLS_VERSION_NUMBER < 0x03000000
             ret = mbedtls_sha1_ret(buf + buf_size - ret, ret, hash);
+#else
+            ret = mbedtls_sha1(buf + buf_size - ret, ret, hash);
+#endif
         mbedtls_free(buf);
         if (ret == MBEDTLS_ERR_ASN1_BUF_TOO_SMALL) {
             buf_size *= 2;
@@ -3931,7 +4017,11 @@ static int ocsp_req(mbedtls_x509_crt *crt, unsigned char *req, size_t size,
     MBEDTLS_ASN1_CHK_ADD(len, mbedtls_asn1_write_octet_string(&p, req,
                 hash, sizeof(hash)));
 
+#if MBEDTLS_VERSION_NUMBER < 0x03000000
     ret = mbedtls_sha1_ret(crt->issuer_raw.p, crt->issuer_raw.len, hash);
+#else
+    ret = mbedtls_sha1(crt->issuer_raw.p, crt->issuer_raw.len, hash);
+#endif
     if (ret)
         return ret;
 
@@ -4254,9 +4344,24 @@ out:
     int ncrt = cert_load(crt, 2, "%s", certfile);
     if (ncrt <= 0)
         goto out;
-    int days_left, sec;
+    int days_left;
     const ASN1_TIME *tm = X509_get0_notAfter(crt[0]);
+#if defined(LIBRESSL_VERSION_NUMBER)
+    struct tm tcrt;
+    if (tm && ASN1_time_parse((const char *)tm->data, tm->length, &tcrt,
+                tm->type) != -1) {
+        time_t now = time(NULL);
+        struct tm *tnow = gmtime(&now);
+        if (!tnow) {
+            warnx("cert_valid: gmtime overflow");
+            goto out;
+        }
+        days_left = difftime(mktime(&tcrt), mktime(tnow))/(3600*24);
+    } else {
+#else
+    int sec;
     if (!tm || !ASN1_TIME_diff(&days_left, &sec, NULL, tm)) {
+#endif
         warnx("cert_valid: invalid expiration time format in %s", certfile);
         goto out;
     }
@@ -4392,7 +4497,11 @@ out:
         goto out;
     }
 
+#if MBEDTLS_VERSION_NUMBER >= 0x03000000
+    if (mbedtls_x509_crt_has_ext_type(crt, MBEDTLS_X509_EXT_SUBJECT_ALT_NAME)) {
+#else
     if (crt->ext_types & MBEDTLS_X509_EXT_SUBJECT_ALT_NAME) {
+#endif
         int r = ext_san(crt->v3_ext.p, crt->v3_ext.len, &san);
         if (r) {
             warnx("cert_valid: ext_san failed: %s", _mbedtls_strerror(r));
@@ -4533,14 +4642,23 @@ char *cert_der_base64url(const char *certfile)
         goto out;
     }
     free(certdata);
+#if MBEDTLS_VERSION_NUMBER >= 0x03000000
+    const unsigned char *certbuf = mbedtls_pem_get_buffer(&ctx, &certsize);
+    if (!certbuf) {
+        warn("csr_der_base64url: mbedtls_pem_get_buffer failed");
+        goto out;
+    }
+#else
+    const unsigned char *certbuf = ctx.buf;
     certsize = ctx.buflen;
+#endif
     certdata = calloc(1, certsize);
     if (!certdata) {
         warn("cert_der_base64url: calloc failed");
         mbedtls_pem_free(&ctx);
         goto out;
     }
-    memcpy(certdata, ctx.buf, ctx.buflen);
+    memcpy(certdata, certbuf, certsize);
     mbedtls_pem_free(&ctx);
 #endif
     r = base64_ENCODED_LEN(certsize, base64_VARIANT_URLSAFE_NO_PADDING);
