@@ -1,4 +1,4 @@
-# Copyright (C) 2019-2021 Nicola Di Lieto <nicola.dilieto@gmail.com>
+# Copyright (C) 2019-2022 Nicola Di Lieto <nicola.dilieto@gmail.com>
 #
 # This file is part of uacme.
 #
@@ -278,6 +278,12 @@ if test "x$OPT_OPENSSL" != "xno"; then
                       AC_SUBST(USE_OPENSSL, [1])
                       USE_OPENSSL="yes"],
                      [AC_MSG_ERROR([openssl check failed])])
+        AC_MSG_CHECKING([if OpenSSL is really LibreSSL])
+        AC_COMPILE_IFELSE([AC_LANG_SOURCE([#include <openssl/crypto.h>
+                           int main() {return LIBRESSL_VERSION_NUMBER;}])],
+            LIBRESSL=yes
+            AC_MSG_RESULT([yes]),
+            AC_MSG_RESULT([no]))
     fi
 fi
 AM_CONDITIONAL(ENABLE_READFILE, test "x$USE_OPENSSL" != "xyes")
@@ -301,16 +307,22 @@ if test "x$OPT_MBEDTLS" != "xno"; then
                  [AC_MSG_ERROR([mbedtls check failed])])
     if test "x$USE_MBEDTLS" = "xyes"; then
         AC_MSG_NOTICE([detected mbedTLS])
-        AC_CHECK_FUNCS([mbedtls_x509_crt_parse_der_with_ext_cb])
     fi
 fi
 
-OPT_UALPN=yes
+if test "x$LIBRESSL" = "xyes"; then
+    OPT_UALPN=no
+else
+    OPT_UALPN=yes
+fi
 AC_ARG_WITH(ualpn,
 [AS_HELP_STRING([--with-ualpn], [enable ualpn])
 AS_HELP_STRING([--without-ualpn], [disable ualpn])], OPT_UALPN=$withval)
 
 if test "x$OPT_UALPN" != "xno"; then
+    if test "x$LIBRESSL" = "xyes"; then
+        AC_MSG_ERROR([ualpn is not compatible with LibreSSL])
+    fi
     AM_PROG_AR
     AC_CHECK_HEADERS([netinet/tcp.h], [],
                      AC_MSG_ERROR([ualpn requires netinet/tcp.h]))

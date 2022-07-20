@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2019-2021 Nicola Di Lieto <nicola.dilieto@gmail.com>
+ * Copyright (C) 2019-2022 Nicola Di Lieto <nicola.dilieto@gmail.com>
  *
  * This file is part of uacme.
  *
@@ -31,6 +31,7 @@
 #include <stdarg.h>
 #include <stdbool.h>
 #include <stdio.h>
+#include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
@@ -907,7 +908,7 @@ bool authorize(acme_t *a)
                 if (acme_post(a, url, "{}") != 200) {
                     warnx("failed to start challenge at %s", url);
                     acme_error(a);
-                } else while (!chlg_done) {
+                } else for (unsigned u = 5; !chlg_done; u *= 2) {
                     msg(1, "polling challenge status at %s", url);
                     if (acme_post(a, url, "") != 200) {
                         warnx("failed to poll challenge status at %s", url);
@@ -923,9 +924,14 @@ bool authorize(acme_t *a)
                                 url, status ? status : "unknown");
                         acme_error(a);
                         break;
+                    } else if (u < 5*512) {
+                        msg(u > 40 ? 1 : 2, "%s, waiting %u seconds",
+                                status, u);
+                        sleep(u);
                     } else {
-                        msg(2, "challenge %s, waiting 5 seconds", status);
-                        sleep(5);
+                        warnx("timeout while polling challenge status at %s, "
+                                "giving up", url);
+                        break;
                     }
                 }
                 if (a->hook && strlen(a->hook) > 0) {
@@ -1003,7 +1009,7 @@ bool cert_issue(acme_t *a, char * const *names, const char *csr)
             warnx("failed to authorize order at %s", orderurl);
             goto out;
         }
-        while (1) {
+        for (unsigned u = 5; true; u *= 2) {
             msg(1, "polling order status at %s", orderurl);
             if (acme_post(a, orderurl, "") != 200) {
                 warnx("failed to poll order status at %s", orderurl);
@@ -1022,9 +1028,13 @@ bool cert_issue(acme_t *a, char * const *names, const char *csr)
                         status ? status : "unknown", orderurl);
                 acme_error(a);
                 goto out;
+            } else if (u < 5*512) {
+                msg(u > 40 ? 1 : 2, "waiting %u seconds", u);
+                sleep(u);
             } else {
-                msg(2, "order pending, waiting 5 seconds");
-                sleep(5);
+                warnx("timeout while polling order status at %s, giving up",
+                        orderurl);
+                break;
             }
         }
     }
@@ -1043,7 +1053,7 @@ bool cert_issue(acme_t *a, char * const *names, const char *csr)
     } else if (acme_error(a))
         goto out;
 
-    while (1) {
+    for (unsigned u = 5; true; u *= 2) {
         msg(1, "polling order status at %s", orderurl);
         if (acme_post(a, orderurl, "") != 200) {
             warnx("failed to poll order status at %s", orderurl);
@@ -1061,9 +1071,13 @@ bool cert_issue(acme_t *a, char * const *names, const char *csr)
                     status ? status : "unknown", orderurl);
             acme_error(a);
             goto out;
+        } else if (u < 5*512) {
+            msg(u > 40 ? 1 : 2, "waiting %u seconds", u);
+            sleep(u);
         } else {
-            msg(2, "order processing, waiting 5 seconds");
-            sleep(5);
+            warnx("timeout while polling order status at %s, giving up",
+                    orderurl);
+            break;
         }
     }
 
@@ -1332,7 +1346,7 @@ bool alt_parse(acme_t *a, char *alt)
 {
     char *endptr;
     long l = strtol(alt, &endptr, 0);
-    if (*endptr == 0 && l > 0 && l < UINT_MAX) {
+    if (*endptr == 0 && l > 0 && (unsigned long)l < SIZE_MAX) {
         a->alt_n = l;
         return true;
     }
@@ -1361,7 +1375,7 @@ void usage(const char *progname)
         "usage: %s [-a|--acme-url URL] [-b|--bits BITS] [-c|--confdir DIR]\n"
         "\t[-d|--days DAYS] [-e|--eab KEYID:KEY] [-f|--force] [-h|--hook PROG]\n"
         "\t[-l|--alternate [N | SHA256]] [-m|--must-staple] [-n|--never-create]\n"
-        "\t[-o|--no-ocsp] [-s|--staging] [-t|--type RSA | EC]\n"
+        "\t[-o|--no-ocsp] [-r|--reason CODE] [-s|--staging] [-t|--type RSA | EC]\n"
         "\t[-v|--verbose ...] [-V|--version] [-y|--yes] [-?|--help]\n"
         "\tnew [EMAIL] | update [EMAIL] | deactivate | newkey |\n"
         "\tissue IDENTIFIER [ALTNAME ...]] | issue CSRFILE |\n"
@@ -1371,7 +1385,7 @@ void usage(const char *progname)
 void version(const char *progname)
 {
     fprintf(stderr, "%s: version " PACKAGE_VERSION "\n"
-            "Copyright (C) 2019-2021 Nicola Di Lieto\n\n"
+            "Copyright (C) 2019-2022 Nicola Di Lieto\n\n"
             "%s is free software: you can redistribute and/or modify\n"
             "it under the terms of the GNU General Public License as\n"
             "published by the Free Software Foundation, either version 3\n"
@@ -1398,6 +1412,7 @@ int main(int argc, char **argv)
         {"must-staple",  no_argument,       NULL, 'm'},
         {"never-create", no_argument,       NULL, 'n'},
         {"no-ocsp",      no_argument,       NULL, 'o'},
+        {"reason",       required_argument, NULL, 'r'},
         {"staging",      no_argument,       NULL, 's'},
         {"type",         required_argument, NULL, 't'},
         {"verbose",      no_argument,       NULL, 'v'},
@@ -1416,6 +1431,7 @@ int main(int argc, char **argv)
     bool status_check = true;
     int days = 30;
     int bits = 0;
+    int reason = 0;
     keytype_t type = PK_RSA;
     const char *ident = NULL;
     char *filename = NULL;
@@ -1456,7 +1472,7 @@ int main(int argc, char **argv)
     while (1) {
         char *endptr;
         int option_index;
-        int c = getopt_long(argc, argv, "a:b:c:d:e:f?h:l:mnost:vVy",
+        int c = getopt_long(argc, argv, "a:b:c:d:e:f?h:l:mnor:st:vVy",
                 options, &option_index);
         if (c == -1) break;
         switch (c) {
@@ -1521,6 +1537,14 @@ int main(int argc, char **argv)
 
             case 'v':
                 g_loglevel++;
+                break;
+
+            case 'r':
+                reason = strtol(optarg, &endptr, 0);
+                if (*endptr != 0 || reason < 0) {
+                    warnx("CODE must be a non-negative integer");
+                    goto out;
+                }
                 break;
 
             case 's':
@@ -1819,7 +1843,7 @@ int main(int argc, char **argv)
             ret = 0;
     } else if (strcmp(action, "revoke") == 0) {
         if (acme_bootstrap(&a) && (!a.keyprefix || account_retrieve(&a)) &&
-                cert_revoke(&a, filename, 0))
+                cert_revoke(&a, filename, reason))
             ret = 0;
     }
 
