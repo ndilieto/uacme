@@ -57,13 +57,14 @@ If you just want to check out the latest pristine release from github:
 ```
 git clone -b upstream/latest https://github.com/ndilieto/uacme
 ```
-[uacme][uacme] packages are available for several distributions:
+[uacme][uacme] is included in several distributions:
 
 * https://packages.debian.org/uacme
 * https://packages.ubuntu.com/uacme
 * https://software.opensuse.org/package/uacme
 * https://pkgs.alpinelinux.org/packages?name=uacme
 * https://aur.archlinux.org/packages/uacme
+* https://voidlinux.org/packages/?q=uacme
 * https://cvsweb.openbsd.org/ports/security/uacme
 * https://www.freshports.org/security/uacme
 * https://github.com/openwrt/packages/tree/master/net/uacme
