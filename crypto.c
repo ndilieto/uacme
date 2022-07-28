@@ -2349,7 +2349,7 @@ char *csr_gen(char * const *names, bool status_req, privkey_t key)
         warnx("csr_gen: -m, --must-staple is not supported by LibreSSL "
                 "- consider recompiling with OpenSSL");
         goto out;
-#endif
+#else
         ext = X509V3_EXT_conf_nid(NULL, NULL, NID_tlsfeature,
                 "status_request");
         if (!ext) {
@@ -2357,6 +2357,7 @@ char *csr_gen(char * const *names, bool status_req, privkey_t key)
             goto out;
         }
         sk_X509_EXTENSION_push(exts, ext);
+#endif
     }
     if (!X509_REQ_add_extensions(crq, exts)) {
         openssl_error("csr_gen");
