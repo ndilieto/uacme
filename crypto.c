@@ -116,6 +116,9 @@ void crypto_deinit(void)
 #if OPENSSL_VERSION_NUMBER < 0x1010100fL
 #error OpenSSL version 1.1.1 or later is required
 #endif
+#if defined(LIBRESSL_VERSION_NUMBER) && LIBRESSL_VERSION_NUMBER < 0x3040200fL
+#error LibreSSL version 3.4.2 or later is required
+#endif
 
 bool crypto_init(void)
 {
@@ -2345,9 +2348,9 @@ char *csr_gen(char * const *names, bool status_req, privkey_t key)
     }
     sk_X509_EXTENSION_push(exts, ext);
     if (status_req) {
-#if defined(LIBRESSL_VERSION_NUMBER)
+#if defined(LIBRESSL_VERSION_NUMBER) && LIBRESSL_VERSION_NUMBER < 0x3050000fL
         warnx("csr_gen: -m, --must-staple is not supported by LibreSSL "
-                "- consider recompiling with OpenSSL");
+                "earlier than 3.5.0 - consider updating it");
         goto out;
 #else
         ext = X509V3_EXT_conf_nid(NULL, NULL, NID_tlsfeature,
