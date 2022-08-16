@@ -4350,7 +4350,7 @@ out:
         goto out;
     int days_left;
     const ASN1_TIME *tm = X509_get0_notAfter(crt[0]);
-#if defined(LIBRESSL_VERSION_NUMBER)
+#if defined(LIBRESSL_VERSION_NUMBER) && LIBRESSL_VERSION_NUMBER < 0x3050000fL
     struct tm tcrt;
     if (tm && ASN1_time_parse((const char *)tm->data, tm->length, &tcrt,
                 tm->type) != -1) {
