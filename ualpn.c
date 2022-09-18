@@ -118,6 +118,10 @@ static const char *_mbedtls_strerror(int code)
     mbedtls_strerror(code, buf, sizeof(buf));
     return buf;
 }
+
+#ifndef MBEDTLS_ERR_SSL_HANDSHAKE_FAILURE
+#define MBEDTLS_ERR_SSL_HANDSHAKE_FAILURE -1
+#endif
 #endif
 
 #if !defined(EAGAIN)
