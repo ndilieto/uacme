@@ -1,3 +1,9 @@
+uacme (1.7.3-1) unstable; urgency=medium
+
+  * New upstream release
+
+ -- Nicola Di Lieto <nicola.dilieto@gmail.com>  Tue, 20 Sep 2022 22:06:39 +0200
+
 uacme (1.7.2-1) unstable; urgency=medium
 
   * New upstream release
