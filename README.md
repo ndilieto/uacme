@@ -10,6 +10,10 @@ and certificate issuance. The protocol also provides facilities for other
 certificate management functions, such as certificate revocation.
 
 ## Features
+* **Lightweight** - Unlike most other ACME clients [uacme][uacme] does one
+thing only and tries to do it well, according to the [Unix philosophy][uph].
+For example don't expect it to automatically set up your webserver to use the
+certificates it obtains.
 * **Written in C** - It runs on any unix machine, including Linux, BSD, ...
 * **Minimal dependencies** - Other than the standard C library, [uacme][uacme] 
 depends only on [libcurl][libcurl] and one of [GnuTLS][GnuTLS],
@@ -57,13 +61,14 @@ If you just want to check out the latest pristine release from github:
 ```
 git clone -b upstream/latest https://github.com/ndilieto/uacme
 ```
-[uacme][uacme] packages are available for several distributions:
+[uacme][uacme] is included in several distributions:
 
 * https://packages.debian.org/uacme
 * https://packages.ubuntu.com/uacme
 * https://software.opensuse.org/package/uacme
 * https://pkgs.alpinelinux.org/packages?name=uacme
 * https://aur.archlinux.org/packages/uacme
+* https://voidlinux.org/packages/?q=uacme
 * https://cvsweb.openbsd.org/ports/security/uacme
 * https://www.freshports.org/security/uacme
 * https://github.com/openwrt/packages/tree/master/net/uacme
@@ -244,6 +249,7 @@ If you have any suggestions for improvements, pull requests are welcome.
 [OpenSSL]: https://www.openssl.org
 [mbedTLS]: https://tls.mbed.org
 [le]: https://letsencrypt.org
+[uph]: https://en.wikipedia.org/wiki/Unix_philosophy
 [uacme.sh]: https://github.com/ndilieto/uacme/blob/master/uacme.sh
 [ualpn.sh]: https://github.com/ndilieto/uacme/blob/master/ualpn.sh
 [tls-alpn-01]: #tls-alpn-01-challenge-support
