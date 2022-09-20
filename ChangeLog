@@ -1,3 +1,10 @@
+2022-09-20 Nicola Di Lieto <nicola.dilieto@gmail.com>
+	* Release 1.7.3
+	- better compatibility with LibreSSL, require 3.4.2 or later
+	- uacme: Enable --must-staple support with LibreSSL > 3.5.0
+	- ualpn: Fix build issue with mbedTLS 2.x
+		 see https://github.com/ndilieto/uacme/pull/61
+
 2022-07-20 Nicola Di Lieto <nicola.dilieto@gmail.com>
 	* Release 1.7.2
 	- uacme: exponential backoff for status polling instead
