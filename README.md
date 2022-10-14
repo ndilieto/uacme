@@ -65,6 +65,7 @@ git clone -b upstream/latest https://github.com/ndilieto/uacme
 
 * https://packages.debian.org/uacme
 * https://packages.ubuntu.com/uacme
+* https://packages.fedoraproject.org/pkgs/uacme/uacme
 * https://software.opensuse.org/package/uacme
 * https://pkgs.alpinelinux.org/packages?name=uacme
 * https://aur.archlinux.org/packages/uacme
