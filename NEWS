@@ -1,6 +1,12 @@
 uacme NEWS
 Copyright (C) 2019-2023 Nicola Di Lieto <nicola.dilieto@gmail.com>
 
+## [1.7.4] - 2023-02-15
+### Changed
+- uacme: Validate token from ACME server. Fixes
+         https://github.com/ndilieto/uacme/issues/64
+- minor documentation changes including copyright year
+
 ## [1.7.3] - 2022-09-20
 ### Changed
 - better compatibility with LibreSSL, require 3.4.2 or later
