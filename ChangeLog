@@ -1,3 +1,9 @@
+2023-02-15 Nicola Di Lieto <nicola.dilieto@gmail.com>
+	* Release 1.7.4
+	- uacme: Validate token from ACME server. Fixes
+		 https://github.com/ndilieto/uacme/issues/64
+	- minor documentation changes including copyright year
+
 2022-09-20 Nicola Di Lieto <nicola.dilieto@gmail.com>
 	* Release 1.7.3
 	- better compatibility with LibreSSL, require 3.4.2 or later
