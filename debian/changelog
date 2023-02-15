@@ -1,3 +1,10 @@
+uacme (1.7.4-1) unstable; urgency=high
+
+  * New upstream release
+  - Includes fix for security issue https://github.com/ndilieto/uacme/issues/64
+
+ -- Nicola Di Lieto <nicola.dilieto@gmail.com>  Wed, 15 Feb 2023 21:31:43 +0100
+
 uacme (1.7.3-1) unstable; urgency=medium
 
   * New upstream release
