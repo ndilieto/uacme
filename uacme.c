@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2019-2022 Nicola Di Lieto <nicola.dilieto@gmail.com>
+ * Copyright (C) 2019-2023 Nicola Di Lieto <nicola.dilieto@gmail.com>
  *
  * This file is part of uacme.
  *
@@ -865,6 +865,11 @@ bool authorize(acme_t *a)
                     warnx("failed to parse challenge");
                     goto out;
                 }
+                for (const char *t = token; *t; t++)
+                    if (!isalnum(*t) && *t != '-' && *t != '_') {
+                        warnx("failed to validate token");
+                        goto out;
+                    }
                 if (strcmp(type, "dns-01") == 0 ||
                         strcmp(type, "tls-alpn-01") == 0)
                     key_auth = sha2_base64url(256, "%s.%s", token, thumbprint);
@@ -1385,7 +1390,7 @@ void usage(const char *progname)
 void version(const char *progname)
 {
     fprintf(stderr, "%s: version " PACKAGE_VERSION "\n"
-            "Copyright (C) 2019-2022 Nicola Di Lieto\n\n"
+            "Copyright (C) 2019-2023 Nicola Di Lieto\n\n"
             "%s is free software: you can redistribute and/or modify\n"
             "it under the terms of the GNU General Public License as\n"
             "published by the Free Software Foundation, either version 3\n"
