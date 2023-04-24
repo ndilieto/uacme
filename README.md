@@ -165,6 +165,8 @@ to integrate with [Cloudflare API][Cloudflare].
 
 https://github.com/tdy91/uacme-gandi-hook works with [gandi.net][gandi].
 
+https://sr.ht/~jacksonchen666/uacme-desec-hook/ works with [deSEC.io][desec].
+
 ## tls-alpn-01 challenge support
 
 [ualpn][ualpn] is a lightweight proxying [tls-alpn-01][RFC8737] challenge
@@ -264,3 +266,4 @@ If you have any suggestions for improvements, pull requests are welcome.
 [libev]: http://libev.schmorp.de
 [splice]: https://en.wikipedia.org/wiki/Splice_%28system_call%29
 [proxy]: http://www.haproxy.org/download/1.8/doc/proxy-protocol.txt
+[desec]: https://desec.readthedocs.io/en/latest/
