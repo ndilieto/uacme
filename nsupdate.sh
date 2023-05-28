@@ -1,5 +1,6 @@
 #!/bin/sh
 # Copyright (C) 2020 Michel Stam <michel@reverze.net>
+# Copyright (C) 2023 Michal Roszkowski
 #
 # This file is part of uacme.
 #
@@ -20,14 +21,18 @@
 DIG=dig
 NSUPDATE=nsupdate
 
+# Server to which updates will be sent. If not specified it will
+# be obtained from MNAME in the SOA record.
+NSUPDATE_SERVER=
+
 # Files
-# RNDC_KEY_{NSUPDATE,DIG}
-#   if you wish to specify an RDC key for TSIG transactions, do so
+# {NSUPDATE,DIG}_KEY
+#   If you wish to sign transactions using TSIG, specify the keyfile
 #   here. If you do, also make sure /etc/named.conf specifies the
 #   key "KEYNAME"; in the zone that must be updated (and disallow
 #   all others for safety)
-RNDC_KEY_NSUPDATE=
-RNDC_KEY_DIG=
+NSUPDATE_KEY=
+DIG_KEY=
 
 # Arguments
 METHOD=$1
@@ -38,102 +43,136 @@ AUTH=$5
 
 ns_getdomain()
 {
-    local domain=$1
+    local name=$1
+    local answer
+    local domain
 
-    [ -n "$domain" ] || return
-    set -- $($DIG ${RNDC_KEY_DIG:+-k ${RNDC_KEY_DIG}} +noall +authority "$domain" SOA 2>/dev/null)
+    [ -n "$name" ] && answer=$($DIG ${DIG_KEY:+-k ${DIG_KEY}} +noall +nottl +noclass +answer +authority "$name" SOA) || return
 
-    echo $1
+    while read -r record type value; do
+        [ "$type" = SOA ] && domain=$record
+    done <<-EOF
+	$answer
+	EOF
+
+    echo $domain
 }
 
-ns_getprimary()
+ns_getns()
 {
     local domain=$1
+    local answer
 
-    [ -n "$domain" ] || return
-    set -- $($DIG ${RNDC_KEY_DIG:+-k ${RNDC_KEY_DIG}} +short "$domain" SOA 2>/dev/null)
+    [ -n "$domain" ] && answer=$($DIG ${DIG_KEY:+-k ${DIG_KEY}} +short "$domain" NS) || return
 
-    echo $1
+    echo $answer
 }
 
 ns_getall()
 {
     local domain=$1
+    local answer
+    local cname
+    local primary
 
-    [ -n "$domain" ] || return 1
+    [ -n "$domain" ] && answer=$($DIG ${DIG_KEY:+-k ${DIG_KEY}} +noall +nottl +noclass +answer +authority "$domain" SOA) || return
 
-    $DIG ${RNDC_KEY_DIG:+-k ${RNDC_KEY_DIG}} +short "$domain" NS 2>/dev/null
+    while read -r record type value; do
+        case "$type" in
+            CNAME)
+                cname=$value
+                ;;
+            SOA)
+                set -- $value && primary=$1
+                ;;
+        esac
+    done <<-EOF
+	$answer
+	EOF
+
+    echo ${cname:-$domain} $primary
 }
 
 ns_ispresent()
 {
-    local fqhn="$1"
-    local expect="$2"
-    local domain=$(ns_getdomain "$fqhn")
-    local nameservers=$(ns_getall "$domain")
-    local res
-    local ret
+    local name=$1
+    local challenge=$2
+    local nameservers=$(ns_getns $(ns_getdomain "$name"))
+    local answer
+    local cname
+    local rc=1
 
-    for NS in $nameservers; do
-        OLDIFS="${IFS}"
-        IFS='.'
-        set -- $($DIG ${RNDC_KEY_DIG:+-k ${RNDC_KEY_DIG}} +short "@$NS" "$fqhn" TXT 2>/dev/null)
-        IFS="${OLDIFS}"
-        { [ "$*" = "$expect" ] || [ "$*" = "\"$expect\"" ] ; } || return 1
+    for ns in $nameservers; do
+        answer=$($DIG ${DIG_KEY:+-k ${DIG_KEY}} +noall +nottl +noclass +answer "@$ns" "$name" TXT) || continue
+        cname=
+
+        while read -r record type value; do
+            case "$type" in
+                CNAME)
+                    cname=$value
+                    ;;
+                TXT)
+                    [ "$value" = \"$challenge\" ] && rc=0 && continue 2
+                    cname=
+                    ;;
+            esac
+        done <<-EOF
+		$answer
+		EOF
+
+        [ -n "$cname" ] && ns_ispresent "$cname" "$challenge" && rc=0 || return 1
     done
 
-    return 0
+    return $rc
 }
 
 ns_doupdate()
 {
-    local fqhn="$1"
-    local challenge="$2"
-    local ttl=600
-    local domain=$(ns_getdomain "$fqhn")
-    local nameserver=$(ns_getprimary "$domain")
-    local action=
+    local action=$1
+    local challenge=$3
+    set -- $(ns_getall "$2")
+    local name=$1
+    local server=${NSUPDATE_SERVER:-$2}
+    local ttl=300
 
-    [ -n "$nameserver" ] || return
+    [ -n "$server" ] && [ -n "$name" ] && [ -n "$challenge" ] || return 1
 
-    if [ -n "${challenge}" ]; then
-            action="update add ${fqhn}. ${ttl} IN TXT ${challenge}"
-    else
-            action="update del ${fqhn}."
-    fi
-
-    $NSUPDATE ${RNDC_KEY_NSUPDATE:+-k ${RNDC_KEY_NSUPDATE}} -v <<-EOF
-            server ${nameserver}
-            ${action}
-            send
-EOF
+    $NSUPDATE ${NSUPDATE_KEY:+-k ${NSUPDATE_KEY}} -v <<-EOF
+	server ${server}
+	update ${action} ${name} ${ttl} IN TXT ${challenge}
+	send
+	EOF
 
     return $?
 }
 
 ns_update()
 {
-    local fqhn="$1"
-    local challenge="$2"
+    local action=$1
+    local name=$2
+    local challenge=$3
+    local retries=5
+    local delay=5
     local count=0
-    local res
 
-    res=1
-    while [ $res -ne 0 ]; do
-        if [ $count -eq 0 ]; then
-            ns_doupdate "$fqhn" "$challenge"
-            res=$?
-            [ $res -eq 0 ] || break
-        else
-            sleep 1
-        fi
+    ns_doupdate "$action" "$name" "$challenge" || return 1
 
-        count=$(((count + 1) % 5))
-        ns_ispresent "$fqhn" "$challenge"
-        res=$?
+    while sleep $delay; do
+        case "$action" in
+            add)
+                ns_ispresent "$name" "$challenge" && break
+                ;;
+            del)
+                ns_ispresent "$name" "$challenge" || break
+                ;;
+            *)
+                return 1
+        esac
+        [ $count -lt $retries ] || return 1
+        count=$((count + 1))
     done
 
-    return $res
+    return 0
 }
 
 ARGS=5
@@ -148,7 +187,7 @@ case "$METHOD" in
     "begin")
         case "$TYPE" in
             dns-01)
-                ns_update "_acme-challenge.$IDENT" "$AUTH"
+                ns_update add "_acme-challenge.$IDENT" "$AUTH"
                 exit $?
                 ;;
             *)
@@ -160,7 +199,7 @@ case "$METHOD" in
     "done"|"failed")
         case "$TYPE" in
             dns-01)
-                ns_update "_acme-challenge.$IDENT"
+                ns_update del "_acme-challenge.$IDENT" "$AUTH"
                 exit $?
                 ;;
             *)
