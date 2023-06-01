@@ -28,99 +28,113 @@ NSUPDATE_SERVER=
 # Files
 # {NSUPDATE,DIG}_KEY
 #   If you wish to sign transactions using TSIG, specify the keyfile
-#   here. If you do, also make sure /etc/named.conf specifies the
+#   here. If you do, also make sure named.conf specifies the
 #   key "KEYNAME"; in the zone that must be updated (and disallow
 #   all others for safety)
 NSUPDATE_KEY=
 DIG_KEY=
 
-# Arguments
+ARGS=5
+E_BADARGS=85
+
+if [ $# -ne "$ARGS" ]; then
+    echo "Usage: $(basename "$0") method type ident token auth" 1>&2
+    exit $E_BADARGS
+fi
+
 METHOD=$1
 TYPE=$2
 IDENT=$3
 TOKEN=$4
 AUTH=$5
 
-ns_getdomain()
+ns_getns()
 {
-    local name=$1
+    local zone=$1
     local answer
-    local domain
 
-    [ -n "$name" ] && answer=$($DIG ${DIG_KEY:+-k ${DIG_KEY}} +noall +nottl +noclass +answer +authority "$name" SOA) || return
+    [ -n "$zone" ] && answer=$($DIG ${DIG_KEY:+-k ${DIG_KEY}} +noall +nottl +noclass +answer "$zone" NS) || return
 
-    while read -r record type value; do
-        [ "$type" = SOA ] && domain=$record
+    local owner
+    local type
+    local rdata
+    while read -r owner type rdata; do
+        [ "$type" = NS ] && echo $rdata
     done <<-EOF
 	$answer
 	EOF
-
-    echo $domain
-}
-
-ns_getns()
-{
-    local domain=$1
-    local answer
-
-    [ -n "$domain" ] && answer=$($DIG ${DIG_KEY:+-k ${DIG_KEY}} +short "$domain" NS) || return
-
-    echo $answer
 }
 
 ns_getall()
 {
-    local domain=$1
+    local name=$1
     local answer
-    local cname
+    local zone
     local primary
 
-    [ -n "$domain" ] && answer=$($DIG ${DIG_KEY:+-k ${DIG_KEY}} +noall +nottl +noclass +answer +authority "$domain" SOA) || return
+    [ -n "$name" ] && answer=$($DIG ${DIG_KEY:+-k ${DIG_KEY}} +noall +nottl +noclass +answer +authority "$name" SOA) || return
 
-    while read -r record type value; do
+    name=${name%.}.
+
+    local owner
+    local type
+    local rdata
+    while read -r owner type rdata; do
         case "$type" in
             CNAME)
-                cname=$value
+                name=$rdata
+                ;;
+            DNAME)
+                name=${name%$owner}$rdata
                 ;;
             SOA)
-                set -- $value && primary=$1
+                zone=$owner
+                set -- $rdata && primary=$1
                 ;;
         esac
     done <<-EOF
 	$answer
 	EOF
 
-    echo ${cname:-$domain} $primary
+    echo $name $zone $primary
 }
 
 ns_ispresent()
 {
-    local name=$1
     local challenge=$2
-    local nameservers=$(ns_getns $(ns_getdomain "$name"))
+    set -- $(ns_getall "$1")
+    local name=$1
+    local nameservers=$(ns_getns "$2")
     local answer
-    local cname
+    local target
     local rc=1
 
+    local ns
     for ns in $nameservers; do
         answer=$($DIG ${DIG_KEY:+-k ${DIG_KEY}} +noall +nottl +noclass +answer "@$ns" "$name" TXT) || continue
-        cname=
+        target=
 
-        while read -r record type value; do
+        local owner
+        local type
+        local rdata
+        while read -r owner type rdata; do
             case "$type" in
                 CNAME)
-                    cname=$value
+                    target=$rdata
+                    ;;
+                DNAME)
+                    [ -n "$target" ] && target=${target%$owner}$rdata || target=${name%$owner}$rdata
                     ;;
                 TXT)
-                    [ "$value" = \"$challenge\" ] && rc=0 && continue 2
-                    cname=
+                    [ "$rdata" = \"$challenge\" ] && rc=0 && continue 2
+                    target=
                     ;;
             esac
         done <<-EOF
 		$answer
 		EOF
 
-        [ -n "$cname" ] && ns_ispresent "$cname" "$challenge" && rc=0 || return 1
+        [ -n "$target" ] && ns_ispresent "$target" "$challenge" && rc=0 || return 1
     done
 
     return $rc
@@ -132,13 +146,15 @@ ns_doupdate()
     local challenge=$3
     set -- $(ns_getall "$2")
     local name=$1
-    local server=${NSUPDATE_SERVER:-$2}
+    local zone=$2
+    local server=${NSUPDATE_SERVER:-$3}
     local ttl=300
 
-    [ -n "$server" ] && [ -n "$name" ] && [ -n "$challenge" ] || return 1
+    [ -n "$server" ] && [ -n "$zone" ] && [ -n "$name" ] && [ -n "$challenge" ] || return 1
 
     $NSUPDATE ${NSUPDATE_KEY:+-k ${NSUPDATE_KEY}} -v <<-EOF
 	server ${server}
+	zone ${zone}
 	update ${action} ${name} ${ttl} IN TXT ${challenge}
 	send
 	EOF
@@ -174,14 +190,6 @@ ns_update()
 
     return 0
 }
-
-ARGS=5
-E_BADARGS=85
-
-if [ $# -ne "$ARGS" ]; then
-    echo "Usage: $(basename "$0") method type ident token auth" 1>&2
-    exit $E_BADARGS
-fi
 
 case "$METHOD" in
     "begin")
