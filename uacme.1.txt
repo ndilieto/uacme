@@ -19,7 +19,7 @@ SYNOPSIS
     [*-m*|*--must-staple*] [*-n*|*--never-create*] [*-o*|*--no-ocsp*]
     [*-r*|*--reason* CODE] [*-s*|*--staging*] [*-t*|*--type* *RSA*|*EC*]
     [*-v*|*--verbose* ...] [*-V*|*--version*] [*-y*|*--yes*] [*-?*|*--help*]
-    *new* ['EMAIL'] | *update* ['EMAIL'] | *deactivate* | *newkey* |
+    *new* ['EMAIL'] | *update* ['EMAIL'] | *deactivate* | *newkey* | *thumbprint* |
     *issue* 'IDENTIFIER' ['ALTNAME' ...]] | *issue* 'CSRFILE' |
     *revoke* 'CERTFILE' ['CERTKEYFILE']
 
@@ -188,6 +188,11 @@ USAGE
     submitted to the server and if the operation succeeds the old key
     is hardlinked to 'CONFDIR/private/key-TIMESTAMP.pem' before
     renaming 'CONFDIR/private/newkey.pem' to 'CONFDIR/private/key.pem'.
+
+*uacme* ['OPTIONS'] ...] *thumbprint*::
+    Prints the JWK token of your private key, per RFC 8555, 8.1.
+    Returns base64url(Thumbprint(accountKey)). Can be used with
+    http-01 stateless challenge mode.
 
 *uacme* ['OPTIONS' ...] *issue* 'IDENTIFIER' ['ALTNAME' ...]::
     Issue a certificate for 'IDENTIFIER' with zero or more 'ALTNAMEs'.

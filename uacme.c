@@ -1382,7 +1382,7 @@ void usage(const char *progname)
         "\t[-l|--alternate [N | SHA256]] [-m|--must-staple] [-n|--never-create]\n"
         "\t[-o|--no-ocsp] [-r|--reason CODE] [-s|--staging] [-t|--type RSA | EC]\n"
         "\t[-v|--verbose ...] [-V|--version] [-y|--yes] [-?|--help]\n"
-        "\tnew [EMAIL] | update [EMAIL] | deactivate | newkey |\n"
+        "\tnew [EMAIL] | update [EMAIL] | deactivate | newkey | thumbprint |\n"
         "\tissue IDENTIFIER [ALTNAME ...]] | issue CSRFILE |\n"
         "\trevoke CERTFILE [CERTKEYFILE]\n", progname);
 }
@@ -1444,6 +1444,7 @@ int main(int argc, char **argv)
     char **names = NULL;
     const char *confdir = DEFAULT_CONFDIR;
     char *keyprefix = NULL;
+    char *thumbprint = NULL;
     privkey_t key = NULL;
     acme_t a;
     memset(&a, 0, sizeof(a));
@@ -1636,7 +1637,8 @@ int main(int argc, char **argv)
             goto out;
         }
     } else if (strcmp(action, "newkey") == 0
-            || strcmp(action, "deactivate") == 0) {
+            || strcmp(action, "deactivate") == 0
+            || strcmp(action, "thumbprint") == 0) {
         if (optind < argc) {
             usage(basename(argv[0]));
             goto out;
@@ -1782,6 +1784,12 @@ int main(int argc, char **argv)
         if (acme_bootstrap(&a) && account_retrieve(&a)
                 && account_deactivate(&a))
             ret = 0;
+    } else if (strcmp(action, "thumbprint") == 0) {
+        thumbprint = jws_thumbprint(a.key);
+        if (thumbprint) {
+            msg(0, "account thumbprint is %s", thumbprint);
+            ret = 0;
+	}
     } else if (strcmp(action, "issue") == 0) {
         if (filename) {
             int len = strlen(filename);
@@ -1869,6 +1877,7 @@ out:
     if (key)
         privkey_deinit(key);
     free(keyprefix);
+    free(thumbprint);
     free(csr);
     free(filename);
     for (int i = 0; names && names[i]; i++)
