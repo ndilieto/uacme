@@ -71,6 +71,14 @@ typedef struct acme {
     char *certprefix;
 } acme_t;
 
+typedef struct authorization {
+    json_value_t *json;
+    bool done;
+    bool run;
+    size_t num_childs;
+    pid_t *childs;
+} authorization_t;
+
 #if !HAVE_STRCASESTR
 char *strcasestr(const char *haystack, const char *needle)
 {
@@ -284,28 +292,39 @@ out:
     return ret;
 }
 
+pid_t hook_start(const char *prog, const char *method, const char *type,
+        const char *ident, const char *token, const char *auth)
+{
+    pid_t pid = fork();
+    if (pid < 0) {
+        warn("hook_start: fork failed");
+        return pid;
+    }
+    if (pid > 0)
+        return pid;
+    execl(prog, prog, method, type, ident, token, auth, (char *)NULL);
+    warnx("hook_run: failed to execute %s", prog);
+    abort();
+    return -1;
+}
+
 int hook_run(const char *prog, const char *method, const char *type,
         const char *ident, const char *token, const char *auth)
 {
     int ret = -1;
-    pid_t pid = fork();
-    if (pid < 0)
+    int status;
+    pid_t pid = hook_start(prog, method, type, ident, token, auth);
+    if (pid < 0) {
         warn("hook_run: fork failed");
-    else if (pid > 0) { // parent
-        int status;
-        if (waitpid(pid, &status, 0) < 0)
-            warn("hook_run: waitpid failed");
-        else if (WIFEXITED(status))
-            ret = WEXITSTATUS(status);
-        else
-            warnx("hook_run: %s terminated abnormally", prog);
-    } else { // child
-        if (execl(prog, prog, method, type, ident, token, auth,
-                    (char *)NULL) < 0) {
-            warn("hook_run: failed to execute %s", prog);
-            abort();
-        }
+        return ret;
     }
+
+    if (waitpid(pid, &status, 0) < 0)
+        warn("hook_run: waitpid failed");
+    else if (WIFEXITED(status))
+        ret = WEXITSTATUS(status);
+    else
+        warnx("hook_run: %s terminated abnormally", prog);
     return ret;
 }
 
@@ -786,15 +805,132 @@ bool account_deactivate(acme_t *a)
     return true;
 }
 
+bool challenge_start(acme_t *a, const char *url)
+{
+    bool chlg_done = false;
+    msg(1, "starting challenge at %s", url);
+    if (acme_post(a, url, "{}") != 200) {
+        warnx("failed to start challenge at %s", url);
+        acme_error(a);
+    } else for (unsigned u = 5; !chlg_done; u *= 2) {
+        msg(1, "polling challenge status at %s", url);
+        if (acme_post(a, url, "") != 200) {
+            warnx("failed to poll challenge status at %s", url);
+            acme_error(a);
+            break;
+        }
+        const char *status = json_find_string(a->json, "status");
+        if (status && strcmp(status, "valid") == 0)
+            chlg_done = true;
+        else if (!status || (strcmp(status, "processing") != 0 &&
+            strcmp(status, "pending") != 0)) {
+            warnx("challenge %s failed with status %s",
+                    url, status ? status : "unknown");
+            acme_error(a);
+            break;
+        } else if (u < 5*512) {
+            msg(u > 40 ? 1 : 2, "%s, waiting %u seconds",
+                    status, u);
+            sleep(u);
+        } else {
+            warnx("timeout while polling challenge status at %s, "
+                    "giving up", url);
+            break;
+        }
+    }
+    return chlg_done;
+}
+
+bool finish_hooks(acme_t *a, size_t num_auth, authorization_t *auth, const char *thumbprint)
+{
+    size_t cnt = 0;
+    int status;
+    pid_t child;
+
+    while ((child = waitpid(-1, &status, 0)) > 0) {
+        bool found = false;
+        size_t i,j;
+        if (!WIFEXITED(status)) {
+            warnx("hook_run: %d terminated abnormally", child);
+            goto out;
+        }
+        msg(2, "hook returned %d", WEXITSTATUS(status));
+        if (WEXITSTATUS(status)) {
+            continue;
+        }
+        for (i=0; !found && i<num_auth; i++) {
+            for (j=0; j<auth[i].num_childs; j++) {
+                if (auth[i].childs[j] == child) {
+                    break;
+                }
+            }
+        }
+        if (!found) {
+            warnx("unknow child found");
+            goto out;
+        }
+        if (auth[i].run) {
+            continue;
+        }
+        const json_value_t *chlgs = json_find(auth[i].json, "challenges");
+        const json_value_t *chlg = chlgs->v.array.values+j;
+        const char *url = json_find_string(chlg, "url");
+        if (!url) {
+            warnx("failed to parse challenge");
+            goto out;
+        }
+        auth[i].done = challenge_start(a, url);
+        auth[i].run = true;
+    }
+
+    for (size_t i=0; i<num_auth; i++) {
+        const json_value_t *chlgs = json_find(auth[i].json, "challenges");
+        const char *method = auth[i].json ? "done" : "failed";
+        const json_value_t *ident = json_find(auth[i].json, "identifier");
+        const char *ident_value = json_find_string(ident, "value");
+        if (auth[i].done) 
+            cnt++;
+        for (size_t j=0; j<chlgs->v.array.size; j++) {
+            const char *type = json_find_string(chlgs->v.array.values+j, "type");
+            const char *token = json_find_string(chlgs->v.array.values+j, "token");
+            char *key_auth = NULL;
+            if (!type || !token) {
+                warnx("failed to parse challenge");
+                goto out;
+            }
+            if (strcmp(type, "dns-01") == 0 || strcmp(type, "tls-alpn-01") == 0)
+                key_auth = sha2_base64url(256, "%s.%s", token, thumbprint);
+            else if (asprintf(&key_auth, "%s.%s", token, thumbprint) < 0)
+                key_auth = NULL;
+            if (!key_auth) {
+                warnx("failed to generate authorization key");
+                goto out;
+            }
+            msg(1, "running %s %s %s %s %s %s", a->hook, method, type, ident_value, token, key_auth);
+            hook_run(a->hook, method, type, ident_value, token, key_auth);
+            free(key_auth);
+        }
+    }
+out:
+    return cnt == num_auth;
+}
+
 bool authorize(acme_t *a)
 {
     bool success = false;
     char *thumbprint = NULL;
+    authorization_t *auth_hooks;
     json_value_t *auth = NULL;
     const json_value_t *auths = json_find(a->order, "authorizations");
     if (!auths || auths->type != JSON_ARRAY) {
         warnx("failed to parse authorizations URL");
         goto out;
+    }
+    if (a->hook && strlen(a->hook) > 0) {
+        auth_hooks = calloc(auths->v.array.size, sizeof(*auth_hooks));
+        if (!auth_hooks) {
+            warnx("cannot alloc memory");
+        }
     }
 
     thumbprint = jws_thumbprint(a->key);
@@ -844,8 +980,18 @@ bool authorize(acme_t *a)
                     auths->v.array.values[i].v.value);
             goto out;
         }
-        json_free(auth);
-        auth = a->json;
+        if (a->hook && strlen(a->hook) > 0) {
+            auth_hooks[i].json = a->json;
+            auth_hooks[i].childs = calloc(chlgs->v.array.size, sizeof(*auth_hooks[i].childs));
+            if (!auth_hooks[i].childs) {
+                warnx("cannot allocate memory for hooks");
+                goto out;
+            }
+            auth_hooks[i].num_childs = chlgs->v.array.size;
+        } else {
+            json_free(auth);
+            auth = a->json;
+        }
         a->json = NULL;
 
         bool chlg_done = false;
@@ -886,17 +1032,14 @@ bool authorize(acme_t *a)
                     msg(2, "key_auth=%s", key_auth);
                     msg(1, "running %s %s %s %s %s %s", a->hook, "begin",
                             type, ident_value, token, key_auth);
-                    int r = hook_run(a->hook, "begin", type, ident_value, token,
+                    auth_hooks[i].childs[j] = hook_start(a->hook, "begin", type, ident_value, token,
                             key_auth);
-                    msg(2, "hook returned %d", r);
-                    if (r < 0) {
+                    msg(2, "hook started: %d", auth_hooks[i].childs[j]);
+                    if (auth_hooks[i].childs[j] < 0) {
                         free(key_auth);
                         goto out;
-                    } else if (r > 0) {
-                        msg(1, "challenge %s declined", type);
-                        free(key_auth);
-                        continue;
                     }
+                    continue;
                 } else {
                     char c = 0;
                     msg(0, "challenge=%s ident=%s token=%s key_auth=%s",
@@ -908,58 +1051,28 @@ bool authorize(acme_t *a)
                         continue;
                     }
                 }
-
-                msg(1, "starting challenge at %s", url);
-                if (acme_post(a, url, "{}") != 200) {
-                    warnx("failed to start challenge at %s", url);
-                    acme_error(a);
-                } else for (unsigned u = 5; !chlg_done; u *= 2) {
-                    msg(1, "polling challenge status at %s", url);
-                    if (acme_post(a, url, "") != 200) {
-                        warnx("failed to poll challenge status at %s", url);
-                        acme_error(a);
-                        break;
-                    }
-                    const char *status = json_find_string(a->json, "status");
-                    if (status && strcmp(status, "valid") == 0)
-                        chlg_done = true;
-                    else if (!status || (strcmp(status, "processing") != 0 &&
-                            strcmp(status, "pending") != 0)) {
-                        warnx("challenge %s failed with status %s",
-                                url, status ? status : "unknown");
-                        acme_error(a);
-                        break;
-                    } else if (u < 5*512) {
-                        msg(u > 40 ? 1 : 2, "%s, waiting %u seconds",
-                                status, u);
-                        sleep(u);
-                    } else {
-                        warnx("timeout while polling challenge status at %s, "
-                                "giving up", url);
-                        break;
-                    }
-                }
-                if (a->hook && strlen(a->hook) > 0) {
-                    const char *method = chlg_done ? "done" : "failed";
-                    msg(1, "running %s %s %s %s %s %s", a->hook, method,
-                            type, ident_value, token, key_auth);
-                    hook_run(a->hook, method, type, ident_value, token,
-                            key_auth);
-                }
-                free(key_auth);
-                if (!chlg_done)
-                    goto out;
+                chlg_done = challenge_start(a, url);
             }
         }
+        if (a->hook && strlen(a->hook) > 0)
+            continue;
         if (!chlg_done) {
             warnx("no challenge completed");
             goto out;
         }
     }
 
-    success = true;
+    if (a->hook && strlen(a->hook) > 0)
+        success = finish_hooks(a, auths->v.array.size, auth_hooks, thumbprint);
+    else
+        success = true;
 
 out:
+    for (size_t i=0; auth_hooks && i<auths->v.array.size; i++) {
+        free(auth_hooks[i].childs);
+        json_free(auth_hooks[i].json);
+    }
+    free(auth_hooks);
     json_free(auth);
     free(thumbprint);
     return success;
