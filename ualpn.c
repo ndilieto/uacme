@@ -4434,24 +4434,38 @@ int main(int argc, char **argv)
             cleanup_and_exit(0, EXIT_FAILURE);
         }
 
+        rc = EXIT_SUCCESS;
         while (1) {
             ssize_t r = getline(&line, &len, stdin);
-            if (r == -1)
+            if (r == -1) {
+                if (!feof(stdin)) {
+                    rc = EXIT_FAILURE;
+                    err("failed to get line from stdin");
+                }
                 break;
-
+            }
             if (fputs(line, f) < 0) {
+                rc = EXIT_FAILURE;
                 err("failed to write to %s", g.socket);
                 break;
             }
             r = getline(&line, &len, f);
-            if (r == -1)
+            if (r == -1) {
+                if (!feof(f)) {
+                    rc = EXIT_FAILURE;
+                    err("failed to read from %s", g.socket);
+                }
                 break;
-            fputs(line, stdout);
+            }
+            if (fputs(line, stdout) < 0) {
+                rc = EXIT_FAILURE;
+                err("failed to write to stdout");
+                break;
+            }
         }
-
         free(line);
         fclose(f);
-        cleanup_and_exit(0, EXIT_FAILURE);
+        cleanup_and_exit(0, rc);
     }
 
     if (g.connect == NULL) {
