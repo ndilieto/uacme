@@ -1,5 +1,15 @@
 uacme NEWS
-Copyright (C) 2019-2023 Nicola Di Lieto <nicola.dilieto@gmail.com>
+Copyright (C) 2019-2024 Nicola Di Lieto <nicola.dilieto@gmail.com>
+
+## [1.7.5] - 2024-01-28
+### Changed
+- fix ualpn exit code in client mode
+  Fixes https://github.com/ndilieto/uacme/issues/76
+- fix build with autoconf version 2.71
+  See https://github.com/ndilieto/uacme/pull/70
+- uacme: nsupdate.sh overhaul and DNAME redirection support
+- add link to deSEC.io DNS integration
+- minor documentation changes including copyright year
 
 ## [1.7.4] - 2023-02-15
 ### Changed

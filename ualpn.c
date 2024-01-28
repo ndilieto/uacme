@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2019-2023 Nicola Di Lieto <nicola.dilieto@gmail.com>
+ * Copyright (C) 2019-2024 Nicola Di Lieto <nicola.dilieto@gmail.com>
  *
  * This file is part of uacme.
  *
@@ -4024,7 +4024,7 @@ void usage(void)
 void version(void)
 {
     fprintf(stderr, "%s: version " PACKAGE_VERSION "\n"
-            "Copyright (C) 2019-2023 Nicola Di Lieto\n\n"
+            "Copyright (C) 2019-2024 Nicola Di Lieto\n\n"
             "%s is free software: you can redistribute and/or modify\n"
             "it under the terms of the GNU General Public License as\n"
             "published by the Free Software Foundation, either version 3\n"
@@ -4434,24 +4434,38 @@ int main(int argc, char **argv)
             cleanup_and_exit(0, EXIT_FAILURE);
         }
 
+        rc = EXIT_SUCCESS;
         while (1) {
             ssize_t r = getline(&line, &len, stdin);
-            if (r == -1)
+            if (r == -1) {
+                if (!feof(stdin)) {
+                    rc = EXIT_FAILURE;
+                    err("failed to get line from stdin");
+                }
                 break;
-
+            }
             if (fputs(line, f) < 0) {
+                rc = EXIT_FAILURE;
                 err("failed to write to %s", g.socket);
                 break;
             }
             r = getline(&line, &len, f);
-            if (r == -1)
+            if (r == -1) {
+                if (!feof(f)) {
+                    rc = EXIT_FAILURE;
+                    err("failed to read from %s", g.socket);
+                }
                 break;
-            fputs(line, stdout);
+            }
+            if (fputs(line, stdout) < 0) {
+                rc = EXIT_FAILURE;
+                err("failed to write to stdout");
+                break;
+            }
         }
-
         free(line);
         fclose(f);
-        cleanup_and_exit(0, EXIT_FAILURE);
+        cleanup_and_exit(0, rc);
     }
 
     if (g.connect == NULL) {
