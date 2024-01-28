@@ -1,3 +1,13 @@
+2024-01-28 Nicola Di Lieto <nicola.dilieto@gmail.com>
+	* Release 1.7.5
+	- fix ualpn exit code in client mode
+	  Fixes https://github.com/ndilieto/uacme/issues/76
+	- fix build with autoconf version 2.71
+	  See https://github.com/ndilieto/uacme/pull/70
+	- uacme: nsupdate.sh overhaul and DNAME redirection support
+	- add link to deSEC.io DNS integration
+	- minor documentation changes including copyright year
+
 2023-02-15 Nicola Di Lieto <nicola.dilieto@gmail.com>
 	* Release 1.7.4
 	- uacme: Validate token from ACME server. Fixes
