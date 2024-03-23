@@ -38,185 +38,130 @@ ARGS=5
 E_BADARGS=85
 
 if [ $# -ne "$ARGS" ]; then
-    echo "Usage: $(basename "$0") method type ident token auth" 1>&2
-    exit $E_BADARGS
+	echo "Usage: $(basename "$0") method type ident token auth" 1>&2
+	exit $E_BADARGS
 fi
 
-METHOD=$1
-TYPE=$2
-IDENT=$3
-TOKEN=$4
-AUTH=$5
+readonly METHOD=$1
+readonly TYPE=$2
+readonly IDENT=$3
+readonly TOKEN=$4
+readonly AUTH=$5
 
-ns_getns()
-{
-    local zone=$1
-    local answer
-
-    [ -n "$zone" ] && answer=$($DIG ${DIG_KEY:+-k ${DIG_KEY}} +noall +nottl +noclass +answer "$zone" NS) || return
-
-    local owner
-    local type
-    local rdata
-    while read -r owner type rdata; do
-        [ "$type" = NS ] && echo $rdata
-    done <<-EOF
-	$answer
-	EOF
-}
-
-ns_getall()
-{
-    local name=$1
-    local answer
-    local zone
-    local primary
-
-    [ -n "$name" ] && answer=$($DIG ${DIG_KEY:+-k ${DIG_KEY}} +noall +nottl +noclass +answer +authority "$name" SOA) || return
-
-    name=${name%.}.
-
-    local owner
-    local type
-    local rdata
-    while read -r owner type rdata; do
-        case "$type" in
-            CNAME)
-                name=$rdata
-                ;;
-            DNAME)
-                name=${name%$owner}$rdata
-                ;;
-            SOA)
-                zone=$owner
-                set -- $rdata && primary=$1
-                ;;
-        esac
-    done <<-EOF
-	$answer
-	EOF
-
-    echo $name $zone $primary
-}
+name=_acme-challenge.${IDENT#.}
 
 ns_ispresent()
 {
-    local challenge=$2
-    set -- $(ns_getall "$1")
-    local name=$1
-    local nameservers=$(ns_getns "$2")
-    local answer
-    local target
-    local rc=1
+	rc=1
 
-    local ns
-    for ns in $nameservers; do
-        answer=$($DIG ${DIG_KEY:+-k ${DIG_KEY}} +noall +nottl +noclass +answer "@$ns" "$name" TXT) || continue
-        target=
+	for ns in $nameservers; do
+		answer=$($DIG ${DIG_KEY:+-k ${DIG_KEY}} +noall +nottl +noclass +answer "@$ns" "$name" TXT) || continue
 
-        local owner
-        local type
-        local rdata
-        while read -r owner type rdata; do
-            case "$type" in
-                CNAME)
-                    target=$rdata
-                    ;;
-                DNAME)
-                    [ -n "$target" ] && target=${target%$owner}$rdata || target=${name%$owner}$rdata
-                    ;;
-                TXT)
-                    [ "$rdata" = \"$challenge\" ] && rc=0 && continue 2
-                    target=
-                    ;;
-            esac
-        done <<-EOF
-		$answer
-		EOF
+		while read -r owner type rdata; do
+			[ "$type" = TXT ] && [ "$rdata" = \"$AUTH\" ] && rc=0 && continue 2
+		done <<-EOF
+			$answer
+			EOF
 
-        [ -n "$target" ] && ns_ispresent "$target" "$challenge" && rc=0 || return 1
-    done
+		return 1
+	done
 
-    return $rc
-}
-
-ns_doupdate()
-{
-    local action=$1
-    local challenge=$3
-    set -- $(ns_getall "$2")
-    local name=$1
-    local zone=$2
-    local server=${NSUPDATE_SERVER:-$3}
-    local ttl=300
-
-    [ -n "$server" ] && [ -n "$zone" ] && [ -n "$name" ] && [ -n "$challenge" ] || return 1
-
-    $NSUPDATE ${NSUPDATE_KEY:+-k ${NSUPDATE_KEY}} -v <<-EOF
-	server ${server}
-	zone ${zone}
-	update ${action} ${name} ${ttl} IN TXT ${challenge}
-	send
-	EOF
-
-    return $?
+	return $rc
 }
 
 ns_update()
 {
-    local action=$1
-    local name=$2
-    local challenge=$3
-    local retries=5
-    local delay=5
-    local count=0
+	readonly action=$1
 
-    ns_doupdate "$action" "$name" "$challenge" || return 1
+	unset zone primary
+	answer=$($DIG ${DIG_KEY:+-k ${DIG_KEY}} +noall +nottl +noclass +answer +authority "$name" SOA) || return 1
 
-    while sleep $delay; do
-        case "$action" in
-            add)
-                ns_ispresent "$name" "$challenge" && break
-                ;;
-            del)
-                ns_ispresent "$name" "$challenge" || break
-                ;;
-            *)
-                return 1
-        esac
-        [ $count -lt $retries ] || return 1
-        count=$((count + 1))
-    done
+	name=${name%.}.
+	while read -r owner type rdata; do
+		case "$type" in
+		CNAME)
+			name=$rdata
+			;;
+		DNAME)
+			[ "$rdata" = . ] && name=${name%$owner} || name=${name%$owner}$rdata
+			;;
+		SOA)
+			zone=$owner
+			set -- $rdata && primary=$1
+			;;
+		esac
+	done <<-EOF
+		$answer
+		EOF
 
-    return 0
+	readonly server=${NSUPDATE_SERVER:-$primary}
+	readonly ttl=300
+
+	[ -n "$server" ] && [ -n "$zone" ] || return 1
+
+	$NSUPDATE ${NSUPDATE_KEY:+-k ${NSUPDATE_KEY}} -v <<-EOF || return 1
+		server ${server}
+		zone ${zone}
+		update ${action} ${name} ${ttl} IN TXT ${AUTH}
+		send
+		EOF
+
+	unset nameservers
+	answer=$($DIG ${DIG_KEY:+-k ${DIG_KEY}} +noall +nottl +noclass +answer "$zone" NS) || return 1
+
+	while read -r owner type rdata; do
+		[ "$type" = NS ] && nameservers="$nameservers $rdata"
+	done <<-EOF
+	$answer
+	EOF
+
+	readonly retries=5
+	readonly delay=5
+	count=0
+	while sleep $delay; do
+		case "$action" in
+		add)
+			ns_ispresent && break
+			;;
+		del)
+			ns_ispresent || break
+			;;
+		*)
+			return 1
+		esac
+		[ $count -lt $retries ] || return 1
+		count=$((count + 1))
+	done
+
+	return 0
 }
 
 case "$METHOD" in
-    "begin")
-        case "$TYPE" in
-            dns-01)
-                ns_update add "_acme-challenge.$IDENT" "$AUTH"
-                exit $?
-                ;;
-            *)
-                exit 1
-                ;;
-        esac
-        ;;
+"begin")
+	case "$TYPE" in
+	dns-01)
+		ns_update add
+		exit $?
+		;;
+	*)
+		exit 1
+		;;
+	esac
+	;;
 
-    "done"|"failed")
-        case "$TYPE" in
-            dns-01)
-                ns_update del "_acme-challenge.$IDENT" "$AUTH"
-                exit $?
-                ;;
-            *)
-                exit 1
-                ;;
-        esac
-        ;;
+"done"|"failed")
+	case "$TYPE" in
+	dns-01)
+		ns_update del
+		exit $?
+		;;
+	*)
+		exit 1
+		;;
+	esac
+	;;
 
-    *)
-        echo "$0: invalid method" 1>&2
-        exit 1
+*)
+	echo "$0: invalid method" 1>&2
+	exit 1
 esac
