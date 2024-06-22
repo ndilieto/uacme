@@ -178,6 +178,50 @@ out:
     return ret;
 }
 
+bool acme_error(acme_t *a)
+{
+    if (!a->json) return false;
+
+    if (a->type && strcasestr(a->type, "application/problem+json")) {
+        warnx("the server reported the following error:");
+        json_dump(stderr, a->json);
+        return true;
+    }
+
+    const json_value_t *e = json_find(a->json, "error");
+    if (e && e->type == JSON_OBJECT) {
+        warnx("the server reported the following error:");
+        json_dump(stderr, e);
+        return true;
+    }
+
+    return false;
+}
+
+bool acme_nonce(acme_t *a)
+{
+    const char *url = json_find_string(a->dir, "newNonce");
+    if (!url)
+    {
+        warnx("failed to find newNonce URL in directory");
+        return false;
+    }
+
+    msg(2, "fetching new nonce at %s", url);
+    if (acme_get(a, url) != 204) {
+        warnx("failed to fetch new nonce at %s", url);
+        acme_error(a);
+        return false;
+    } else if (acme_error(a))
+        return false;
+    else if (!a->nonce) {
+        warnx("failed to find nonce in newNonce resource");
+        return false;
+    }
+
+    return true;
+}
+
 int acme_post(acme_t *a, const char *url, const char *format, ...)
 {
     int ret = 0;
@@ -190,8 +234,8 @@ int acme_post(acme_t *a, const char *url, const char *format, ...)
         return 0;
     }
 
-    if (!a->nonce) {
-        warnx("acme_post: need a nonce first");
+    if (!a->nonce && !acme_nonce(a)) {
+        warnx("acme_post: no nonce available");
         return 0;
     }
 
@@ -377,26 +421,6 @@ char *identifiers(char * const *names)
     return ids;
 }
 
-bool acme_error(acme_t *a)
-{
-    if (!a->json) return false;
-
-    if (a->type && strcasestr(a->type, "application/problem+json")) {
-        warnx("the server reported the following error:");
-        json_dump(stderr, a->json);
-        return true;
-    }
-
-    const json_value_t *e = json_find(a->json, "error");
-    if (e && e->type == JSON_OBJECT) {
-        warnx("the server reported the following error:");
-        json_dump(stderr, e);
-        return true;
-    }
-
-    return false;
-}
-
 bool acme_bootstrap(acme_t *a)
 {
     msg(1, "fetching directory at %s", a->directory);
@@ -409,21 +433,6 @@ bool acme_bootstrap(acme_t *a)
 
     a->dir = a->json;
     a->json = NULL;
-
-    const char *url = json_find_string(a->dir, "newNonce");
-    if (!url)
-    {
-        warnx("failed to find newNonce URL in directory");
-        return false;
-    }
-
-    msg(2, "fetching new nonce at %s", url);
-    if (acme_get(a, url) != 204) {
-        warnx("failed to fetch new nonce at %s", url);
-        acme_error(a);
-        return false;
-    } else if (acme_error(a))
-        return false;
 
     return true;
 }
