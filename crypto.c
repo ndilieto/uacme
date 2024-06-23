@@ -57,6 +57,9 @@
 #include <openssl/bio.h>
 #include <openssl/bn.h>
 #include <openssl/crypto.h>
+#if OPENSSL_VERSION_NUMBER >= 0x30000000L
+#include <openssl/core_names.h>
+#endif
 #include <openssl/engine.h>
 #include <openssl/err.h>
 #include <openssl/evp.h>
@@ -173,29 +176,11 @@ out:
 static bool openssl_hmac_fast(const EVP_MD *type, const void *key,
         size_t keylen, const void *input, size_t len, unsigned char *output)
 {
-    bool success = false;
-    HMAC_CTX *hmac = HMAC_CTX_new();
-    if (!hmac) {
+    if (HMAC(type, key, keylen, input, len, output, NULL) == NULL) {
         openssl_error("openssl_hmac_fast");
-        goto out;
+        return false;
     }
-    if (!HMAC_Init_ex(hmac, key, keylen, type, NULL)) {
-        openssl_error("openssl_hmac_fast");
-        goto out;
-    }
-    if (!HMAC_Update(hmac, input, len)) {
-        openssl_error("openssl_hmac_fast");
-        goto out;
-    }
-    if (!HMAC_Final(hmac, output, NULL)) {
-        openssl_error("openssl_hmac_fast");
-        goto out;
-    }
-    success = true;
-out:
-    if (hmac)
-        HMAC_CTX_free(hmac);
-    return success;
+    return true;
 }
 #elif defined(USE_MBEDTLS)
 #if MBEDTLS_VERSION_NUMBER < 0x02100000
@@ -556,6 +541,18 @@ static bool rsa_params(privkey_t key, char **m, char **e)
     }
 #elif defined(USE_OPENSSL)
     unsigned char *data = NULL;
+#if OPENSSL_VERSION_NUMBER >= 0x30000000L
+    BIGNUM *bm = NULL;
+    BIGNUM *be = NULL;
+    if (!EVP_PKEY_get_bn_param(key, OSSL_PKEY_PARAM_RSA_N, &bm)) {
+        openssl_error("rsa_params");
+        goto out;
+    }
+    if (!EVP_PKEY_get_bn_param(key, OSSL_PKEY_PARAM_RSA_E, &be)) {
+        openssl_error("rsa_params");
+        goto out;
+    }
+#else
     const BIGNUM *bm = NULL;
     const BIGNUM *be = NULL;
     RSA *rsa = EVP_PKEY_get0_RSA(key);
@@ -564,6 +561,7 @@ static bool rsa_params(privkey_t key, char **m, char **e)
         goto out;
     }
     RSA_get0_key(rsa, &bm, &be, NULL);
+#endif
     r = BN_num_bytes(bm);
     data = calloc(1, r);
     if (!data) {
@@ -654,6 +652,12 @@ out:
     free(exp.data);
 #elif defined(USE_OPENSSL)
     free(data);
+#if OPENSSL_VERSION_NUMBER >= 0x30000000L
+    if (bm)
+        BN_free(bm);
+    if (be)
+        BN_free(be);
+#endif
 #elif defined(USE_MBEDTLS)
     free(data);
     mbedtls_mpi_free(&mn);
@@ -728,6 +732,31 @@ static size_t ec_params(privkey_t key, char **x, char **y)
         openssl_error("ec_params");
         goto out;
     }
+#if OPENSSL_VERSION_NUMBER >= 0x30000000L
+    char group[0x20];
+    if (!EVP_PKEY_get_utf8_string_param(key, OSSL_PKEY_PARAM_GROUP_NAME,
+                group, sizeof(group), NULL)) {
+        openssl_error("ec_params");
+        goto out;
+    }
+    if (strcasecmp(group, "prime256v1") == 0)
+        bits = 256;
+    else if (strcasecmp(group, "secp384r1") == 0)
+        bits = 384;
+    else {
+        warnx("ec_params: only \"prime256v1\" and \"secp384r1\" "
+                "Elliptic Curves supported");
+        goto out;
+    }
+    if (!EVP_PKEY_get_bn_param(key, OSSL_PKEY_PARAM_EC_PUB_X, &bx)) {
+        openssl_error("ec_params");
+        goto out;
+    }
+    if (!EVP_PKEY_get_bn_param(key, OSSL_PKEY_PARAM_EC_PUB_Y, &by)) {
+        openssl_error("ec_params");
+        goto out;
+    }
+#else
     EC_KEY *ec = EVP_PKEY_get0_EC_KEY(key);
     if (!ec) {
         openssl_error("ec_params");
@@ -760,6 +789,7 @@ static size_t ec_params(privkey_t key, char **x, char **y)
         openssl_error("ec_params");
         goto out;
     }
+#endif
     r = BN_num_bytes(bx);
     data = calloc(1, r);
     if (!data) {
