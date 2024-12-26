@@ -2,12 +2,12 @@
 .\"     Title: uacme
 .\"    Author: [see the "AUTHOR" section]
 .\" Generator: DocBook XSL Stylesheets v1.79.1 <http://docbook.sf.net/>
-.\"      Date: 01/28/2024
+.\"      Date: 12/26/2024
 .\"    Manual: User Commands
 .\"    Source: uacme 1.7.5
 .\"  Language: English
 .\"
-.TH "UACME" "1" "01/28/2024" "uacme 1\&.7\&.5" "User Commands"
+.TH "UACME" "1" "12/26/2024" "uacme 1\&.7\&.5" "User Commands"
 .\" -----------------------------------------------------------------
 .\" * Define some portability stuff
 .\" -----------------------------------------------------------------
@@ -194,8 +194,9 @@ select the Nth alternative chain in the order presented by the server\&. A colon
 \fIFP\fR
 makes
 \fBuacme\fR
-select the first alternative chain containing a certificate whose SHA256 fingerprint begins with
-\fIFP\fR\&. In both cases
+select the first alternative chain containing either a certificate whose SHA256 fingerprint begins with
+\fIFP\fR, or a certificate in which the Authority Key Identifier extension contains a keyIdentifier field beginning with
+\fIFP\fR\&. In all cases
 \fBuacme\fR
 falls back to the main certificate URL if it cannot match an alternative chain or the download thereof fails\&.
 .RE

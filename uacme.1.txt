@@ -102,9 +102,11 @@ OPTIONS
     in one of two ways. A positive integer 'N' makes *uacme* select the Nth
     alternative chain in the order presented by the server.
     A colon (':') separated list of two or more 2-digit hexadecimal numbers
-    'FP' makes *uacme* select the first alternative chain containing a
-    certificate whose SHA256 fingerprint begins with 'FP'.
-    In both cases *uacme* falls back to the main certificate URL if it cannot
+    'FP' makes *uacme* select the first alternative chain containing either a
+    certificate whose SHA256 fingerprint begins with 'FP', or a certificate
+    in which the Authority Key Identifier extension contains a keyIdentifier
+    field beginning with 'FP'.
+    In all cases *uacme* falls back to the main certificate URL if it cannot
     match an alternative chain or the download thereof fails.
 
 *-m, --must-staple*::

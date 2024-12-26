@@ -975,9 +975,11 @@ The key authorization (for <strong>dns-01</strong> and <strong>tls-alpn-01</stro
     in one of two ways. A positive integer <em>N</em> makes <strong>uacme</strong> select the Nth
     alternative chain in the order presented by the server.
     A colon (<em>:</em>) separated list of two or more 2-digit hexadecimal numbers
-    <em>FP</em> makes <strong>uacme</strong> select the first alternative chain containing a
-    certificate whose SHA256 fingerprint begins with <em>FP</em>.
-    In both cases <strong>uacme</strong> falls back to the main certificate URL if it cannot
+    <em>FP</em> makes <strong>uacme</strong> select the first alternative chain containing either a
+    certificate whose SHA256 fingerprint begins with <em>FP</em>, or a certificate
+    in which the Authority Key Identifier extension contains a keyIdentifier
+    field beginning with <em>FP</em>.
+    In all cases <strong>uacme</strong> falls back to the main certificate URL if it cannot
     match an alternative chain or the download thereof fails.
 </p>
 </dd>
@@ -1338,7 +1340,7 @@ along with this program.  If not, see <a href="http://www.gnu.org/licenses/">htt
 <div id="footer-text">
 Version 1.7.5<br>
 Last updated
- 2024-01-28 20:29:11 CET
+ 2024-12-26 17:39:08 CET
 </div>
 </div>
 </body>

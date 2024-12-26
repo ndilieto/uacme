@@ -3430,12 +3430,26 @@ bool cert_match(const char *cert, unsigned char *fingerprint,
         return ret;
     }
     for (unsigned int i = 0; i < crt_size; i++) {
-        unsigned char fp[32];
-        size_t s = sizeof(fp);
-        r = gnutls_x509_crt_get_fingerprint(crt[i], GNUTLS_DIG_SHA256, fp, &s);
-        if (r == 0 && fingerprint_len <= s &&
-                memcmp(fp, fingerprint, fingerprint_len) == 0)
-            ret = true;
+        unsigned char fp[128];
+        if (!ret) {
+            size_t s = sizeof(fp);
+            r = gnutls_x509_crt_get_fingerprint(crt[i], GNUTLS_DIG_SHA256,
+                    fp, &s);
+            if (r == 0 && fingerprint_len <= s &&
+                    memcmp(fp, fingerprint, fingerprint_len) == 0) {
+                msg(1, "certificate matched by fingerprint");
+                ret = true;
+            }
+        }
+        if (!ret) {
+            size_t s = sizeof(fp);
+            r = gnutls_x509_crt_get_authority_key_id(crt[i], fp, &s, NULL);
+            if (r == 0 && fingerprint_len <= s &&
+                    memcmp(fp, fingerprint, fingerprint_len) == 0) {
+                msg(1, "certificate matched by Authority Key Id");
+                ret = true;
+            }
+        }
         gnutls_x509_crt_deinit(crt[i]);
     }
     gnutls_free(crt);
@@ -3453,8 +3467,23 @@ bool cert_match(const char *cert, unsigned char *fingerprint,
             break;
         if (X509_digest(crt, EVP_sha256(), fp, &s) &&
                 fingerprint_len <= s &&
-                memcmp(fp, fingerprint, fingerprint_len) == 0)
+                memcmp(fp, fingerprint, fingerprint_len) == 0) {
+            msg(1, "certificate matched by fingerprint");
             ret = true;
+        } else {
+            AUTHORITY_KEYID *akid = X509_get_ext_d2i(crt,
+                    NID_authority_key_identifier, NULL, NULL);
+            if (akid != NULL) {
+                if (akid->keyid != NULL && fingerprint_len <=
+                        (size_t)ASN1_STRING_length(akid->keyid) &&
+                        memcmp(ASN1_STRING_get0_data(akid->keyid),
+                            fingerprint, fingerprint_len) == 0) {
+                    msg(1, "certificate matched by Authority Key Id");
+                    ret = true;
+                }
+                AUTHORITY_KEYID_free(akid);
+            }
+        }
         X509_free(crt);
     }
     BIO_free(bio);
@@ -3473,12 +3502,76 @@ bool cert_match(const char *cert, unsigned char *fingerprint,
         mbedtls_x509_crt_free(&crt);
         return ret;
     }
-    for (mbedtls_x509_crt *c = &crt; c; c = c->next) {
+    for (mbedtls_x509_crt *c = &crt; c && !ret; c = c->next) {
         unsigned char fp[32];
         r = mbedtls_hash_fast(MBEDTLS_MD_SHA256, c->raw.p, c->raw.len, fp);
         if (r == 0 && fingerprint_len <= sizeof(fp) &&
-                memcmp(fp, fingerprint, fingerprint_len) == 0)
+                memcmp(fp, fingerprint, fingerprint_len) == 0) {
+            msg(1, "certificate matched by fingerprint");
             ret = true;
+            break;
+        }
+        if (!c->v3_ext.p || c->v3_ext.len == 0)
+            continue;
+        unsigned char *p = c->v3_ext.p;
+        unsigned char *end = p + c->v3_ext.len;
+        size_t len;
+        r = mbedtls_asn1_get_tag(&p, end, &len,
+                MBEDTLS_ASN1_CONSTRUCTED | MBEDTLS_ASN1_SEQUENCE);
+        if (r || p + len != end)
+            continue;
+        while (p < end) {
+            unsigned char *end_ext;
+
+            r = mbedtls_asn1_get_tag(&p, end, &len,
+                    MBEDTLS_ASN1_CONSTRUCTED | MBEDTLS_ASN1_SEQUENCE);
+            if (r)
+                break;
+
+            end_ext = p + len;
+            r = mbedtls_asn1_get_tag(&p, end_ext, &len, MBEDTLS_ASN1_OID);
+            if (r)
+                break;
+
+            if (len != MBEDTLS_OID_SIZE(MBEDTLS_OID_AUTHORITY_KEY_IDENTIFIER) ||
+                    memcmp(p, MBEDTLS_OID_AUTHORITY_KEY_IDENTIFIER, len)) {
+                p = end_ext;
+                continue;
+            }
+            p += len;
+
+            r = mbedtls_asn1_get_tag(&p, end_ext, &len, MBEDTLS_ASN1_BOOLEAN);
+            if (r == 0) {
+                if (len != 1)
+                    break;
+                p++;
+            } else if (r != MBEDTLS_ERR_ASN1_UNEXPECTED_TAG)
+                break;
+
+            r = mbedtls_asn1_get_tag(&p, end_ext, &len,
+                    MBEDTLS_ASN1_OCTET_STRING);
+            if (r || end_ext != p + len)
+                break;
+
+            r = mbedtls_asn1_get_tag(&p, p + len, &len,
+                    MBEDTLS_ASN1_CONSTRUCTED | MBEDTLS_ASN1_SEQUENCE);
+            if (r)
+                break;
+
+            r = mbedtls_asn1_get_tag(&p, p + len, &len,
+                    MBEDTLS_ASN1_CONTEXT_SPECIFIC);
+            if (r)
+                break;
+
+            if (fingerprint_len <= len &&
+                memcmp(p, fingerprint, fingerprint_len) == 0) {
+                msg(1, "certificate matched by Authority Key Id");
+                ret = true;
+                break;
+            }
+
+            p = end_ext;
+        }
     }
     mbedtls_x509_crt_free(&crt);
 #endif
