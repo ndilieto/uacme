@@ -3412,6 +3412,78 @@ out:
     return ret;
 }
 
+#if defined(USE_MBEDTLS)
+static int mbedtls_crt_get_authority_key_id(mbedtls_x509_crt *crt,
+        unsigned char **akid, size_t *size)
+{
+    unsigned char *p = crt->v3_ext.p;
+    unsigned char *end = p + crt->v3_ext.len;
+    size_t len;
+    int r;
+
+    if (!p || p == end)
+        return MBEDTLS_ERR_X509_INVALID_EXTENSIONS;
+    r = mbedtls_asn1_get_tag(&p, end, &len,
+            MBEDTLS_ASN1_CONSTRUCTED | MBEDTLS_ASN1_SEQUENCE);
+    if (r)
+        return r;
+    if (p + len != end)
+        return MBEDTLS_ERR_ASN1_LENGTH_MISMATCH;
+
+    while (p < end) {
+        unsigned char *end_ext;
+
+        r = mbedtls_asn1_get_tag(&p, end, &len,
+                MBEDTLS_ASN1_CONSTRUCTED | MBEDTLS_ASN1_SEQUENCE);
+        if (r)
+            return r;
+
+        end_ext = p + len;
+        r = mbedtls_asn1_get_tag(&p, end_ext, &len, MBEDTLS_ASN1_OID);
+        if (r)
+            return r;
+
+        if (len != MBEDTLS_OID_SIZE(MBEDTLS_OID_AUTHORITY_KEY_IDENTIFIER) ||
+                memcmp(p, MBEDTLS_OID_AUTHORITY_KEY_IDENTIFIER, len)) {
+            p = end_ext;
+            continue;
+        }
+        p += len;
+
+        r = mbedtls_asn1_get_tag(&p, end_ext, &len, MBEDTLS_ASN1_BOOLEAN);
+        if (r == 0) {
+            if (len != 1)
+                return MBEDTLS_ERR_ASN1_LENGTH_MISMATCH;
+            p++;
+        } else if (r != MBEDTLS_ERR_ASN1_UNEXPECTED_TAG)
+            return r;
+
+        r = mbedtls_asn1_get_tag(&p, end_ext, &len,
+                MBEDTLS_ASN1_OCTET_STRING);
+        if (r)
+            return r;
+        if (end_ext != p + len)
+            return MBEDTLS_ERR_ASN1_LENGTH_MISMATCH;
+
+        r = mbedtls_asn1_get_tag(&p, p + len, &len,
+                MBEDTLS_ASN1_CONSTRUCTED | MBEDTLS_ASN1_SEQUENCE);
+        if (r)
+            return r;
+
+        r = mbedtls_asn1_get_tag(&p, p + len, &len,
+                MBEDTLS_ASN1_CONTEXT_SPECIFIC);
+        if (r)
+            return r;
+
+        *akid = p;
+        *size = len;
+        return 0;
+    }
+
+    return MBEDTLS_ERR_X509_UNKNOWN_OID;
+}
+#endif
+
 bool cert_match(const char *cert, unsigned char *fingerprint,
         size_t fingerprint_len)
 {
@@ -3502,8 +3574,10 @@ bool cert_match(const char *cert, unsigned char *fingerprint,
         mbedtls_x509_crt_free(&crt);
         return ret;
     }
-    for (mbedtls_x509_crt *c = &crt; c && !ret; c = c->next) {
+    for (mbedtls_x509_crt *c = &crt; c; c = c->next) {
         unsigned char fp[32];
+        unsigned char *akid;
+        size_t akid_len;
         r = mbedtls_hash_fast(MBEDTLS_MD_SHA256, c->raw.p, c->raw.len, fp);
         if (r == 0 && fingerprint_len <= sizeof(fp) &&
                 memcmp(fp, fingerprint, fingerprint_len) == 0) {
@@ -3511,66 +3585,12 @@ bool cert_match(const char *cert, unsigned char *fingerprint,
             ret = true;
             break;
         }
-        if (!c->v3_ext.p || c->v3_ext.len == 0)
-            continue;
-        unsigned char *p = c->v3_ext.p;
-        unsigned char *end = p + c->v3_ext.len;
-        size_t len;
-        r = mbedtls_asn1_get_tag(&p, end, &len,
-                MBEDTLS_ASN1_CONSTRUCTED | MBEDTLS_ASN1_SEQUENCE);
-        if (r || p + len != end)
-            continue;
-        while (p < end) {
-            unsigned char *end_ext;
-
-            r = mbedtls_asn1_get_tag(&p, end, &len,
-                    MBEDTLS_ASN1_CONSTRUCTED | MBEDTLS_ASN1_SEQUENCE);
-            if (r)
-                break;
-
-            end_ext = p + len;
-            r = mbedtls_asn1_get_tag(&p, end_ext, &len, MBEDTLS_ASN1_OID);
-            if (r)
-                break;
-
-            if (len != MBEDTLS_OID_SIZE(MBEDTLS_OID_AUTHORITY_KEY_IDENTIFIER) ||
-                    memcmp(p, MBEDTLS_OID_AUTHORITY_KEY_IDENTIFIER, len)) {
-                p = end_ext;
-                continue;
-            }
-            p += len;
-
-            r = mbedtls_asn1_get_tag(&p, end_ext, &len, MBEDTLS_ASN1_BOOLEAN);
-            if (r == 0) {
-                if (len != 1)
-                    break;
-                p++;
-            } else if (r != MBEDTLS_ERR_ASN1_UNEXPECTED_TAG)
-                break;
-
-            r = mbedtls_asn1_get_tag(&p, end_ext, &len,
-                    MBEDTLS_ASN1_OCTET_STRING);
-            if (r || end_ext != p + len)
-                break;
-
-            r = mbedtls_asn1_get_tag(&p, p + len, &len,
-                    MBEDTLS_ASN1_CONSTRUCTED | MBEDTLS_ASN1_SEQUENCE);
-            if (r)
-                break;
-
-            r = mbedtls_asn1_get_tag(&p, p + len, &len,
-                    MBEDTLS_ASN1_CONTEXT_SPECIFIC);
-            if (r)
-                break;
-
-            if (fingerprint_len <= len &&
-                memcmp(p, fingerprint, fingerprint_len) == 0) {
-                msg(1, "certificate matched by Authority Key Id");
-                ret = true;
-                break;
-            }
-
-            p = end_ext;
+        r = mbedtls_crt_get_authority_key_id(c, &akid, &akid_len);
+        if (r == 0 && fingerprint_len <= akid_len &&
+                memcmp(akid, fingerprint, fingerprint_len) == 0) {
+            msg(1, "certificate matched by Authority Key Id");
+            ret = true;
+            break;
         }
     }
     mbedtls_x509_crt_free(&crt);
