@@ -748,10 +748,11 @@ UACME(1) Manual Page
 <div class="sectionbody">
 <div class="paragraph"><p><strong>uacme</strong> [<strong>-a</strong>|<strong>--acme-url</strong> <em>URL</em>] [<strong>-b</strong>|<strong>--bits</strong> <em>BITS</em>]
     [<strong>-c</strong>|<strong>--confdir</strong> <em>DIR</em>] [<strong>-d</strong>|<strong>--days</strong> <em>DAYS</em>] [<strong>-e</strong>|<strong>--eab</strong> KEYID:KEY]
-    [<strong>-f</strong>|<strong>--force</strong>] [<strong>-h</strong>|<strong>--hook</strong> <em>PROGRAM</em>] [<strong>-l</strong>|<strong>--alternate</strong> <em>N</em> | <em>FP</em>]
-    [<strong>-m</strong>|<strong>--must-staple</strong>] [<strong>-n</strong>|<strong>--never-create</strong>] [<strong>-o</strong>|<strong>--no-ocsp</strong>]
-    [<strong>-r</strong>|<strong>--reason</strong> CODE] [<strong>-s</strong>|<strong>--staging</strong>] [<strong>-t</strong>|<strong>--type</strong> <strong>RSA</strong>|<strong>EC</strong>]
-    [<strong>-v</strong>|<strong>--verbose</strong> &#8230;] [<strong>-V</strong>|<strong>--version</strong>] [<strong>-y</strong>|<strong>--yes</strong>] [<strong>-?</strong>|<strong>--help</strong>]
+    [<strong>-f</strong>|<strong>--force</strong>] [<strong>-h</strong>|<strong>--hook</strong> <em>PROGRAM</em>] [<strong>-i</strong>|<strong>--no-ari</strong>]
+    [<strong>-l</strong>|<strong>--alternate</strong> <em>N</em> | <em>FP</em>] [<strong>-m</strong>|<strong>--must-staple</strong>]
+    [<strong>-n</strong>|<strong>--never-create</strong>] [<strong>-o</strong>|<strong>--no-ocsp</strong>] [<strong>-r</strong>|<strong>--reason</strong> CODE]
+    [<strong>-s</strong>|<strong>--staging</strong>] [<strong>-t</strong>|<strong>--type</strong> <strong>RSA</strong>|<strong>EC</strong>] [<strong>-v</strong>|<strong>--verbose</strong> &#8230;]
+    [<strong>-V</strong>|<strong>--version</strong>] [<strong>-y</strong>|<strong>--yes</strong>] [<strong>-?</strong>|<strong>--help</strong>]
     <strong>new</strong> [<em>EMAIL</em>] | <strong>update</strong> [<em>EMAIL</em>] | <strong>deactivate</strong> | <strong>newkey</strong> |
     <strong>issue</strong> <em>IDENTIFIER</em> [<em>ALTNAME</em> &#8230;]] | <strong>issue</strong> <em>CSRFILE</em> |
     <strong>revoke</strong> <em>CERTFILE</em> [<em>CERTKEYFILE</em>]</p></div>
@@ -854,7 +855,9 @@ certificate for <em>IDENTIFIER</em>
 <dd>
 <p>
     Do not reissue certificates that are still valid for longer
-    than <em>DAYS</em> (default 30). See also <strong>-o, --no-ocsp</strong>.
+    than <em>DAYS</em> (default 30). This only applies as a fallback
+    if no server renewal information is available. See also
+    <strong>-i, --no-ari</strong> and <strong>-o, --no-ocsp</strong>.
 </p>
 </dd>
 <dt class="hdlist1">
@@ -874,7 +877,8 @@ certificate for <em>IDENTIFIER</em>
 </dt>
 <dd>
 <p>
-    Force certificate reissuance regardless of expiration date.
+    Force certificate reissuance regardless of expiration date and
+    renewal information from the server.
 </p>
 </dd>
 <dt class="hdlist1">
@@ -962,6 +966,16 @@ The key authorization (for <strong>dns-01</strong> and <strong>tls-alpn-01</stro
 </p>
 </dd>
 </dl></div>
+</dd>
+<dt class="hdlist1">
+<strong>-i, --no-ari</strong>
+</dt>
+<dd>
+<p>
+    Do not query or use the server&#8217;s certificate renewal information window
+    to decide whether to reissue an existing certificate. See also
+    <strong>-d, --days</strong> and <strong>-o, --no-ocsp</strong>.
+</p>
 </dd>
 <dt class="hdlist1">
 <strong>-l, --alternate</strong> <em>N</em> | <em>FP</em>
@@ -1340,7 +1354,7 @@ along with this program.  If not, see <a href="http://www.gnu.org/licenses/">htt
 <div id="footer-text">
 Version 1.7.5<br>
 Last updated
- 2024-12-26 17:39:08 CET
+ 2024-12-28 14:17:19 CET
 </div>
 </div>
 </body>

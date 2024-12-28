@@ -20,6 +20,7 @@
 
 #include "config.h"
 #include <err.h>
+#include <regex.h>
 #include <stdarg.h>
 #include <stdlib.h>
 #include <string.h>
@@ -192,4 +193,28 @@ curldata_t *curl_post(const char *url, void *post_data, size_t post_size,
         }
     }
     return c;
+}
+
+char *find_header(const char *headers, const char *name)
+{
+    char *regex = NULL;
+    if (asprintf(&regex, "^%s:[ \t]*(.*)\r\n", name) < 0) {
+        warnx("find_header: asprintf failed");
+        return NULL;
+    }
+    char *ret = NULL;
+    regex_t reg;
+    if (regcomp(&reg, regex, REG_EXTENDED | REG_ICASE | REG_NEWLINE)) {
+        warnx("find_header: regcomp failed");
+    } else {
+        regmatch_t m[2];
+        if (regexec(&reg, headers, 2, m, 0) == 0) {
+            ret = strndup(headers + m[1].rm_so, m[1].rm_eo - m[1].rm_so);
+            if (!ret)
+                warn("find_header: strndup failed");
+        }
+    }
+    free(regex);
+    regfree(&reg);
+    return ret;
 }

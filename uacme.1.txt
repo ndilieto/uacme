@@ -15,10 +15,11 @@ SYNOPSIS
 --------
 *uacme* [*-a*|*--acme-url* 'URL'] [*-b*|*--bits* 'BITS']
     [*-c*|*--confdir* 'DIR'] [*-d*|*--days* 'DAYS'] [*-e*|*--eab* KEYID:KEY]
-    [*-f*|*--force*] [*-h*|*--hook* 'PROGRAM'] [*-l*|*--alternate* 'N' | 'FP']
-    [*-m*|*--must-staple*] [*-n*|*--never-create*] [*-o*|*--no-ocsp*]
-    [*-r*|*--reason* CODE] [*-s*|*--staging*] [*-t*|*--type* *RSA*|*EC*]
-    [*-v*|*--verbose* ...] [*-V*|*--version*] [*-y*|*--yes*] [*-?*|*--help*]
+    [*-f*|*--force*] [*-h*|*--hook* 'PROGRAM'] [*-i*|*--no-ari*]
+    [*-l*|*--alternate* 'N' | 'FP'] [*-m*|*--must-staple*]
+    [*-n*|*--never-create*] [*-o*|*--no-ocsp*] [*-r*|*--reason* CODE]
+    [*-s*|*--staging*] [*-t*|*--type* *RSA*|*EC*] [*-v*|*--verbose* ...]
+    [*-V*|*--version*] [*-y*|*--yes*] [*-?*|*--help*]
     *new* ['EMAIL'] | *update* ['EMAIL'] | *deactivate* | *newkey* |
     *issue* 'IDENTIFIER' ['ALTNAME' ...]] | *issue* 'CSRFILE' |
     *revoke* 'CERTFILE' ['CERTKEYFILE']
@@ -61,7 +62,9 @@ OPTIONS
 
 *-d, --days* 'DAYS'::
     Do not reissue certificates that are still valid for longer
-    than 'DAYS' (default 30). See also *-o, --no-ocsp*.
+    than 'DAYS' (default 30). This only applies as a fallback
+    if no server renewal information is available. See also
+    *-i, --no-ari* and *-o, --no-ocsp*.
 
 *-e, --eab* 'KEYID:KEY'::
     Specify RFC8555 External Account Binding credentials according
@@ -71,7 +74,8 @@ OPTIONS
     'KEYID' must be an ASCII string. 'KEY' must be base64url-encoded.
 
 *-f, --force*::
-    Force certificate reissuance regardless of expiration date.
+    Force certificate reissuance regardless of expiration date and
+    renewal information from the server.
 
 *-h, --hook* 'PROGRAM'::
     Challenge hook program. If not specified *uacme* interacts with
@@ -93,6 +97,11 @@ OPTIONS
         'TOKEN'::: The challenge token
         'AUTH'::: The key authorization (for *dns-01* and *tls-alpn-01*
            already converted to the base64url-encoded SHA256 digest format)
+
+*-i, --no-ari*::
+    Do not query or use the server's certificate renewal information window
+    to decide whether to reissue an existing certificate. See also
+    *-d, --days* and *-o, --no-ocsp*.
 
 *-l, --alternate* 'N' | 'FP'::
     According to <https://tools.ietf.org/html/rfc8555#section-7.4.2>

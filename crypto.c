@@ -38,6 +38,7 @@
 #include "base64.h"
 #include "crypto.h"
 #include "curlwrap.h"
+#include "json.h"
 #include "msg.h"
 #if !defined(USE_OPENSSL)
 #include "read-file.h"
@@ -251,6 +252,31 @@ static int mbedtls_hmac_fast(mbedtls_md_type_t md_type, const void *key,
         return MBEDTLS_ERR_MD_FEATURE_UNAVAILABLE;
     }
     return mbedtls_md_hmac(mdi, key, keylen, input, len, output);
+}
+#endif
+
+#if !HAVE_STRCASESTR
+char *strcasestr(const char *haystack, const char *needle)
+{
+    char *ret = NULL;
+    char *_haystack = strdup(haystack);
+    char *_needle = strdup(needle);
+
+    if (!_haystack || !_needle)
+        warn("strcasestr: strdup failed");
+    else {
+        char *p;
+        for (p = _haystack; *p; p++)
+            *p = tolower(*p);
+        for (p = _needle; *p; p++)
+            *p = tolower(*p);
+        ret = strstr(_haystack, _needle);
+        if (ret)
+            ret = (char *)haystack + (ret - _haystack);
+    }
+    free(_haystack);
+    free(_needle);
+    return ret;
 }
 #endif
 
@@ -3597,6 +3623,94 @@ bool cert_match(const char *cert, unsigned char *fingerprint,
 #endif
     return ret;
 }
+
+#if defined(USE_GNUTLS)
+static char *crt_ari_url(gnutls_x509_crt_t crt, const char *prefix)
+#elif defined(USE_OPENSSL)
+static char *crt_ari_url(X509 *crt, const char *prefix)
+#elif defined(USE_MBEDTLS)
+static char *crt_ari_url(mbedtls_x509_crt *crt, const char *prefix)
+#endif
+{
+    char *url = NULL;
+    unsigned char akid[128];
+    char akid_b64[base64_ENCODED_LEN(sizeof(akid),
+            base64_VARIANT_URLSAFE_NO_PADDING)];
+    unsigned char serial[128];
+    char serial_b64[base64_ENCODED_LEN(sizeof(akid),
+            base64_VARIANT_URLSAFE_NO_PADDING)];
+    size_t alen = sizeof(akid);
+    size_t slen = sizeof(serial);
+
+#if defined(USE_GNUTLS)
+    int r = gnutls_x509_crt_get_authority_key_id(crt, akid, &alen, NULL);
+    if (r)
+        return NULL;
+    r = gnutls_x509_crt_get_serial(crt, serial, &slen);
+    if (r)
+        return NULL;
+#elif defined(USE_OPENSSL)
+    AUTHORITY_KEYID *ak = X509_get_ext_d2i(crt,
+            NID_authority_key_identifier, NULL, NULL);
+    if (ak != NULL) {
+        if (ak->keyid == NULL ||
+                alen < (size_t)ASN1_STRING_length(ak->keyid))
+            alen = 0;
+        else {
+            alen = (size_t)ASN1_STRING_length(ak->keyid);
+            memcpy(akid, ASN1_STRING_get0_data(ak->keyid), alen);
+        }
+        AUTHORITY_KEYID_free(ak);
+        if (alen == 0)
+            return NULL;
+    } else
+        return NULL;
+    const ASN1_INTEGER *sn = X509_get0_serialNumber(crt);
+    if (!sn)
+        return NULL;
+    BIGNUM *bn = ASN1_INTEGER_to_BN(sn, NULL);
+    if (!bn) {
+        openssl_error("cert_ari_url");
+        return NULL;
+    }
+    if (slen < (size_t)BN_num_bytes(bn)) {
+        BN_free(bn);
+        return NULL;
+    } else {
+        slen = (size_t)BN_bn2bin(bn, serial);
+        BN_free(bn);
+    }
+#elif defined(USE_MBEDTLS)
+    unsigned char *ak;
+    size_t len;
+    int r = mbedtls_crt_get_authority_key_id(crt, &ak, &len);
+    if (r)
+        return NULL;
+    if (alen < len)
+        return NULL;
+    alen = len;
+    memcpy(akid, ak, alen);
+    if (!crt->serial.p || slen < crt->serial.len)
+        return NULL;
+    slen = crt->serial.len;
+    memcpy(serial, crt->serial.p, slen);
+#endif
+    if (!bin2base64(akid_b64, sizeof(akid_b64), akid, alen,
+                base64_VARIANT_URLSAFE_NO_PADDING) ||
+            !bin2base64(serial_b64, sizeof(serial_b64), serial, slen,
+                base64_VARIANT_URLSAFE_NO_PADDING)) {
+        warnx("crt_ari_url: bin2base64 failed");
+        return NULL;
+    }
+
+    if (asprintf(&url, "%s/%s.%s", prefix, akid_b64, serial_b64) < 0) {
+        warnx("crt_ari_url: asprintf failed");
+        url = NULL;
+    }
+
+    return url;
+}
+
 #if defined(USE_GNUTLS)
 static bool ocsp_check(gnutls_x509_crt_t *crt)
 {
@@ -4441,8 +4555,99 @@ out:
 }
 #endif
 
-bool cert_valid(const char *certfile, char * const *names, int validity,
-        bool status_check)
+#if defined(USE_GNUTLS)
+int ari_check(gnutls_x509_crt_t crt, const char *ari_url)
+#elif defined(USE_OPENSSL)
+int ari_check(X509 *crt, const char *ari_url)
+#elif defined(USE_MBEDTLS)
+int ari_check(mbedtls_x509_crt *crt, const char *ari_url)
+#endif
+{
+    int ret = -1;
+    json_value_t *json = NULL;
+
+    if (!ari_url)
+        goto out;
+
+    char *url = crt_ari_url(crt, ari_url);
+    if (!url)
+        goto out;
+
+    msg(1, "checking certificate renewal info at %s", url);
+    curldata_t *c = curl_get(url);
+    free(url);
+    if (!c) {
+        warnx("ari_check: curl_get failed");
+        goto out;
+    }
+
+    if (c->headers)
+        msg(3, "ari_check: HTTP headers\n%s", c->headers);
+    if (c->body)
+        msg(3, "ari_check: HTTP body\n%s", c->body);
+
+    char *p = find_header(c->headers, "Content-Type");
+    if (p && strcasestr(p, "json"))
+        json = json_parse(c->body, c->body_len);
+    free(p);
+    curldata_free(c);
+
+    if (!json) {
+        warnx("ari_check: failed to parse");
+        goto out;
+    }
+
+    const json_value_t *window = json_find(json, "suggestedWindow");
+    if (!window) {
+        warnx("ari_check: missing suggestedWindow");
+        goto out;
+    }
+
+    const char *start = json_find_string(window, "start");
+    const char *end = json_find_string(window, "end");
+    if (!start || !end) {
+        warnx("ari_check: missing start or end");
+        goto out;
+    }
+    msg(1, "certificate renewal window: start=%s end=%s", start, end);
+    struct tm start_tm, end_tm;
+    p = strptime(start, "%Y-%m-%dT%T%z", &start_tm);
+    if (!p || *p) {
+        warnx("ari_check: failed to parse start");
+        goto out;
+    }
+    p = strptime(end, "%Y-%m-%dT%T%z", &end_tm);
+    if (!p || *p) {
+        warnx("ari_check: failed to parse end");
+        goto out;
+    }
+    time_t start_t = mktime(&start_tm);
+    if (start_t == (time_t)-1) {
+        warnx("ari_check: invalid start");
+        goto out;
+    }
+    time_t end_t = mktime(&end_tm);
+    if (end_t == (time_t)-1) {
+        warnx("ari_check: invalid end");
+        goto out;
+    }
+    if (start_t >= end_t) {
+        warnx("ari_check: invalid start/end");
+        goto out;
+    }
+
+    if (time(NULL) > start_t + (end_t - start_t) * ((float)rand()/RAND_MAX))
+        ret = 1;
+    else
+        ret = 0;
+
+out:
+    json_free(json);
+    return ret;
+}
+
+bool cert_valid(const char *certfile, char * const *names, const char *ari_url,
+        int validity, bool status_check)
 {
     bool valid = false;
 #if defined(USE_GNUTLS)
@@ -4459,7 +4664,10 @@ bool cert_valid(const char *certfile, char * const *names, int validity,
 
     int days_left = (expiration - time(NULL))/(24*3600);
     msg(1, "%s expires in %d days", certfile, days_left);
-    if (days_left < validity) {
+    int ari = -1;
+    if (days_left > 0)
+        ari = ari_check(crt[0], ari_url);
+    if (ari > 0 || (ari < 0 && days_left < validity)) {
         msg(1, "%s is due for renewal", certfile);
         goto out;
     }
@@ -4513,7 +4721,10 @@ out:
         goto out;
     }
     msg(1, "%s expires in %d days", certfile, days_left);
-    if (days_left < validity) {
+    int ari = -1;
+    if (days_left > 0)
+        ari = ari_check(crt[0], ari_url);
+    if (ari > 0 || (ari < 0 && days_left < validity)) {
         msg(1, "%s is due for renewal", certfile);
         goto out;
     }
@@ -4639,7 +4850,10 @@ out:
 
     int days_left = (expiration - time(NULL))/(24*3600);
     msg(1, "%s expires in %d days", certfile, days_left);
-    if (days_left < validity) {
+    int ari = -1;
+    if (days_left > 0)
+        ari = ari_check(crt, ari_url);
+    if (ari > 0 || (ari < 0 && days_left < validity)) {
         msg(1, "%s is due for renewal", certfile);
         goto out;
     }
