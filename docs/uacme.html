@@ -1306,6 +1306,38 @@ Interface name and IP address or hostname
 </div>
 </div>
 <div class="sect1">
+<h2 id="_hook_environment">HOOK ENVIRONMENT</h2>
+<div class="sectionbody">
+<div class="paragraph"><p>The following environment variables are exported for use by the hook program:</p></div>
+<div class="dlist"><dl>
+<dt class="hdlist1">
+<strong>UACME_CONFDIR</strong>
+</dt>
+<dd>
+<p>
+    Path to <em>CONFDIR</em>, see <strong>-c, --confdir</strong>
+</p>
+</dd>
+<dt class="hdlist1">
+<strong>UACME_VERBOSE</strong>
+</dt>
+<dd>
+<p>
+    Verbosity, see <strong>-v, --verbose</strong>
+</p>
+</dd>
+<dt class="hdlist1">
+<strong>UACME_METHOD</strong>, <strong>UACME_TYPE</strong>, <strong>UACME_IDENT</strong>, <strong>UACME_TOKEN</strong>, <strong>UACME_AUTH</strong>
+</dt>
+<dd>
+<p>
+    Copies of the hook program arguments, see <strong>-h, --hook</strong>
+</p>
+</dd>
+</dl></div>
+</div>
+</div>
+<div class="sect1">
 <h2 id="_exit_status">EXIT STATUS</h2>
 <div class="sectionbody">
 <div class="dlist"><dl>
@@ -1442,7 +1474,7 @@ along with this program.  If not, see <a href="http://www.gnu.org/licenses/">htt
 <div id="footer-text">
 Version 1.7.5<br>
 Last updated
- 2024-12-29 11:22:08 CET
+ 2024-12-29 17:04:25 CET
 </div>
 </div>
 </body>

@@ -285,6 +285,20 @@ ENVIRONMENT
     for ordinary URLs in the style: 'scheme://username:password@hostname'
 
 
+HOOK ENVIRONMENT
+----------------
+The following environment variables are exported for use by the hook program:
+
+*UACME_CONFDIR*::
+    Path to 'CONFDIR', see *-c, --confdir*
+
+*UACME_VERBOSE*::
+    Verbosity, see *-v, --verbose*
+
+*UACME_METHOD*, *UACME_TYPE*, *UACME_IDENT*, *UACME_TOKEN*, *UACME_AUTH*::
+    Copies of the hook program arguments, see *-h, --hook*
+
+
 EXIT STATUS
 -----------
 *0*::

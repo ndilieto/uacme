@@ -295,6 +295,11 @@ int hook_run(const char *prog, const char *method, const char *type,
         else
             warnx("hook_run: %s terminated abnormally", prog);
     } else { // child
+        setenv("UACME_METHOD", method, 1);
+        setenv("UACME_TYPE", type, 1);
+        setenv("UACME_IDENT", ident, 1);
+        setenv("UACME_TOKEN", token, 1);
+        setenv("UACME_AUTH", auth, 1);
         if (execl(prog, prog, method, type, ident, token, auth,
                     (char *)NULL) < 0) {
             warn("hook_run: failed to execute %s", prog);
@@ -1695,6 +1700,10 @@ int main(int argc, char **argv)
                 "https://github.com/ndilieto/uacme/tree/upstream/latest");
     } else
         msg(1, "version " PACKAGE_VERSION " starting on %s", buf);
+
+    snprintf(buf, sizeof(buf), "%d", g_loglevel);
+    setenv("UACME_VERBOSE", buf, 1);
+    setenv("UACME_CONFDIR", confdir, 1);
 
     if (a.hook && access(a.hook, R_OK | X_OK) < 0) {
         warn("%s", a.hook);
