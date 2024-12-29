@@ -35,5 +35,6 @@ void curldata_free(curldata_t *c);
 curldata_t *curl_get(const char *url);
 curldata_t *curl_post(const char *url, void *post_data, size_t post_size,
         const char *header, ...);
+char *find_header(const char *headers, const char *name);
 
 #endif

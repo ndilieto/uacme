@@ -355,7 +355,8 @@ if test "x$OPT_UALPN" != "xno"; then
                 AC_DEFINE(HAVE_MAP_DEVZERO, 1, [if mmap("/dev/zero", MAP_SHARED) works])
                 AC_MSG_RESULT([yes]),
                 AC_MSG_RESULT([no])
-                AC_MSG_ERROR([ualpn requires MAP_ANON or mmap("/dev/zero", MAP_SHARED)])),
+                AC_MSG_ERROR([ualpn requires MAP_ANON or mmap("/dev/zero", MAP_SHARED)]))
+        ], [
             AC_COMPILE_IFELSE([AC_LANG_SOURCE([#include <sys/mman.h>
                              int main() {return mmap(0, 4096, PROT_READ|PROT_WRITE,
                                 MAP_ANON|MAP_SHARED, -1, 0) == MAP_FAILED;}])],

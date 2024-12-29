@@ -1,6 +1,24 @@
 uacme NEWS
 Copyright (C) 2019-2024 Nicola Di Lieto <nicola.dilieto@gmail.com>
 
+## [1.7.6] - 2024-12-29
+### Changed
+- Fix OpenSSL 3.x deprecated APIs
+- Fix cross compilation
+  Closes https://github.com/ndilieto/uacme/issues/79
+- uacme: Add environment variables
+  Closes https://github.com/ndilieto/uacme/issues/63
+- uacme: Add support for ACME Renewal Information (ARI)
+  Closes https://github.com/ndilieto/uacme/issues/67
+- uacme: Try obtaining new Reply-Nonce if server doesn't supply one
+  Closes https://github.com/ndilieto/uacme/issues/82
+- uacme: Add hook environment variables
+  Closes https://github.com/ndilieto/uacme/issues/83
+- uacme: Allow matching alternative chain by Authority Key Id
+  Closes https://github.com/ndilieto/uacme/issues/85
+- Documentation update
+- Add link to linode api hook
+
 ## [1.7.5] - 2024-01-28
 ### Changed
 - fix ualpn exit code in client mode

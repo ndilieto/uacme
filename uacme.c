@@ -71,55 +71,6 @@ typedef struct acme {
     char *certprefix;
 } acme_t;
 
-#if !HAVE_STRCASESTR
-char *strcasestr(const char *haystack, const char *needle)
-{
-    char *ret = NULL;
-    char *_haystack = strdup(haystack);
-    char *_needle = strdup(needle);
-
-    if (!_haystack || !_needle)
-        warn("strcasestr: strdup failed");
-    else {
-        char *p;
-        for (p = _haystack; *p; p++)
-            *p = tolower(*p);
-        for (p = _needle; *p; p++)
-            *p = tolower(*p);
-        ret = strstr(_haystack, _needle);
-        if (ret)
-            ret = (char *)haystack + (ret - _haystack);
-    }
-    free(_haystack);
-    free(_needle);
-    return ret;
-}
-#endif
-
-char *find_header(const char *headers, const char *name)
-{
-    char *regex = NULL;
-    if (asprintf(&regex, "^%s:[ \t]*(.*)\r\n", name) < 0) {
-        warnx("find_header: asprintf failed");
-        return NULL;
-    }
-    char *ret = NULL;
-    regex_t reg;
-    if (regcomp(&reg, regex, REG_EXTENDED | REG_ICASE | REG_NEWLINE)) {
-        warnx("find_header: regcomp failed");
-    } else {
-        regmatch_t m[2];
-        if (regexec(&reg, headers, 2, m, 0) == 0) {
-            ret = strndup(headers + m[1].rm_so, m[1].rm_eo - m[1].rm_so);
-            if (!ret)
-                warn("find_header: strndup failed");
-        }
-    }
-    free(regex);
-    regfree(&reg);
-    return ret;
-}
-
 int acme_get(acme_t *a, const char *url)
 {
     int ret = 0;
@@ -178,6 +129,50 @@ out:
     return ret;
 }
 
+bool acme_error(acme_t *a)
+{
+    if (!a->json) return false;
+
+    if (a->type && strcasestr(a->type, "application/problem+json")) {
+        warnx("the server reported the following error:");
+        json_dump(stderr, a->json);
+        return true;
+    }
+
+    const json_value_t *e = json_find(a->json, "error");
+    if (e && e->type == JSON_OBJECT) {
+        warnx("the server reported the following error:");
+        json_dump(stderr, e);
+        return true;
+    }
+
+    return false;
+}
+
+bool acme_nonce(acme_t *a)
+{
+    const char *url = json_find_string(a->dir, "newNonce");
+    if (!url)
+    {
+        warnx("failed to find newNonce URL in directory");
+        return false;
+    }
+
+    msg(2, "fetching new nonce at %s", url);
+    if (acme_get(a, url) != 204) {
+        warnx("failed to fetch new nonce at %s", url);
+        acme_error(a);
+        return false;
+    } else if (acme_error(a))
+        return false;
+    else if (!a->nonce) {
+        warnx("failed to find nonce in newNonce resource");
+        return false;
+    }
+
+    return true;
+}
+
 int acme_post(acme_t *a, const char *url, const char *format, ...)
 {
     int ret = 0;
@@ -190,8 +185,8 @@ int acme_post(acme_t *a, const char *url, const char *format, ...)
         return 0;
     }
 
-    if (!a->nonce) {
-        warnx("acme_post: need a nonce first");
+    if (!a->nonce && !acme_nonce(a)) {
+        warnx("acme_post: no nonce available");
         return 0;
     }
 
@@ -300,6 +295,11 @@ int hook_run(const char *prog, const char *method, const char *type,
         else
             warnx("hook_run: %s terminated abnormally", prog);
     } else { // child
+        setenv("UACME_METHOD", method, 1);
+        setenv("UACME_TYPE", type, 1);
+        setenv("UACME_IDENT", ident, 1);
+        setenv("UACME_TOKEN", token, 1);
+        setenv("UACME_AUTH", auth, 1);
         if (execl(prog, prog, method, type, ident, token, auth,
                     (char *)NULL) < 0) {
             warn("hook_run: failed to execute %s", prog);
@@ -377,26 +377,6 @@ char *identifiers(char * const *names)
     return ids;
 }
 
-bool acme_error(acme_t *a)
-{
-    if (!a->json) return false;
-
-    if (a->type && strcasestr(a->type, "application/problem+json")) {
-        warnx("the server reported the following error:");
-        json_dump(stderr, a->json);
-        return true;
-    }
-
-    const json_value_t *e = json_find(a->json, "error");
-    if (e && e->type == JSON_OBJECT) {
-        warnx("the server reported the following error:");
-        json_dump(stderr, e);
-        return true;
-    }
-
-    return false;
-}
-
 bool acme_bootstrap(acme_t *a)
 {
     msg(1, "fetching directory at %s", a->directory);
@@ -409,21 +389,6 @@ bool acme_bootstrap(acme_t *a)
 
     a->dir = a->json;
     a->json = NULL;
-
-    const char *url = json_find_string(a->dir, "newNonce");
-    if (!url)
-    {
-        warnx("failed to find newNonce URL in directory");
-        return false;
-    }
-
-    msg(2, "fetching new nonce at %s", url);
-    if (acme_get(a, url) != 204) {
-        warnx("failed to fetch new nonce at %s", url);
-        acme_error(a);
-        return false;
-    } else if (acme_error(a))
-        return false;
 
     return true;
 }
@@ -1379,10 +1344,10 @@ void usage(const char *progname)
     fprintf(stderr,
         "usage: %s [-a|--acme-url URL] [-b|--bits BITS] [-c|--confdir DIR]\n"
         "\t[-d|--days DAYS] [-e|--eab KEYID:KEY] [-f|--force] [-h|--hook PROG]\n"
-        "\t[-l|--alternate [N | SHA256]] [-m|--must-staple] [-n|--never-create]\n"
-        "\t[-o|--no-ocsp] [-r|--reason CODE] [-s|--staging] [-t|--type RSA | EC]\n"
-        "\t[-v|--verbose ...] [-V|--version] [-y|--yes] [-?|--help]\n"
-        "\tnew [EMAIL] | update [EMAIL] | deactivate | newkey |\n"
+        "\t[-i|--no-ari] [-l|--alternate [N | SHA256]] [-m|--must-staple]\n"
+        "\t[-n|--never-create] [-o|--no-ocsp] [-r|--reason CODE] [-s|--staging]\n"
+        "\t[-t|--type RSA | EC] [-v|--verbose ...] [-V|--version] [-y|--yes]\n"
+        "\t[-?|--help] new [EMAIL] | update [EMAIL] | deactivate | newkey |\n"
         "\tissue IDENTIFIER [ALTNAME ...]] | issue CSRFILE |\n"
         "\trevoke CERTFILE [CERTKEYFILE]\n", progname);
 }
@@ -1413,6 +1378,7 @@ int main(int argc, char **argv)
         {"force",        no_argument,       NULL, 'f'},
         {"help",         no_argument,       NULL, '?'},
         {"hook",         required_argument, NULL, 'h'},
+        {"no-ari",       no_argument,       NULL, 'i'},
         {"alternate",    required_argument, NULL, 'l'},
         {"must-staple",  no_argument,       NULL, 'm'},
         {"never-create", no_argument,       NULL, 'n'},
@@ -1434,6 +1400,7 @@ int main(int argc, char **argv)
     bool custom_directory = false;
     bool status_req = false;
     bool status_check = true;
+    bool ari_check = true;
     int days = 30;
     int bits = 0;
     int reason = 0;
@@ -1453,6 +1420,8 @@ int main(int argc, char **argv)
         usage(basename(argv[0]));
         return ret;
     }
+
+    srand(getpid() ^ time(NULL));
 
 #if LIBCURL_VERSION_NUM < 0x072600
 #error libcurl version 7.38.0 or later is required
@@ -1477,7 +1446,7 @@ int main(int argc, char **argv)
     while (1) {
         char *endptr;
         int option_index;
-        int c = getopt_long(argc, argv, "a:b:c:d:e:f?h:l:mnor:st:vVy",
+        int c = getopt_long(argc, argv, "a:b:c:d:e:f?h:il:mnor:st:vVy",
                 options, &option_index);
         if (c == -1) break;
         switch (c) {
@@ -1521,6 +1490,10 @@ int main(int argc, char **argv)
 
             case 'h':
                 a.hook = optarg;
+                break;
+
+            case 'i':
+                ari_check = false;
                 break;
 
             case 'l':
@@ -1728,6 +1701,10 @@ int main(int argc, char **argv)
     } else
         msg(1, "version " PACKAGE_VERSION " starting on %s", buf);
 
+    snprintf(buf, sizeof(buf), "%d", g_loglevel);
+    setenv("UACME_VERBOSE", buf, 1);
+    setenv("UACME_CONFDIR", confdir, 1);
+
     if (a.hook && access(a.hook, R_OK | X_OK) < 0) {
         warn("%s", a.hook);
         goto out;
@@ -1823,8 +1800,13 @@ int main(int argc, char **argv)
             goto out;
         }
 
+        if (!acme_bootstrap(&a))
+            goto out;
+        const char *ari_url = ari_check ?
+            json_find_string(a.dir, "renewalInfo") : NULL;
+
         msg(1, "checking existence and expiration of %s", filename);
-        if (cert_valid(filename, names, days, status_check)) {
+        if (cert_valid(filename, names, ari_url, days, status_check)) {
             if (force)
                 msg(1, "forcing reissue of %s", filename);
             else {
@@ -1843,8 +1825,7 @@ int main(int argc, char **argv)
             }
         }
 
-        if (acme_bootstrap(&a) && account_retrieve(&a)
-                && cert_issue(&a, names, csr))
+        if (account_retrieve(&a) && cert_issue(&a, names, csr))
             ret = 0;
     } else if (strcmp(action, "revoke") == 0) {
         if (acme_bootstrap(&a) && (!a.keyprefix || account_retrieve(&a)) &&

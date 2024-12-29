@@ -748,10 +748,11 @@ UACME(1) Manual Page
 <div class="sectionbody">
 <div class="paragraph"><p><strong>uacme</strong> [<strong>-a</strong>|<strong>--acme-url</strong> <em>URL</em>] [<strong>-b</strong>|<strong>--bits</strong> <em>BITS</em>]
     [<strong>-c</strong>|<strong>--confdir</strong> <em>DIR</em>] [<strong>-d</strong>|<strong>--days</strong> <em>DAYS</em>] [<strong>-e</strong>|<strong>--eab</strong> KEYID:KEY]
-    [<strong>-f</strong>|<strong>--force</strong>] [<strong>-h</strong>|<strong>--hook</strong> <em>PROGRAM</em>] [<strong>-l</strong>|<strong>--alternate</strong> <em>N</em> | <em>FP</em>]
-    [<strong>-m</strong>|<strong>--must-staple</strong>] [<strong>-n</strong>|<strong>--never-create</strong>] [<strong>-o</strong>|<strong>--no-ocsp</strong>]
-    [<strong>-r</strong>|<strong>--reason</strong> CODE] [<strong>-s</strong>|<strong>--staging</strong>] [<strong>-t</strong>|<strong>--type</strong> <strong>RSA</strong>|<strong>EC</strong>]
-    [<strong>-v</strong>|<strong>--verbose</strong> &#8230;] [<strong>-V</strong>|<strong>--version</strong>] [<strong>-y</strong>|<strong>--yes</strong>] [<strong>-?</strong>|<strong>--help</strong>]
+    [<strong>-f</strong>|<strong>--force</strong>] [<strong>-h</strong>|<strong>--hook</strong> <em>PROGRAM</em>] [<strong>-i</strong>|<strong>--no-ari</strong>]
+    [<strong>-l</strong>|<strong>--alternate</strong> <em>N</em> | <em>FP</em>] [<strong>-m</strong>|<strong>--must-staple</strong>]
+    [<strong>-n</strong>|<strong>--never-create</strong>] [<strong>-o</strong>|<strong>--no-ocsp</strong>] [<strong>-r</strong>|<strong>--reason</strong> CODE]
+    [<strong>-s</strong>|<strong>--staging</strong>] [<strong>-t</strong>|<strong>--type</strong> <strong>RSA</strong>|<strong>EC</strong>] [<strong>-v</strong>|<strong>--verbose</strong> &#8230;]
+    [<strong>-V</strong>|<strong>--version</strong>] [<strong>-y</strong>|<strong>--yes</strong>] [<strong>-?</strong>|<strong>--help</strong>]
     <strong>new</strong> [<em>EMAIL</em>] | <strong>update</strong> [<em>EMAIL</em>] | <strong>deactivate</strong> | <strong>newkey</strong> |
     <strong>issue</strong> <em>IDENTIFIER</em> [<em>ALTNAME</em> &#8230;]] | <strong>issue</strong> <em>CSRFILE</em> |
     <strong>revoke</strong> <em>CERTFILE</em> [<em>CERTKEYFILE</em>]</p></div>
@@ -854,7 +855,9 @@ certificate for <em>IDENTIFIER</em>
 <dd>
 <p>
     Do not reissue certificates that are still valid for longer
-    than <em>DAYS</em> (default 30). See also <strong>-o, --no-ocsp</strong>.
+    than <em>DAYS</em> (default 30). This only applies as a fallback
+    if no server renewal information is available. See also
+    <strong>-i, --no-ari</strong> and <strong>-o, --no-ocsp</strong>.
 </p>
 </dd>
 <dt class="hdlist1">
@@ -874,7 +877,8 @@ certificate for <em>IDENTIFIER</em>
 </dt>
 <dd>
 <p>
-    Force certificate reissuance regardless of expiration date.
+    Force certificate reissuance regardless of expiration date and
+    renewal information from the server.
 </p>
 </dd>
 <dt class="hdlist1">
@@ -964,6 +968,16 @@ The key authorization (for <strong>dns-01</strong> and <strong>tls-alpn-01</stro
 </dl></div>
 </dd>
 <dt class="hdlist1">
+<strong>-i, --no-ari</strong>
+</dt>
+<dd>
+<p>
+    Do not query or use the server&#8217;s certificate renewal information window
+    to decide whether to reissue an existing certificate. See also
+    <strong>-d, --days</strong> and <strong>-o, --no-ocsp</strong>.
+</p>
+</dd>
+<dt class="hdlist1">
 <strong>-l, --alternate</strong> <em>N</em> | <em>FP</em>
 </dt>
 <dd>
@@ -975,9 +989,11 @@ The key authorization (for <strong>dns-01</strong> and <strong>tls-alpn-01</stro
     in one of two ways. A positive integer <em>N</em> makes <strong>uacme</strong> select the Nth
     alternative chain in the order presented by the server.
     A colon (<em>:</em>) separated list of two or more 2-digit hexadecimal numbers
-    <em>FP</em> makes <strong>uacme</strong> select the first alternative chain containing a
-    certificate whose SHA256 fingerprint begins with <em>FP</em>.
-    In both cases <strong>uacme</strong> falls back to the main certificate URL if it cannot
+    <em>FP</em> makes <strong>uacme</strong> select the first alternative chain containing either a
+    certificate whose SHA256 fingerprint begins with <em>FP</em>, or a certificate
+    in which the Authority Key Identifier extension contains a keyIdentifier
+    field beginning with <em>FP</em>.
+    In all cases <strong>uacme</strong> falls back to the main certificate URL if it cannot
     match an alternative chain or the download thereof fails.
 </p>
 </dd>
@@ -1202,6 +1218,126 @@ The key authorization (for <strong>dns-01</strong> and <strong>tls-alpn-01</stro
 </div>
 </div>
 <div class="sect1">
+<h2 id="_environment">ENVIRONMENT</h2>
+<div class="sectionbody">
+<div class="dlist"><dl>
+<dt class="hdlist1">
+<strong>UACME_CAINFO</strong>
+</dt>
+<dd>
+<p>
+    String naming a file holding one or more CA certificates to verify
+    the ACME server with.
+</p>
+</dd>
+<dt class="hdlist1">
+<strong>UACME_CAPATH</strong>
+</dt>
+<dd>
+<p>
+    String naming a directory holding multiple CA certificates to verify
+    the ACME server with. If libcurl is built against OpenSSL, the certificate
+    directory must be prepared using the OpenSSL c_rehash utility.
+</p>
+</dd>
+<dt class="hdlist1">
+<strong>UACME_DNS_SERVERS</strong>
+</dt>
+<dd>
+<p>
+    Comma separated list of DNS servers to be used instead of the system
+    default. The format of the dns servers option is
+    <em>host[:port][,host[:port]]&#8230;</em>
+</p>
+</dd>
+<dt class="hdlist1">
+<strong>UACME_INTERFACE</strong>
+</dt>
+<dd>
+<p>
+    String setting the interface name to use as outgoing network interface.
+    The name can be an interface name, an IP address, or a hostname.
+    If you prefer one of these, you can use the following special prefixes:
+</p>
+<div class="dlist"><dl>
+<dt class="hdlist1">
+<em>if!&lt;name&gt;</em>
+</dt>
+<dd>
+<p>
+Interface name
+</p>
+</dd>
+<dt class="hdlist1">
+<em>host!&lt;name&gt;</em>
+</dt>
+<dd>
+<p>
+IP address or hostname
+</p>
+</dd>
+<dt class="hdlist1">
+<em>ifhost!&lt;interface&gt;!&lt;host&gt;</em>
+</dt>
+<dd>
+<p>
+Interface name and IP address or hostname
+</p>
+</dd>
+</dl></div>
+</dd>
+<dt class="hdlist1">
+<strong>UACME_PROXY</strong>
+</dt>
+<dd>
+<p>
+    String holding the proxy hostname or dotted numerical IP address.
+    A numerical IPv6 address must be written within [brackets].
+    To specify port number in this string, append :[port] to the end of
+    the host name. If not specified, default to using port 1080.
+    The proxy string may be prefixed with [scheme]:// to specify which
+    kind of proxy is used (http://, https://, socks4://, socks4a://,
+    socks5://, socks5h://).
+    The proxy can also be specified with its associated credentials like
+    for ordinary URLs in the style: <em>scheme://username:password@hostname</em>
+</p>
+</dd>
+</dl></div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_hook_environment">HOOK ENVIRONMENT</h2>
+<div class="sectionbody">
+<div class="paragraph"><p>The following environment variables are exported for use by the hook program:</p></div>
+<div class="dlist"><dl>
+<dt class="hdlist1">
+<strong>UACME_CONFDIR</strong>
+</dt>
+<dd>
+<p>
+    Path to <em>CONFDIR</em>, see <strong>-c, --confdir</strong>
+</p>
+</dd>
+<dt class="hdlist1">
+<strong>UACME_VERBOSE</strong>
+</dt>
+<dd>
+<p>
+    Verbosity, see <strong>-v, --verbose</strong>
+</p>
+</dd>
+<dt class="hdlist1">
+<strong>UACME_METHOD</strong>, <strong>UACME_TYPE</strong>, <strong>UACME_IDENT</strong>, <strong>UACME_TOKEN</strong>, <strong>UACME_AUTH</strong>
+</dt>
+<dd>
+<p>
+    Copies of the hook program arguments, see <strong>-h, --hook</strong>
+</p>
+</dd>
+</dl></div>
+</div>
+</div>
+<div class="sect1">
 <h2 id="_exit_status">EXIT STATUS</h2>
 <div class="sectionbody">
 <div class="dlist"><dl>
@@ -1336,9 +1472,9 @@ along with this program.  If not, see <a href="http://www.gnu.org/licenses/">htt
 <div id="footnotes"><hr></div>
 <div id="footer">
 <div id="footer-text">
-Version 1.7.5<br>
+Version 1.7.6<br>
 Last updated
- 2024-01-28 20:29:11 CET
+ 2024-12-29 17:25:16 CET
 </div>
 </div>
 </body>

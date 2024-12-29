@@ -2,12 +2,12 @@
 .\"     Title: uacme
 .\"    Author: [see the "AUTHOR" section]
 .\" Generator: DocBook XSL Stylesheets v1.79.1 <http://docbook.sf.net/>
-.\"      Date: 01/28/2024
+.\"      Date: 12/29/2024
 .\"    Manual: User Commands
-.\"    Source: uacme 1.7.5
+.\"    Source: uacme 1.7.6
 .\"  Language: English
 .\"
-.TH "UACME" "1" "01/28/2024" "uacme 1\&.7\&.5" "User Commands"
+.TH "UACME" "1" "12/29/2024" "uacme 1\&.7\&.6" "User Commands"
 .\" -----------------------------------------------------------------
 .\" * Define some portability stuff
 .\" -----------------------------------------------------------------
@@ -31,7 +31,7 @@
 uacme \- ACMEv2 client written in plain C with minimal dependencies
 .SH "SYNOPSIS"
 .sp
-\fBuacme\fR [\fB\-a\fR|\fB\-\-acme\-url\fR \fIURL\fR] [\fB\-b\fR|\fB\-\-bits\fR \fIBITS\fR] [\fB\-c\fR|\fB\-\-confdir\fR \fIDIR\fR] [\fB\-d\fR|\fB\-\-days\fR \fIDAYS\fR] [\fB\-e\fR|\fB\-\-eab\fR KEYID:KEY] [\fB\-f\fR|\fB\-\-force\fR] [\fB\-h\fR|\fB\-\-hook\fR \fIPROGRAM\fR] [\fB\-l\fR|\fB\-\-alternate\fR \fIN\fR | \fIFP\fR] [\fB\-m\fR|\fB\-\-must\-staple\fR] [\fB\-n\fR|\fB\-\-never\-create\fR] [\fB\-o\fR|\fB\-\-no\-ocsp\fR] [\fB\-r\fR|\fB\-\-reason\fR CODE] [\fB\-s\fR|\fB\-\-staging\fR] [\fB\-t\fR|\fB\-\-type\fR \fBRSA\fR|\fBEC\fR] [\fB\-v\fR|\fB\-\-verbose\fR \&...] [\fB\-V\fR|\fB\-\-version\fR] [\fB\-y\fR|\fB\-\-yes\fR] [\fB\-?\fR|\fB\-\-help\fR] \fBnew\fR [\fIEMAIL\fR] | \fBupdate\fR [\fIEMAIL\fR] | \fBdeactivate\fR | \fBnewkey\fR | \fBissue\fR \fIIDENTIFIER\fR [\fIALTNAME\fR \&...]] | \fBissue\fR \fICSRFILE\fR | \fBrevoke\fR \fICERTFILE\fR [\fICERTKEYFILE\fR]
+\fBuacme\fR [\fB\-a\fR|\fB\-\-acme\-url\fR \fIURL\fR] [\fB\-b\fR|\fB\-\-bits\fR \fIBITS\fR] [\fB\-c\fR|\fB\-\-confdir\fR \fIDIR\fR] [\fB\-d\fR|\fB\-\-days\fR \fIDAYS\fR] [\fB\-e\fR|\fB\-\-eab\fR KEYID:KEY] [\fB\-f\fR|\fB\-\-force\fR] [\fB\-h\fR|\fB\-\-hook\fR \fIPROGRAM\fR] [\fB\-i\fR|\fB\-\-no\-ari\fR] [\fB\-l\fR|\fB\-\-alternate\fR \fIN\fR | \fIFP\fR] [\fB\-m\fR|\fB\-\-must\-staple\fR] [\fB\-n\fR|\fB\-\-never\-create\fR] [\fB\-o\fR|\fB\-\-no\-ocsp\fR] [\fB\-r\fR|\fB\-\-reason\fR CODE] [\fB\-s\fR|\fB\-\-staging\fR] [\fB\-t\fR|\fB\-\-type\fR \fBRSA\fR|\fBEC\fR] [\fB\-v\fR|\fB\-\-verbose\fR \&...] [\fB\-V\fR|\fB\-\-version\fR] [\fB\-y\fR|\fB\-\-yes\fR] [\fB\-?\fR|\fB\-\-help\fR] \fBnew\fR [\fIEMAIL\fR] | \fBupdate\fR [\fIEMAIL\fR] | \fBdeactivate\fR | \fBnewkey\fR | \fBissue\fR \fIIDENTIFIER\fR [\fIALTNAME\fR \&...]] | \fBissue\fR \fICSRFILE\fR | \fBrevoke\fR \fICERTFILE\fR [\fICERTKEYFILE\fR]
 .SH "DESCRIPTION"
 .sp
 \fBuacme\fR is a client for the ACMEv2 protocol described in RFC8555, written in plain C with minimal dependencies (libcurl and one of GnuTLS, OpenSSL or mbedTLS)\&. The ACMEv2 protocol allows a Certificate Authority (https://letsencrypt\&.org is a popular one) and an applicant to automate the process of verification and certificate issuance\&. The protocol also provides facilities for other certificate management functions, such as certificate revocation\&. For more information see https://tools\&.ietf\&.org/html/rfc8555
@@ -95,7 +95,9 @@ certificate for
 .RS 4
 Do not reissue certificates that are still valid for longer than
 \fIDAYS\fR
-(default 30)\&. See also
+(default 30)\&. This only applies as a fallback if no server renewal information is available\&. See also
+\fB\-i, \-\-no\-ari\fR
+and
 \fB\-o, \-\-no\-ocsp\fR\&.
 .RE
 .PP
@@ -111,7 +113,7 @@ must be base64url\-encoded\&.
 .PP
 \fB\-f, \-\-force\fR
 .RS 4
-Force certificate reissuance regardless of expiration date\&.
+Force certificate reissuance regardless of expiration date and renewal information from the server\&.
 .RE
 .PP
 \fB\-h, \-\-hook\fR \fIPROGRAM\fR
@@ -182,6 +184,14 @@ already converted to the base64url\-encoded SHA256 digest format)
 .RE
 .RE
 .PP
+\fB\-i, \-\-no\-ari\fR
+.RS 4
+Do not query or use the server\(cqs certificate renewal information window to decide whether to reissue an existing certificate\&. See also
+\fB\-d, \-\-days\fR
+and
+\fB\-o, \-\-no\-ocsp\fR\&.
+.RE
+.PP
 \fB\-l, \-\-alternate\fR \fIN\fR | \fIFP\fR
 .RS 4
 According to
@@ -194,8 +204,9 @@ select the Nth alternative chain in the order presented by the server\&. A colon
 \fIFP\fR
 makes
 \fBuacme\fR
-select the first alternative chain containing a certificate whose SHA256 fingerprint begins with
-\fIFP\fR\&. In both cases
+select the first alternative chain containing either a certificate whose SHA256 fingerprint begins with
+\fIFP\fR, or a certificate in which the Authority Key Identifier extension contains a keyIdentifier field beginning with
+\fIFP\fR\&. In all cases
 \fBuacme\fR
 falls back to the main certificate URL if it cannot match an alternative chain or the download thereof fails\&.
 .RE
@@ -395,6 +406,71 @@ is specified\&. In the first instance the account key and the configuration dire
 is renamed to
 \fIrevoked\-TIMESTAMP\&.pem\fR\&. The reason code in the revocation request defaults to 0 but it can be specified by the user with
 \fB\-r, \-\-reason\fR\&.
+.RE
+.SH "ENVIRONMENT"
+.PP
+\fBUACME_CAINFO\fR
+.RS 4
+String naming a file holding one or more CA certificates to verify the ACME server with\&.
+.RE
+.PP
+\fBUACME_CAPATH\fR
+.RS 4
+String naming a directory holding multiple CA certificates to verify the ACME server with\&. If libcurl is built against OpenSSL, the certificate directory must be prepared using the OpenSSL c_rehash utility\&.
+.RE
+.PP
+\fBUACME_DNS_SERVERS\fR
+.RS 4
+Comma separated list of DNS servers to be used instead of the system default\&. The format of the dns servers option is
+\fIhost[:port][,host[:port]]\&...\fR
+.RE
+.PP
+\fBUACME_INTERFACE\fR
+.RS 4
+String setting the interface name to use as outgoing network interface\&. The name can be an interface name, an IP address, or a hostname\&. If you prefer one of these, you can use the following special prefixes:
+.PP
+\fIif!<name>\fR
+.RS 4
+Interface name
+.RE
+.PP
+\fIhost!<name>\fR
+.RS 4
+IP address or hostname
+.RE
+.PP
+\fIifhost!<interface>!<host>\fR
+.RS 4
+Interface name and IP address or hostname
+.RE
+.RE
+.PP
+\fBUACME_PROXY\fR
+.RS 4
+String holding the proxy hostname or dotted numerical IP address\&. A numerical IPv6 address must be written within [brackets]\&. To specify port number in this string, append :[port] to the end of the host name\&. If not specified, default to using port 1080\&. The proxy string may be prefixed with [scheme]:// to specify which kind of proxy is used (http://, https://, socks4://, socks4a://, socks5://, socks5h://)\&. The proxy can also be specified with its associated credentials like for ordinary URLs in the style:
+\fIscheme://username:password@hostname\fR
+.RE
+.SH "HOOK ENVIRONMENT"
+.sp
+The following environment variables are exported for use by the hook program:
+.PP
+\fBUACME_CONFDIR\fR
+.RS 4
+Path to
+\fICONFDIR\fR, see
+\fB\-c, \-\-confdir\fR
+.RE
+.PP
+\fBUACME_VERBOSE\fR
+.RS 4
+Verbosity, see
+\fB\-v, \-\-verbose\fR
+.RE
+.PP
+\fBUACME_METHOD\fR, \fBUACME_TYPE\fR, \fBUACME_IDENT\fR, \fBUACME_TOKEN\fR, \fBUACME_AUTH\fR
+.RS 4
+Copies of the hook program arguments, see
+\fB\-h, \-\-hook\fR
 .RE
 .SH "EXIT STATUS"
 .PP
