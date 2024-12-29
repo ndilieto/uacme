@@ -27,6 +27,7 @@
 #include <unistd.h>
 
 #include "curlwrap.h"
+#include "msg.h"
 
 curldata_t *curldata_calloc(void)
 {
@@ -90,6 +91,30 @@ static size_t curl_wcb(void *ptr, size_t size, size_t n, void *userdata)
     return size * n;
 }
 
+static void curl_env(CURL *curl)
+{
+    const char *cainfo = getenv("UACME_CAINFO");
+    const char *capath = getenv("UACME_CAPATH");
+    const char *dnssrv = getenv("UACME_DNS_SERVERS");
+    const char *iface = getenv("UACME_INTERFACE");
+    const char *proxy = getenv("UACME_PROXY");
+
+    curl_easy_setopt(curl, CURLOPT_USERAGENT,
+            "uacme/" VERSION " (https://github.com/ndilieto/uacme)");
+    if (g_loglevel > 3)
+        curl_easy_setopt(curl, CURLOPT_VERBOSE, 1L);
+    if (cainfo)
+        curl_easy_setopt(curl, CURLOPT_CAINFO, cainfo);
+    if (capath)
+        curl_easy_setopt(curl, CURLOPT_CAPATH, capath);
+    if (dnssrv)
+        curl_easy_setopt(curl, CURLOPT_DNS_SERVERS, dnssrv);
+    if (iface)
+        curl_easy_setopt(curl, CURLOPT_INTERFACE, iface);
+    if (proxy)
+        curl_easy_setopt(curl, CURLOPT_PROXY, proxy);
+}
+
 curldata_t *curl_get(const char *url)
 {
     curldata_t *c = NULL;
@@ -107,13 +132,12 @@ curldata_t *curl_get(const char *url)
             curl_easy_cleanup(curl);
             return NULL;
         }
+        curl_env(curl);
         curl_easy_setopt(curl, CURLOPT_URL, url);
         curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, curl_wcb);
         curl_easy_setopt(curl, CURLOPT_WRITEDATA, c);
         curl_easy_setopt(curl, CURLOPT_HEADERFUNCTION, curl_hcb);
         curl_easy_setopt(curl, CURLOPT_HEADERDATA, c);
-        curl_easy_setopt(curl, CURLOPT_USERAGENT,
-                "uacme/" VERSION " (https://github.com/ndilieto/uacme)");
         res = curl_easy_perform(curl);
         if (res != CURLE_OK) {
             warnx("curl_get: GET %s failed: %s", url,
@@ -156,13 +180,12 @@ curldata_t *curl_post(const char *url, void *post_data, size_t post_size,
             curl_easy_cleanup(curl);
             return NULL;
         }
+        curl_env(curl);
         curl_easy_setopt(curl, CURLOPT_URL, url);
         curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, curl_wcb);
         curl_easy_setopt(curl, CURLOPT_WRITEDATA, c);
         curl_easy_setopt(curl, CURLOPT_HEADERFUNCTION, curl_hcb);
         curl_easy_setopt(curl, CURLOPT_HEADERDATA, c);
-        curl_easy_setopt(curl, CURLOPT_USERAGENT,
-                "uacme/" VERSION " (https://github.com/ndilieto/uacme)");
         curl_easy_setopt(curl, CURLOPT_POSTFIELDS, post_data);
         curl_easy_setopt(curl, CURLOPT_POSTFIELDSIZE, post_size);
         va_start(ap, header);

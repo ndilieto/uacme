@@ -1218,6 +1218,94 @@ The key authorization (for <strong>dns-01</strong> and <strong>tls-alpn-01</stro
 </div>
 </div>
 <div class="sect1">
+<h2 id="_environment">ENVIRONMENT</h2>
+<div class="sectionbody">
+<div class="dlist"><dl>
+<dt class="hdlist1">
+<strong>UACME_CAINFO</strong>
+</dt>
+<dd>
+<p>
+    String naming a file holding one or more CA certificates to verify
+    the ACME server with.
+</p>
+</dd>
+<dt class="hdlist1">
+<strong>UACME_CAPATH</strong>
+</dt>
+<dd>
+<p>
+    String naming a directory holding multiple CA certificates to verify
+    the ACME server with. If libcurl is built against OpenSSL, the certificate
+    directory must be prepared using the OpenSSL c_rehash utility.
+</p>
+</dd>
+<dt class="hdlist1">
+<strong>UACME_DNS_SERVERS</strong>
+</dt>
+<dd>
+<p>
+    Comma separated list of DNS servers to be used instead of the system
+    default. The format of the dns servers option is
+    <em>host[:port][,host[:port]]&#8230;</em>
+</p>
+</dd>
+<dt class="hdlist1">
+<strong>UACME_INTERFACE</strong>
+</dt>
+<dd>
+<p>
+    String setting the interface name to use as outgoing network interface.
+    The name can be an interface name, an IP address, or a hostname.
+    If you prefer one of these, you can use the following special prefixes:
+</p>
+<div class="dlist"><dl>
+<dt class="hdlist1">
+<em>if!&lt;name&gt;</em>
+</dt>
+<dd>
+<p>
+Interface name
+</p>
+</dd>
+<dt class="hdlist1">
+<em>host!&lt;name&gt;</em>
+</dt>
+<dd>
+<p>
+IP address or hostname
+</p>
+</dd>
+<dt class="hdlist1">
+<em>ifhost!&lt;interface&gt;!&lt;host&gt;</em>
+</dt>
+<dd>
+<p>
+Interface name and IP address or hostname
+</p>
+</dd>
+</dl></div>
+</dd>
+<dt class="hdlist1">
+<strong>UACME_PROXY</strong>
+</dt>
+<dd>
+<p>
+    String holding the proxy hostname or dotted numerical IP address.
+    A numerical IPv6 address must be written within [brackets].
+    To specify port number in this string, append :[port] to the end of
+    the host name. If not specified, default to using port 1080.
+    The proxy string may be prefixed with [scheme]:// to specify which
+    kind of proxy is used (http://, https://, socks4://, socks4a://,
+    socks5://, socks5h://).
+    The proxy can also be specified with its associated credentials like
+    for ordinary URLs in the style: <em>scheme://username:password@hostname</em>
+</p>
+</dd>
+</dl></div>
+</div>
+</div>
+<div class="sect1">
 <h2 id="_exit_status">EXIT STATUS</h2>
 <div class="sectionbody">
 <div class="dlist"><dl>
@@ -1354,7 +1442,7 @@ along with this program.  If not, see <a href="http://www.gnu.org/licenses/">htt
 <div id="footer-text">
 Version 1.7.5<br>
 Last updated
- 2024-12-28 14:17:19 CET
+ 2024-12-29 11:22:08 CET
 </div>
 </div>
 </body>

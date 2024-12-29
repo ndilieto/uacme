@@ -248,6 +248,43 @@ USAGE
     can be specified by the user with *-r, --reason*.
 
 
+ENVIRONMENT
+-----------
+*UACME_CAINFO*::
+    String naming a file holding one or more CA certificates to verify
+    the ACME server with.
+
+*UACME_CAPATH*::
+    String naming a directory holding multiple CA certificates to verify
+    the ACME server with. If libcurl is built against OpenSSL, the certificate
+    directory must be prepared using the OpenSSL c_rehash utility.
+
+*UACME_DNS_SERVERS*::
+    Comma separated list of DNS servers to be used instead of the system
+    default. The format of the dns servers option is
+    'host[:port][,host[:port]]...'
+
+*UACME_INTERFACE*::
+    String setting the interface name to use as outgoing network interface.
+    The name can be an interface name, an IP address, or a hostname.
+    If you prefer one of these, you can use the following special prefixes:
+
+    'if!<name>'::: Interface name
+    'host!<name>'::: IP address or hostname
+    'ifhost!<interface>!<host>'::: Interface name and IP address or hostname 
+
+*UACME_PROXY*::
+    String holding the proxy hostname or dotted numerical IP address.
+    A numerical IPv6 address must be written within [brackets].
+    To specify port number in this string, append :[port] to the end of
+    the host name. If not specified, default to using port 1080.
+    The proxy string may be prefixed with [scheme]:// to specify which
+    kind of proxy is used (http://, https://, socks4://, socks4a://,
+    socks5://, socks5h://).
+    The proxy can also be specified with its associated credentials like
+    for ordinary URLs in the style: 'scheme://username:password@hostname'
+
+
 EXIT STATUS
 -----------
 *0*::
