@@ -4,7 +4,7 @@ Priority: optional
 Maintainer: Nicola Di Lieto <nicola.dilieto@gmail.com>
 Build-Depends: debhelper-compat (= 12),
                autoconf-archive,
-               pkg-config,
+               pkgconf,
                libev-dev,
                libgnutls28-dev,
                curl,

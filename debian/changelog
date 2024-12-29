@@ -1,3 +1,10 @@
+uacme (1.7.6-1) unstable; urgency=medium
+
+  * New upstream release
+  - Build-Depends: on pkgconf instead of pkg-config
+
+ -- Nicola Di Lieto <nicola.dilieto@gmail.com>  Sun, 29 Dec 2024 17:47:18 +0100
+
 uacme (1.7.5-1) unstable; urgency=medium
 
   * New upstream release
@@ -8,7 +15,7 @@ uacme (1.7.5-1) unstable; urgency=medium
 
 uacme (1.7.4-2) unstable; urgency=medium
 
-  * add debian/clean and debian/source/options. Closes #1046040
+  * add debian/clean and debian/source/options. Closes: #1046040
 
  -- Nicola Di Lieto <nicola.dilieto@gmail.com>  Mon, 14 Aug 2023 23:08:47 +0200
 
