@@ -82,8 +82,12 @@ bool is_ip(const char *, unsigned char *, size_t *);
 char *csr_gen(char * const *, bool, privkey_t);
 char *csr_load(const char *, char ***);
 char *cert_der_base64url(const char *);
-bool cert_valid(const char *, char * const *, int, bool);
+bool cert_valid(const char *, char * const *, const char *, int, bool);
 bool cert_match(const char *, unsigned char *, size_t);
+
+#if !HAVE_STRCASESTR
+char *strcasestr(const char *haystack, const char *needle);
+#endif
 
 #endif
 

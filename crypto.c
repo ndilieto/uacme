@@ -38,6 +38,7 @@
 #include "base64.h"
 #include "crypto.h"
 #include "curlwrap.h"
+#include "json.h"
 #include "msg.h"
 #if !defined(USE_OPENSSL)
 #include "read-file.h"
@@ -57,6 +58,9 @@
 #include <openssl/bio.h>
 #include <openssl/bn.h>
 #include <openssl/crypto.h>
+#if OPENSSL_VERSION_NUMBER >= 0x30000000L
+#include <openssl/core_names.h>
+#endif
 #include <openssl/engine.h>
 #include <openssl/err.h>
 #include <openssl/evp.h>
@@ -173,29 +177,11 @@ out:
 static bool openssl_hmac_fast(const EVP_MD *type, const void *key,
         size_t keylen, const void *input, size_t len, unsigned char *output)
 {
-    bool success = false;
-    HMAC_CTX *hmac = HMAC_CTX_new();
-    if (!hmac) {
+    if (HMAC(type, key, keylen, input, len, output, NULL) == NULL) {
         openssl_error("openssl_hmac_fast");
-        goto out;
+        return false;
     }
-    if (!HMAC_Init_ex(hmac, key, keylen, type, NULL)) {
-        openssl_error("openssl_hmac_fast");
-        goto out;
-    }
-    if (!HMAC_Update(hmac, input, len)) {
-        openssl_error("openssl_hmac_fast");
-        goto out;
-    }
-    if (!HMAC_Final(hmac, output, NULL)) {
-        openssl_error("openssl_hmac_fast");
-        goto out;
-    }
-    success = true;
-out:
-    if (hmac)
-        HMAC_CTX_free(hmac);
-    return success;
+    return true;
 }
 #elif defined(USE_MBEDTLS)
 #if MBEDTLS_VERSION_NUMBER < 0x02100000
@@ -266,6 +252,31 @@ static int mbedtls_hmac_fast(mbedtls_md_type_t md_type, const void *key,
         return MBEDTLS_ERR_MD_FEATURE_UNAVAILABLE;
     }
     return mbedtls_md_hmac(mdi, key, keylen, input, len, output);
+}
+#endif
+
+#if !HAVE_STRCASESTR
+char *strcasestr(const char *haystack, const char *needle)
+{
+    char *ret = NULL;
+    char *_haystack = strdup(haystack);
+    char *_needle = strdup(needle);
+
+    if (!_haystack || !_needle)
+        warn("strcasestr: strdup failed");
+    else {
+        char *p;
+        for (p = _haystack; *p; p++)
+            *p = tolower(*p);
+        for (p = _needle; *p; p++)
+            *p = tolower(*p);
+        ret = strstr(_haystack, _needle);
+        if (ret)
+            ret = (char *)haystack + (ret - _haystack);
+    }
+    free(_haystack);
+    free(_needle);
+    return ret;
 }
 #endif
 
@@ -556,6 +567,18 @@ static bool rsa_params(privkey_t key, char **m, char **e)
     }
 #elif defined(USE_OPENSSL)
     unsigned char *data = NULL;
+#if OPENSSL_VERSION_NUMBER >= 0x30000000L
+    BIGNUM *bm = NULL;
+    BIGNUM *be = NULL;
+    if (!EVP_PKEY_get_bn_param(key, OSSL_PKEY_PARAM_RSA_N, &bm)) {
+        openssl_error("rsa_params");
+        goto out;
+    }
+    if (!EVP_PKEY_get_bn_param(key, OSSL_PKEY_PARAM_RSA_E, &be)) {
+        openssl_error("rsa_params");
+        goto out;
+    }
+#else
     const BIGNUM *bm = NULL;
     const BIGNUM *be = NULL;
     RSA *rsa = EVP_PKEY_get0_RSA(key);
@@ -564,6 +587,7 @@ static bool rsa_params(privkey_t key, char **m, char **e)
         goto out;
     }
     RSA_get0_key(rsa, &bm, &be, NULL);
+#endif
     r = BN_num_bytes(bm);
     data = calloc(1, r);
     if (!data) {
@@ -654,6 +678,12 @@ out:
     free(exp.data);
 #elif defined(USE_OPENSSL)
     free(data);
+#if OPENSSL_VERSION_NUMBER >= 0x30000000L
+    if (bm)
+        BN_free(bm);
+    if (be)
+        BN_free(be);
+#endif
 #elif defined(USE_MBEDTLS)
     free(data);
     mbedtls_mpi_free(&mn);
@@ -728,6 +758,31 @@ static size_t ec_params(privkey_t key, char **x, char **y)
         openssl_error("ec_params");
         goto out;
     }
+#if OPENSSL_VERSION_NUMBER >= 0x30000000L
+    char group[0x20];
+    if (!EVP_PKEY_get_utf8_string_param(key, OSSL_PKEY_PARAM_GROUP_NAME,
+                group, sizeof(group), NULL)) {
+        openssl_error("ec_params");
+        goto out;
+    }
+    if (strcasecmp(group, "prime256v1") == 0)
+        bits = 256;
+    else if (strcasecmp(group, "secp384r1") == 0)
+        bits = 384;
+    else {
+        warnx("ec_params: only \"prime256v1\" and \"secp384r1\" "
+                "Elliptic Curves supported");
+        goto out;
+    }
+    if (!EVP_PKEY_get_bn_param(key, OSSL_PKEY_PARAM_EC_PUB_X, &bx)) {
+        openssl_error("ec_params");
+        goto out;
+    }
+    if (!EVP_PKEY_get_bn_param(key, OSSL_PKEY_PARAM_EC_PUB_Y, &by)) {
+        openssl_error("ec_params");
+        goto out;
+    }
+#else
     EC_KEY *ec = EVP_PKEY_get0_EC_KEY(key);
     if (!ec) {
         openssl_error("ec_params");
@@ -760,6 +815,7 @@ static size_t ec_params(privkey_t key, char **x, char **y)
         openssl_error("ec_params");
         goto out;
     }
+#endif
     r = BN_num_bytes(bx);
     data = calloc(1, r);
     if (!data) {
@@ -3382,6 +3438,78 @@ out:
     return ret;
 }
 
+#if defined(USE_MBEDTLS)
+static int mbedtls_crt_get_authority_key_id(mbedtls_x509_crt *crt,
+        unsigned char **akid, size_t *size)
+{
+    unsigned char *p = crt->v3_ext.p;
+    unsigned char *end = p + crt->v3_ext.len;
+    size_t len;
+    int r;
+
+    if (!p || p == end)
+        return MBEDTLS_ERR_X509_INVALID_EXTENSIONS;
+    r = mbedtls_asn1_get_tag(&p, end, &len,
+            MBEDTLS_ASN1_CONSTRUCTED | MBEDTLS_ASN1_SEQUENCE);
+    if (r)
+        return r;
+    if (p + len != end)
+        return MBEDTLS_ERR_ASN1_LENGTH_MISMATCH;
+
+    while (p < end) {
+        unsigned char *end_ext;
+
+        r = mbedtls_asn1_get_tag(&p, end, &len,
+                MBEDTLS_ASN1_CONSTRUCTED | MBEDTLS_ASN1_SEQUENCE);
+        if (r)
+            return r;
+
+        end_ext = p + len;
+        r = mbedtls_asn1_get_tag(&p, end_ext, &len, MBEDTLS_ASN1_OID);
+        if (r)
+            return r;
+
+        if (len != MBEDTLS_OID_SIZE(MBEDTLS_OID_AUTHORITY_KEY_IDENTIFIER) ||
+                memcmp(p, MBEDTLS_OID_AUTHORITY_KEY_IDENTIFIER, len)) {
+            p = end_ext;
+            continue;
+        }
+        p += len;
+
+        r = mbedtls_asn1_get_tag(&p, end_ext, &len, MBEDTLS_ASN1_BOOLEAN);
+        if (r == 0) {
+            if (len != 1)
+                return MBEDTLS_ERR_ASN1_LENGTH_MISMATCH;
+            p++;
+        } else if (r != MBEDTLS_ERR_ASN1_UNEXPECTED_TAG)
+            return r;
+
+        r = mbedtls_asn1_get_tag(&p, end_ext, &len,
+                MBEDTLS_ASN1_OCTET_STRING);
+        if (r)
+            return r;
+        if (end_ext != p + len)
+            return MBEDTLS_ERR_ASN1_LENGTH_MISMATCH;
+
+        r = mbedtls_asn1_get_tag(&p, p + len, &len,
+                MBEDTLS_ASN1_CONSTRUCTED | MBEDTLS_ASN1_SEQUENCE);
+        if (r)
+            return r;
+
+        r = mbedtls_asn1_get_tag(&p, p + len, &len,
+                MBEDTLS_ASN1_CONTEXT_SPECIFIC);
+        if (r)
+            return r;
+
+        *akid = p;
+        *size = len;
+        return 0;
+    }
+
+    return MBEDTLS_ERR_X509_UNKNOWN_OID;
+}
+#endif
+
 bool cert_match(const char *cert, unsigned char *fingerprint,
         size_t fingerprint_len)
 {
@@ -3400,12 +3528,26 @@ bool cert_match(const char *cert, unsigned char *fingerprint,
         return ret;
     }
     for (unsigned int i = 0; i < crt_size; i++) {
-        unsigned char fp[32];
-        size_t s = sizeof(fp);
-        r = gnutls_x509_crt_get_fingerprint(crt[i], GNUTLS_DIG_SHA256, fp, &s);
-        if (r == 0 && fingerprint_len <= s &&
-                memcmp(fp, fingerprint, fingerprint_len) == 0)
-            ret = true;
+        unsigned char fp[128];
+        if (!ret) {
+            size_t s = sizeof(fp);
+            r = gnutls_x509_crt_get_fingerprint(crt[i], GNUTLS_DIG_SHA256,
+                    fp, &s);
+            if (r == 0 && fingerprint_len <= s &&
+                    memcmp(fp, fingerprint, fingerprint_len) == 0) {
+                msg(1, "certificate matched by fingerprint");
+                ret = true;
+            }
+        }
+        if (!ret) {
+            size_t s = sizeof(fp);
+            r = gnutls_x509_crt_get_authority_key_id(crt[i], fp, &s, NULL);
+            if (r == 0 && fingerprint_len <= s &&
+                    memcmp(fp, fingerprint, fingerprint_len) == 0) {
+                msg(1, "certificate matched by Authority Key Id");
+                ret = true;
+            }
+        }
         gnutls_x509_crt_deinit(crt[i]);
     }
     gnutls_free(crt);
@@ -3423,8 +3565,23 @@ bool cert_match(const char *cert, unsigned char *fingerprint,
             break;
         if (X509_digest(crt, EVP_sha256(), fp, &s) &&
                 fingerprint_len <= s &&
-                memcmp(fp, fingerprint, fingerprint_len) == 0)
+                memcmp(fp, fingerprint, fingerprint_len) == 0) {
+            msg(1, "certificate matched by fingerprint");
             ret = true;
+        } else {
+            AUTHORITY_KEYID *akid = X509_get_ext_d2i(crt,
+                    NID_authority_key_identifier, NULL, NULL);
+            if (akid != NULL) {
+                if (akid->keyid != NULL && fingerprint_len <=
+                        (size_t)ASN1_STRING_length(akid->keyid) &&
+                        memcmp(ASN1_STRING_get0_data(akid->keyid),
+                            fingerprint, fingerprint_len) == 0) {
+                    msg(1, "certificate matched by Authority Key Id");
+                    ret = true;
+                }
+                AUTHORITY_KEYID_free(akid);
+            }
+        }
         X509_free(crt);
     }
     BIO_free(bio);
@@ -3445,15 +3602,115 @@ bool cert_match(const char *cert, unsigned char *fingerprint,
     }
     for (mbedtls_x509_crt *c = &crt; c; c = c->next) {
         unsigned char fp[32];
+        unsigned char *akid;
+        size_t akid_len;
         r = mbedtls_hash_fast(MBEDTLS_MD_SHA256, c->raw.p, c->raw.len, fp);
         if (r == 0 && fingerprint_len <= sizeof(fp) &&
-                memcmp(fp, fingerprint, fingerprint_len) == 0)
+                memcmp(fp, fingerprint, fingerprint_len) == 0) {
+            msg(1, "certificate matched by fingerprint");
             ret = true;
+            break;
+        }
+        r = mbedtls_crt_get_authority_key_id(c, &akid, &akid_len);
+        if (r == 0 && fingerprint_len <= akid_len &&
+                memcmp(akid, fingerprint, fingerprint_len) == 0) {
+            msg(1, "certificate matched by Authority Key Id");
+            ret = true;
+            break;
+        }
     }
     mbedtls_x509_crt_free(&crt);
 #endif
     return ret;
 }
+
+#if defined(USE_GNUTLS)
+static char *crt_ari_url(gnutls_x509_crt_t crt, const char *prefix)
+#elif defined(USE_OPENSSL)
+static char *crt_ari_url(X509 *crt, const char *prefix)
+#elif defined(USE_MBEDTLS)
+static char *crt_ari_url(mbedtls_x509_crt *crt, const char *prefix)
+#endif
+{
+    char *url = NULL;
+    unsigned char akid[128];
+    char akid_b64[base64_ENCODED_LEN(sizeof(akid),
+            base64_VARIANT_URLSAFE_NO_PADDING)];
+    unsigned char serial[128];
+    char serial_b64[base64_ENCODED_LEN(sizeof(akid),
+            base64_VARIANT_URLSAFE_NO_PADDING)];
+    size_t alen = sizeof(akid);
+    size_t slen = sizeof(serial);
+
+#if defined(USE_GNUTLS)
+    int r = gnutls_x509_crt_get_authority_key_id(crt, akid, &alen, NULL);
+    if (r)
+        return NULL;
+    r = gnutls_x509_crt_get_serial(crt, serial, &slen);
+    if (r)
+        return NULL;
+#elif defined(USE_OPENSSL)
+    AUTHORITY_KEYID *ak = X509_get_ext_d2i(crt,
+            NID_authority_key_identifier, NULL, NULL);
+    if (ak != NULL) {
+        if (ak->keyid == NULL ||
+                alen < (size_t)ASN1_STRING_length(ak->keyid))
+            alen = 0;
+        else {
+            alen = (size_t)ASN1_STRING_length(ak->keyid);
+            memcpy(akid, ASN1_STRING_get0_data(ak->keyid), alen);
+        }
+        AUTHORITY_KEYID_free(ak);
+        if (alen == 0)
+            return NULL;
+    } else
+        return NULL;
+    const ASN1_INTEGER *sn = X509_get0_serialNumber(crt);
+    if (!sn)
+        return NULL;
+    BIGNUM *bn = ASN1_INTEGER_to_BN(sn, NULL);
+    if (!bn) {
+        openssl_error("cert_ari_url");
+        return NULL;
+    }
+    if (slen < (size_t)BN_num_bytes(bn)) {
+        BN_free(bn);
+        return NULL;
+    } else {
+        slen = (size_t)BN_bn2bin(bn, serial);
+        BN_free(bn);
+    }
+#elif defined(USE_MBEDTLS)
+    unsigned char *ak;
+    size_t len;
+    int r = mbedtls_crt_get_authority_key_id(crt, &ak, &len);
+    if (r)
+        return NULL;
+    if (alen < len)
+        return NULL;
+    alen = len;
+    memcpy(akid, ak, alen);
+    if (!crt->serial.p || slen < crt->serial.len)
+        return NULL;
+    slen = crt->serial.len;
+    memcpy(serial, crt->serial.p, slen);
+#endif
+    if (!bin2base64(akid_b64, sizeof(akid_b64), akid, alen,
+                base64_VARIANT_URLSAFE_NO_PADDING) ||
+            !bin2base64(serial_b64, sizeof(serial_b64), serial, slen,
+                base64_VARIANT_URLSAFE_NO_PADDING)) {
+        warnx("crt_ari_url: bin2base64 failed");
+        return NULL;
+    }
+
+    if (asprintf(&url, "%s/%s.%s", prefix, akid_b64, serial_b64) < 0) {
+        warnx("crt_ari_url: asprintf failed");
+        url = NULL;
+    }
+
+    return url;
+}
+
 #if defined(USE_GNUTLS)
 static bool ocsp_check(gnutls_x509_crt_t *crt)
 {
@@ -4298,8 +4555,99 @@ out:
 }
 #endif
 
-bool cert_valid(const char *certfile, char * const *names, int validity,
-        bool status_check)
+#if defined(USE_GNUTLS)
+int ari_check(gnutls_x509_crt_t crt, const char *ari_url)
+#elif defined(USE_OPENSSL)
+int ari_check(X509 *crt, const char *ari_url)
+#elif defined(USE_MBEDTLS)
+int ari_check(mbedtls_x509_crt *crt, const char *ari_url)
+#endif
+{
+    int ret = -1;
+    json_value_t *json = NULL;
+
+    if (!ari_url)
+        goto out;
+
+    char *url = crt_ari_url(crt, ari_url);
+    if (!url)
+        goto out;
+
+    msg(1, "checking certificate renewal info at %s", url);
+    curldata_t *c = curl_get(url);
+    free(url);
+    if (!c) {
+        warnx("ari_check: curl_get failed");
+        goto out;
+    }
+
+    if (c->headers)
+        msg(3, "ari_check: HTTP headers\n%s", c->headers);
+    if (c->body)
+        msg(3, "ari_check: HTTP body\n%s", c->body);
+
+    char *p = find_header(c->headers, "Content-Type");
+    if (p && strcasestr(p, "json"))
+        json = json_parse(c->body, c->body_len);
+    free(p);
+    curldata_free(c);
+
+    if (!json) {
+        warnx("ari_check: failed to parse");
+        goto out;
+    }
+
+    const json_value_t *window = json_find(json, "suggestedWindow");
+    if (!window) {
+        warnx("ari_check: missing suggestedWindow");
+        goto out;
+    }
+
+    const char *start = json_find_string(window, "start");
+    const char *end = json_find_string(window, "end");
+    if (!start || !end) {
+        warnx("ari_check: missing start or end");
+        goto out;
+    }
+    msg(1, "certificate renewal window: start=%s end=%s", start, end);
+    struct tm start_tm, end_tm;
+    p = strptime(start, "%Y-%m-%dT%T%z", &start_tm);
+    if (!p || *p) {
+        warnx("ari_check: failed to parse start");
+        goto out;
+    }
+    p = strptime(end, "%Y-%m-%dT%T%z", &end_tm);
+    if (!p || *p) {
+        warnx("ari_check: failed to parse end");
+        goto out;
+    }
+    time_t start_t = mktime(&start_tm);
+    if (start_t == (time_t)-1) {
+        warnx("ari_check: invalid start");
+        goto out;
+    }
+    time_t end_t = mktime(&end_tm);
+    if (end_t == (time_t)-1) {
+        warnx("ari_check: invalid end");
+        goto out;
+    }
+    if (start_t >= end_t) {
+        warnx("ari_check: invalid start/end");
+        goto out;
+    }
+
+    if (time(NULL) > start_t + (end_t - start_t) * ((float)rand()/RAND_MAX))
+        ret = 1;
+    else
+        ret = 0;
+
+out:
+    json_free(json);
+    return ret;
+}
+
+bool cert_valid(const char *certfile, char * const *names, const char *ari_url,
+        int validity, bool status_check)
 {
     bool valid = false;
 #if defined(USE_GNUTLS)
@@ -4316,7 +4664,10 @@ bool cert_valid(const char *certfile, char * const *names, int validity,
 
     int days_left = (expiration - time(NULL))/(24*3600);
     msg(1, "%s expires in %d days", certfile, days_left);
-    if (days_left < validity) {
+    int ari = -1;
+    if (days_left > 0)
+        ari = ari_check(crt[0], ari_url);
+    if (ari > 0 || (ari < 0 && days_left < validity)) {
         msg(1, "%s is due for renewal", certfile);
         goto out;
     }
@@ -4370,7 +4721,10 @@ out:
         goto out;
     }
     msg(1, "%s expires in %d days", certfile, days_left);
-    if (days_left < validity) {
+    int ari = -1;
+    if (days_left > 0)
+        ari = ari_check(crt[0], ari_url);
+    if (ari > 0 || (ari < 0 && days_left < validity)) {
         msg(1, "%s is due for renewal", certfile);
         goto out;
     }
@@ -4496,7 +4850,10 @@ out:
 
     int days_left = (expiration - time(NULL))/(24*3600);
     msg(1, "%s expires in %d days", certfile, days_left);
-    if (days_left < validity) {
+    int ari = -1;
+    if (days_left > 0)
+        ari = ari_check(crt, ari_url);
+    if (ari > 0 || (ari < 0 && days_left < validity)) {
         msg(1, "%s is due for renewal", certfile);
         goto out;
     }

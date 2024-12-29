@@ -167,6 +167,9 @@ https://github.com/tdy91/uacme-gandi-hook works with [gandi.net][gandi].
 
 https://sr.ht/~jacksonchen666/uacme-desec-hook/ works with [deSEC.io][desec].
 
+https://gist.github.com/acamari/93db6e6d26c3d6f223840283f195d8be shows how to
+integrate with [Linode API][Linode]
+
 ## tls-alpn-01 challenge support
 
 [ualpn][ualpn] is a lightweight proxying [tls-alpn-01][RFC8737] challenge
@@ -267,3 +270,4 @@ If you have any suggestions for improvements, pull requests are welcome.
 [splice]: https://en.wikipedia.org/wiki/Splice_%28system_call%29
 [proxy]: http://www.haproxy.org/download/1.8/doc/proxy-protocol.txt
 [desec]: https://desec.readthedocs.io/en/latest/
+[Linode]: https://techdocs.akamai.com/linode-api/reference/post-domain-record
