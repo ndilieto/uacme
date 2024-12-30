@@ -1,11 +1,11 @@
 #!/bin/sh
-if test $# -ne "3" -o "x$1" != "x--upstream-version"; then
-    echo "Usage: `basename $0` --upstream-version version filename"
+if test $# -ne "2" -o "x$1" != "x--upstream-version"; then
+    echo "Usage: `basename $0` --upstream-version version"
     exit 1
 fi
 
 VERSION="$2"
-FILENAME="$3"
+FILENAME="../uacme_${VERSION}.orig.tar.gz"
 BASENAME="$(basename $FILENAME)"
 DELTA="https://raw.githubusercontent.com/ndilieto/uacme/pristine-tar/${BASENAME}.delta"
 
