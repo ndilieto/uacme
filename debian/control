@@ -2,9 +2,9 @@ Source: uacme
 Section: net
 Priority: optional
 Maintainer: Nicola Di Lieto <nicola.dilieto@gmail.com>
-Build-Depends: debhelper-compat (= 12),
+Build-Depends: debhelper-compat (= 13),
                autoconf-archive,
-               pkg-config,
+               pkgconf,
                libev-dev,
                libgnutls28-dev,
                curl,
@@ -15,7 +15,7 @@ Build-Depends: debhelper-compat (= 12),
                libxml2-utils,
                xsltproc
 Rules-Requires-Root: no
-Standards-Version: 4.5.0
+Standards-Version: 4.7.0
 Homepage: https://github.com/ndilieto/uacme
 Vcs-Git: https://github.com/ndilieto/uacme.git
 Vcs-Browser: https://github.com/ndilieto/uacme
