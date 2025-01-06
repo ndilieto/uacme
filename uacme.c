@@ -26,6 +26,7 @@
 #include <fcntl.h>
 #include <getopt.h>
 #include <libgen.h>
+#include <limits.h>
 #include <locale.h>
 #include <regex.h>
 #include <stdarg.h>
@@ -36,6 +37,7 @@
 #include <string.h>
 #include <sys/stat.h>
 #include <sys/wait.h>
+#include <time.h>
 #include <unistd.h>
 
 #include "base64.h"
@@ -71,55 +73,105 @@ typedef struct acme {
     char *certprefix;
 } acme_t;
 
+unsigned int retry_after(const char *str, unsigned int d)
+{
+    long dt;
+    char *p;
+
+    if (!str || !*str)
+        return d;
+
+    dt = strtol(str, &p, 10);
+    if (*p) {
+        time_t now = time(NULL);
+        struct tm t, tnow;
+
+        gmtime_r(&now, &tnow);
+        p = strptime(str, "%a, %d %b %Y %T", &t);
+        if (!p)
+            p = strptime(str, "%a, %d-%b-%y %T", &t);
+        if (!p)
+            p = strptime(str, "%a %b %d %T %Y", &t);
+        if (!p)
+            return d;
+        dt = difftime(mktime(&t), mktime(&tnow));
+    }
+    if (dt > UINT_MAX)
+        return UINT_MAX;
+    else if (dt > 0)
+        return (unsigned int)dt;
+    else
+        return d;
+}
+
 int acme_get(acme_t *a, const char *url)
 {
     int ret = 0;
-
-    json_free(a->json);
-    a->json = NULL;
-    free(a->headers);
-    a->headers = NULL;
-    free(a->body);
-    a->body = NULL;
-    free(a->type);
-    a->type = NULL;
 
     if (!url) {
         warnx("acme_get: invalid URL");
         goto out;
     }
-    if (g_loglevel > 1)
-        warnx("acme_get: url=%s", url);
-    curldata_t *c = curl_get(url);
-    if (!c) {
-        warnx("acme_get: curl_get failed");
-        goto out;
+
+    for (int retry = 0; retry < 3; retry++) {
+        if (retry > 0)
+            msg(1, "acme_get: retrying");
+
+        json_free(a->json);
+        a->json = NULL;
+        free(a->headers);
+        a->headers = NULL;
+        free(a->body);
+        a->body = NULL;
+        free(a->type);
+        a->type = NULL;
+
+        if (g_loglevel > 1)
+            warnx("acme_get: url=%s", url);
+        curldata_t *c = curl_get(url);
+        if (!c) {
+            warnx("acme_get: curl_get failed");
+            goto out;
+        }
+        free(a->nonce);
+        a->nonce = find_header(c->headers, "Replay-Nonce");
+        a->type = find_header(c->headers, "Content-Type");
+        if (a->type && strcasestr(a->type, "json"))
+            a->json = json_parse(c->body, c->body_len);
+        a->headers = c->headers;
+        c->headers = NULL;
+        a->body = c->body;
+        c->body = NULL;
+        ret = c->code;
+        curldata_free(c);
+        if (g_loglevel > 2) {
+            if (a->headers)
+                warnx("acme_get: HTTP headers\n%s", a->headers);
+            if (a->body)
+                warnx("acme_get: HTTP body\n%s", a->body);
+        }
+        if (g_loglevel > 1) {
+            if (a->json) {
+                warnx("acme_get: return code %d, json=", ret);
+                json_dump(stderr, a->json);
+            } else
+                warnx("acme_get: return code %d", ret);
+        }
+        if (!a->type || !a->json ||
+                !strcasestr(a->type, "application/problem+json"))
+            break;
+        if (ret == 503 && json_compare_string(a->json, "type",
+                    "urn:ietf:params:acme:error:rateLimited") == 0) {
+            char *ra = find_header(a->headers, "Retry-After");
+            unsigned int dt = retry_after(ra, 60);
+            free(ra);
+            msg(1, "acme_get: server busy, waiting %u seconds", dt);
+            sleep(dt);
+            continue;
+        }
+        break;
     }
-    free(a->nonce);
-    a->nonce = find_header(c->headers, "Replay-Nonce");
-    a->type = find_header(c->headers, "Content-Type");
-    if (a->type && strcasestr(a->type, "json"))
-        a->json = json_parse(c->body, c->body_len);
-    a->headers = c->headers;
-    c->headers = NULL;
-    a->body = c->body;
-    c->body = NULL;
-    ret = c->code;
-    curldata_free(c);
 out:
-    if (g_loglevel > 2) {
-        if (a->headers)
-            warnx("acme_get: HTTP headers\n%s", a->headers);
-        if (a->body)
-            warnx("acme_get: HTTP body\n%s", a->body);
-    }
-    if (g_loglevel > 1) {
-        if (a->json) {
-            warnx("acme_get: return code %d, json=", ret);
-            json_dump(stderr, a->json);
-        } else
-            warnx("acme_get: return code %d", ret);
-    }
     if (!a->headers)
         a->headers = strdup("");
     if (!a->body)
@@ -185,11 +237,6 @@ int acme_post(acme_t *a, const char *url, const char *format, ...)
         return 0;
     }
 
-    if (!a->nonce && !acme_nonce(a)) {
-        warnx("acme_post: no nonce available");
-        return 0;
-    }
-
     va_list ap;
     va_start(ap, format);
     if (vasprintf(&payload, format, ap) < 0)
@@ -200,9 +247,14 @@ int acme_post(acme_t *a, const char *url, const char *format, ...)
         return 0;
     }
 
-    for (int retry = 0; a->nonce && retry < 3; retry++) {
+    for (int retry = 0; retry < 3; retry++) {
         if (retry > 0)
-            msg(1, "acme_post: server rejected nonce, retrying");
+            msg(1, "acme_post: retrying");
+
+        if (!a->nonce && !acme_nonce(a)) {
+            warnx("acme_post: no nonce available");
+            goto out;
+        }
 
         json_free(a->json);
         a->json = NULL;
@@ -260,11 +312,24 @@ int acme_post(acme_t *a, const char *url, const char *format, ...)
             } else
                 warnx("acme_post: return code %d", ret);
         }
-        if (ret != 400 || !a->type || !a->nonce || !a->json ||
-                !strcasestr(a->type, "application/problem+json") ||
-                json_compare_string(a->json, "type",
-                    "urn:ietf:params:acme:error:badNonce") != 0)
+        if (!a->type || !a->json ||
+                !strcasestr(a->type, "application/problem+json"))
             break;
+        if (ret == 400 && json_compare_string(a->json, "type",
+                    "urn:ietf:params:acme:error:badNonce") == 0) {
+            msg(1, "acme_post: server rejected nonce");
+            continue;
+        }
+        if (ret == 503 && json_compare_string(a->json, "type",
+                    "urn:ietf:params:acme:error:rateLimited") == 0) {
+            char *ra = find_header(a->headers, "Retry-After");
+            unsigned int dt = retry_after(ra, 60);
+            free(ra);
+            msg(1, "acme_post: server busy, waiting %u seconds", dt);
+            sleep(dt);
+            continue;
+        }
+        break;
     }
 out:
     free(payload);
@@ -895,9 +960,12 @@ bool authorize(acme_t *a)
                         acme_error(a);
                         break;
                     } else if (u < 5*512) {
-                        msg(u > 40 ? 1 : 2, "%s, waiting %u seconds",
-                                status, u);
-                        sleep(u);
+                        char *ra = find_header(a->headers, "Retry-After");
+                        unsigned int dt = retry_after(ra, u);
+                        free(ra);
+                        msg(dt > 40 ? 1 : 2, "%s, waiting %u seconds",
+                                status, dt);
+                        sleep(dt);
                     } else {
                         warnx("timeout while polling challenge status at %s, "
                                 "giving up", url);
@@ -999,8 +1067,11 @@ bool cert_issue(acme_t *a, char * const *names, const char *csr)
                 acme_error(a);
                 goto out;
             } else if (u < 5*512) {
-                msg(u > 40 ? 1 : 2, "waiting %u seconds", u);
-                sleep(u);
+                char *ra = find_header(a->headers, "Retry-After");
+                unsigned int dt = retry_after(ra, u);
+                free(ra);
+                msg(dt > 40 ? 1 : 2, "%s, waiting %u seconds", status, dt);
+                sleep(dt);
             } else {
                 warnx("timeout while polling order status at %s, giving up",
                         orderurl);
@@ -1042,8 +1113,11 @@ bool cert_issue(acme_t *a, char * const *names, const char *csr)
             acme_error(a);
             goto out;
         } else if (u < 5*512) {
-            msg(u > 40 ? 1 : 2, "waiting %u seconds", u);
-            sleep(u);
+            char *ra = find_header(a->headers, "Retry-After");
+            unsigned int dt = retry_after(ra, u);
+            free(ra);
+            msg(dt > 40 ? 1 : 2, "%s, waiting %u seconds", status, dt);
+            sleep(dt);
         } else {
             warnx("timeout while polling order status at %s, giving up",
                     orderurl);
