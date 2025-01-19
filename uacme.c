@@ -69,6 +69,7 @@ typedef struct acme {
     const char *directory;
     const char *hook;
     const char *email;
+    const char *profile;
     char *keyprefix;
     char *certprefix;
 } acme_t;
@@ -417,7 +418,7 @@ char *identifiers(char * const *names)
 {
     char *ids = NULL;
     char *tmp = NULL;
-    if (asprintf(&tmp, "{\"identifiers\":[") < 0) {
+    if (asprintf(&tmp, "\"identifiers\":[") < 0) {
         warnx("identifiers: asprintf failed");
         return NULL;
     }
@@ -434,7 +435,7 @@ char *identifiers(char * const *names)
         names++;
     }
     tmp[strlen(tmp)-1] = 0;
-    if (asprintf(&ids, "%s]}", tmp) < 0) {
+    if (asprintf(&ids, "%s]", tmp) < 0) {
         warnx("identifiers: asprintf failed");
         ids = NULL;
     }
@@ -454,6 +455,20 @@ bool acme_bootstrap(acme_t *a)
 
     a->dir = a->json;
     a->json = NULL;
+
+    if (a->profile) {
+        const json_value_t *meta = json_find(a->dir, "meta");
+        const json_value_t *profiles  = json_find(meta, "profiles");
+        if (!profiles) {
+            warnx("server does not support profiles");
+            return false;
+        }
+        if (!json_find_string(profiles, a->profile)) {
+            warnx("profile must be a supported one:");
+            json_dump(stderr, profiles);
+            return false;
+        }
+    }
 
     return true;
 }
@@ -1021,7 +1036,9 @@ bool cert_issue(acme_t *a, char * const *names, const char *csr)
     }
 
     msg(1, "creating new order at %s", url);
-    if (acme_post(a, url, ids) != 201)
+    if (acme_post(a, url, "{%s%s%s%s}", a->profile ? "\"profile\": \"" : "",
+                a->profile ? a->profile : "",
+                a->profile ? "\", " : "", ids) != 201)
     {
         warnx("failed to create new order at %s", url);
         acme_error(a);
@@ -1419,9 +1436,10 @@ void usage(const char *progname)
         "usage: %s [-a|--acme-url URL] [-b|--bits BITS] [-c|--confdir DIR]\n"
         "\t[-d|--days DAYS] [-e|--eab KEYID:KEY] [-f|--force] [-h|--hook PROG]\n"
         "\t[-i|--no-ari] [-l|--alternate [N | SHA256]] [-m|--must-staple]\n"
-        "\t[-n|--never-create] [-o|--no-ocsp] [-r|--reason CODE] [-s|--staging]\n"
-        "\t[-t|--type RSA | EC] [-v|--verbose ...] [-V|--version] [-y|--yes]\n"
-        "\t[-?|--help] new [EMAIL] | update [EMAIL] | deactivate | newkey |\n"
+        "\t[-n|--never-create] [-o|--no-ocsp] [-p|--profile profile]\n"
+        "\t[-r|--reason CODE] [-s|--staging] [-t|--type RSA | EC]\n"
+        "\t[-v|--verbose ...] [-V|--version] [-y|--yes] [-?|--help]\n"
+        "\tnew [EMAIL] | update [EMAIL] | deactivate | newkey |\n"
         "\tissue IDENTIFIER [ALTNAME ...]] | issue CSRFILE |\n"
         "\trevoke CERTFILE [CERTKEYFILE]\n", progname);
 }
@@ -1457,6 +1475,7 @@ int main(int argc, char **argv)
         {"must-staple",  no_argument,       NULL, 'm'},
         {"never-create", no_argument,       NULL, 'n'},
         {"no-ocsp",      no_argument,       NULL, 'o'},
+        {"profile",      no_argument,       NULL, 'p'},
         {"reason",       required_argument, NULL, 'r'},
         {"staging",      no_argument,       NULL, 's'},
         {"type",         required_argument, NULL, 't'},
@@ -1520,7 +1539,7 @@ int main(int argc, char **argv)
     while (1) {
         char *endptr;
         int option_index;
-        int c = getopt_long(argc, argv, "a:b:c:d:e:f?h:il:mnor:st:vVy",
+        int c = getopt_long(argc, argv, "a:b:c:d:e:f?h:il:mnop:r:st:vVy",
                 options, &option_index);
         if (c == -1) break;
         switch (c) {
@@ -1585,6 +1604,10 @@ int main(int argc, char **argv)
 
             case 'o':
                 status_check = false;
+                break;
+
+            case 'p':
+                a.profile = optarg;
                 break;
 
             case 'v':
@@ -1892,7 +1915,7 @@ int main(int argc, char **argv)
 
         if (!csr) {
             msg(1, "generating certificate request");
-            csr = csr_gen(names, status_req, key);
+            csr = csr_gen(names, status_req, a.profile != NULL, key);
             if (!csr) {
                 warnx("failed to generate certificate request");
                 goto out;

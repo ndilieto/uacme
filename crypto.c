@@ -2134,7 +2134,8 @@ bool is_ip(const char *s, unsigned char *ip, size_t *ip_len)
     return ret;
 }
 
-char *csr_gen(char * const *names, bool status_req, privkey_t key)
+char *csr_gen(char * const *names, bool status_req, bool no_key_usage,
+        privkey_t key)
 {
     char *req = NULL;
     unsigned char *csrdata = NULL;
@@ -2259,11 +2260,13 @@ char *csr_gen(char * const *names, bool status_req, privkey_t key)
         names++;
     }
 
-    r = gnutls_x509_crq_set_key_usage(crq, key_usage);
-    if (r != GNUTLS_E_SUCCESS) {
-        warnx("csr_gen: gnutls_x509_crq_set_key_usage: %s",
-                gnutls_strerror(r));
-        goto out;
+    if (!no_key_usage) {
+        r = gnutls_x509_crq_set_key_usage(crq, key_usage);
+        if (r != GNUTLS_E_SUCCESS) {
+            warnx("csr_gen: gnutls_x509_crq_set_key_usage: %s",
+                    gnutls_strerror(r));
+            goto out;
+        }
     }
 
     if (status_req) {
@@ -2397,12 +2400,14 @@ char *csr_gen(char * const *names, bool status_req, privkey_t key)
         goto out;
     }
     sk_X509_EXTENSION_push(exts, ext);
-    ext = X509V3_EXT_conf_nid(NULL, NULL, NID_key_usage, key_usage);
-    if (!ext) {
-        openssl_error("csr_gen");
-        goto out;
+    if (!no_key_usage) {
+        ext = X509V3_EXT_conf_nid(NULL, NULL, NID_key_usage, key_usage);
+        if (!ext) {
+            openssl_error("csr_gen");
+            goto out;
+        }
+        sk_X509_EXTENSION_push(exts, ext);
     }
-    sk_X509_EXTENSION_push(exts, ext);
     if (status_req) {
 #if defined(LIBRESSL_VERSION_NUMBER) && LIBRESSL_VERSION_NUMBER < 0x3050000fL
         warnx("csr_gen: -m, --must-staple is not supported by LibreSSL "
@@ -2452,11 +2457,13 @@ char *csr_gen(char * const *names, bool status_req, privkey_t key)
         goto out;
     }
 
-    r = mbedtls_x509write_csr_set_key_usage(&csr, key_usage);
-    if (r) {
-        warnx("csr_gen: mbedtls_x509write_csr_set_key_usage failed: %s",
-                _mbedtls_strerror(r));
-        goto out;
+    if (!no_key_usage) {
+        r = mbedtls_x509write_csr_set_key_usage(&csr, key_usage);
+        if (r) {
+            warnx("csr_gen: mbedtls_x509write_csr_set_key_usage failed: %s",
+                    _mbedtls_strerror(r));
+            goto out;
+        }
     }
 
     r = mbedtls_x509write_csr_set_subject_name(&csr, cn);

@@ -750,9 +750,9 @@ UACME(1) Manual Page
     [<strong>-c</strong>|<strong>--confdir</strong> <em>DIR</em>] [<strong>-d</strong>|<strong>--days</strong> <em>DAYS</em>] [<strong>-e</strong>|<strong>--eab</strong> KEYID:KEY]
     [<strong>-f</strong>|<strong>--force</strong>] [<strong>-h</strong>|<strong>--hook</strong> <em>PROGRAM</em>] [<strong>-i</strong>|<strong>--no-ari</strong>]
     [<strong>-l</strong>|<strong>--alternate</strong> <em>N</em> | <em>FP</em>] [<strong>-m</strong>|<strong>--must-staple</strong>]
-    [<strong>-n</strong>|<strong>--never-create</strong>] [<strong>-o</strong>|<strong>--no-ocsp</strong>] [<strong>-r</strong>|<strong>--reason</strong> CODE]
-    [<strong>-s</strong>|<strong>--staging</strong>] [<strong>-t</strong>|<strong>--type</strong> <strong>RSA</strong>|<strong>EC</strong>] [<strong>-v</strong>|<strong>--verbose</strong> &#8230;]
-    [<strong>-V</strong>|<strong>--version</strong>] [<strong>-y</strong>|<strong>--yes</strong>] [<strong>-?</strong>|<strong>--help</strong>]
+    [<strong>-n</strong>|<strong>--never-create</strong>] [<strong>-o</strong>|<strong>--no-ocsp</strong>] [<strong>-p</strong>|<strong>--profile</strong> PROFILE]
+    [<strong>-r</strong>|<strong>--reason</strong> CODE] [<strong>-s</strong>|<strong>--staging</strong>] [<strong>-t</strong>|<strong>--type</strong> <strong>RSA</strong>|<strong>EC</strong>]
+    [<strong>-v</strong>|<strong>--verbose</strong> &#8230;] [<strong>-V</strong>|<strong>--version</strong>] [<strong>-y</strong>|<strong>--yes</strong>] [<strong>-?</strong>|<strong>--help</strong>]
     <strong>new</strong> [<em>EMAIL</em>] | <strong>update</strong> [<em>EMAIL</em>] | <strong>deactivate</strong> | <strong>newkey</strong> |
     <strong>issue</strong> <em>IDENTIFIER</em> [<em>ALTNAME</em> &#8230;]] | <strong>issue</strong> <em>CSRFILE</em> |
     <strong>revoke</strong> <em>CERTFILE</em> [<em>CERTKEYFILE</em>]</p></div>
@@ -1029,6 +1029,16 @@ The key authorization (for <strong>dns-01</strong> and <strong>tls-alpn-01</stro
     <strong>uacme</strong> makes an OCSP request to the server; if the certificate is
     reported as revoked <strong>uacme</strong> forces reissuance regardless of the
     expiration date. See also <strong>-d, --days</strong>.
+</p>
+</dd>
+<dt class="hdlist1">
+<strong>-p, --profile</strong> <em>PROFILE</em>
+</dt>
+<dd>
+<p>
+    If the server supports it, use <em>PROFILE</em>, a collection of attributes
+    about the certificate that will be issued, such as what extensions it
+    will contain, how long it will be valid for, and more.
 </p>
 </dd>
 <dt class="hdlist1">
@@ -1472,9 +1482,9 @@ along with this program.  If not, see <a href="http://www.gnu.org/licenses/">htt
 <div id="footnotes"><hr></div>
 <div id="footer">
 <div id="footer-text">
-Version 1.7.6<br>
+Version 1.7.6-dev<br>
 Last updated
- 2024-12-29 17:25:16 CET
+ 2025-01-19 12:57:02 CET
 </div>
 </div>
 </body>

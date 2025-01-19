@@ -17,9 +17,9 @@ SYNOPSIS
     [*-c*|*--confdir* 'DIR'] [*-d*|*--days* 'DAYS'] [*-e*|*--eab* KEYID:KEY]
     [*-f*|*--force*] [*-h*|*--hook* 'PROGRAM'] [*-i*|*--no-ari*]
     [*-l*|*--alternate* 'N' | 'FP'] [*-m*|*--must-staple*]
-    [*-n*|*--never-create*] [*-o*|*--no-ocsp*] [*-r*|*--reason* CODE]
-    [*-s*|*--staging*] [*-t*|*--type* *RSA*|*EC*] [*-v*|*--verbose* ...]
-    [*-V*|*--version*] [*-y*|*--yes*] [*-?*|*--help*]
+    [*-n*|*--never-create*] [*-o*|*--no-ocsp*] [*-p*|*--profile* PROFILE]
+    [*-r*|*--reason* CODE] [*-s*|*--staging*] [*-t*|*--type* *RSA*|*EC*]
+    [*-v*|*--verbose* ...] [*-V*|*--version*] [*-y*|*--yes*] [*-?*|*--help*]
     *new* ['EMAIL'] | *update* ['EMAIL'] | *deactivate* | *newkey* |
     *issue* 'IDENTIFIER' ['ALTNAME' ...]] | *issue* 'CSRFILE' |
     *revoke* 'CERTFILE' ['CERTKEYFILE']
@@ -136,6 +136,11 @@ OPTIONS
     *uacme* makes an OCSP request to the server; if the certificate is
     reported as revoked *uacme* forces reissuance regardless of the
     expiration date. See also *-d, --days*.
+
+*-p, --profile* 'PROFILE'::
+    If the server supports it, use 'PROFILE', a collection of attributes
+    about the certificate that will be issued, such as what extensions it
+    will contain, how long it will be valid for, and more.
 
 *-r, --reason* 'CODE'::
     Use 'CODE' (default 0) as reason code in revocation requests. A list
