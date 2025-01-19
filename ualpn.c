@@ -1379,8 +1379,8 @@ static void controller_handle_cmd(controller_t *c, char *line, ev_tstamp ts)
             0x20, // LENGTH
         };
 
-        if (base642bin(id + 2, sizeof(id) - 2, auth, strlen(auth), NULL,
-                    &id_len, NULL, base64_VARIANT_URLSAFE_NO_PADDING)
+        if (!auth || base642bin(id + 2, sizeof(id) - 2, auth, strlen(auth),
+                    NULL, &id_len, NULL, base64_VARIANT_URLSAFE_NO_PADDING)
                 || id_len != sizeof(id) - 2) {
             buf_puts(&c->buf_send, "ERR invalid auth\n");
             return;
