@@ -21,6 +21,7 @@
 #include "config.h"
 
 #include <arpa/inet.h>
+#include <ctype.h>
 #include <err.h>
 #include <errno.h>
 #include <netdb.h>
@@ -4562,6 +4563,44 @@ out:
 }
 #endif
 
+static time_t parse_rfc3339_timestamp(const char *str)
+{
+    int n;
+    time_t t = (time_t)-1;
+    struct tm tm;
+
+    memset(&tm, 0, sizeof(tm));
+    if (sscanf(str, "%4d-%2d-%2d%*[Tt]%2d:%2d:%2d%n",
+                &tm.tm_year, &tm.tm_mon, &tm.tm_mday,
+                &tm.tm_hour, &tm.tm_min, &tm.tm_sec, &n) != 6)
+        return (time_t)-1;
+    tm.tm_year -= 1900;
+    tm.tm_mon -= 1;
+    t = mktime(&tm);
+    if (t == (time_t)-1)
+        return (time_t)-1;
+    str += n;
+    str += strspn(str, ".0123456789");
+    if (toupper(*str) != 'Z') {
+        int tz, tzh, tzm;
+        if (strlen(str) < 6 ||
+            sscanf(str + 1, "%2d:%2d", &tzh, &tzm) != 2)
+                return (time_t)-1;
+        tz = 60*(60*tzh + tzm);
+        switch (*str) {
+            case '+':
+                t -= tz;
+                break;
+            case '-':
+                t += tz;
+                break;
+            default:
+                t = (time_t) -1;
+        }
+    }
+    return t;
+}
+
 #if defined(USE_GNUTLS)
 int ari_check(gnutls_x509_crt_t crt, const char *ari_url)
 #elif defined(USE_OPENSSL)
@@ -4617,23 +4656,12 @@ int ari_check(mbedtls_x509_crt *crt, const char *ari_url)
         goto out;
     }
     msg(1, "certificate renewal window: start=%s end=%s", start, end);
-    struct tm start_tm, end_tm;
-    p = strptime(start, "%Y-%m-%dT%T%z", &start_tm);
-    if (!p || *p) {
-        warnx("ari_check: failed to parse start");
-        goto out;
-    }
-    p = strptime(end, "%Y-%m-%dT%T%z", &end_tm);
-    if (!p || *p) {
-        warnx("ari_check: failed to parse end");
-        goto out;
-    }
-    time_t start_t = mktime(&start_tm);
+    time_t start_t = parse_rfc3339_timestamp(start);
     if (start_t == (time_t)-1) {
         warnx("ari_check: invalid start");
         goto out;
     }
-    time_t end_t = mktime(&end_tm);
+    time_t end_t = parse_rfc3339_timestamp(end);
     if (end_t == (time_t)-1) {
         warnx("ari_check: invalid end");
         goto out;
