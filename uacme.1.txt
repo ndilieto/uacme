@@ -22,6 +22,7 @@ SYNOPSIS
     [*-v*|*--verbose* ...] [*-V*|*--version*] [*-y*|*--yes*] [*-?*|*--help*]
     *new* ['EMAIL'] | *update* ['EMAIL'] | *deactivate* | *newkey* |
     *issue* 'IDENTIFIER' ['ALTNAME' ...]] | *issue* 'CSRFILE' |
+    *check* 'IDENTIFIER' ['ALTNAME' ...]] | *check* 'CSRFILE' |
     *revoke* 'CERTFILE' ['CERTKEYFILE']
 
 
@@ -206,15 +207,9 @@ USAGE
     renaming 'CONFDIR/private/newkey.pem' to 'CONFDIR/private/key.pem'.
 
 *uacme* ['OPTIONS' ...] *issue* 'IDENTIFIER' ['ALTNAME' ...]::
-    Issue a certificate for 'IDENTIFIER' with zero or more 'ALTNAMEs'.
-    If a certificate is already available at 'CONFDIR/IDENTIFIER/cert.pem'
-    for the specified 'IDENTIFIER' and 'ALTNAMEs' and is still valid for
-    longer than 'DAYS' no action is taken unless *-f, --force* is specified
-    or *-o, --no-ocsp* is *not* specified and the certificate is reported
-    as revoked by the OCSP server.  The new certificate is saved to
-    'CONFDIR/IDENTIFIER/cert.pem'.  If the certificate file already exists
-    it is hardlinked to 'CONFDIR/IDENTIFIER/cert-TIMESTAMP.pem' before
-    overwriting.  The private key for the certificate is loaded from
+    Issue a certificate for 'IDENTIFIER' with zero or more 'ALTNAMEs' and
+    save it to 'CONFDIR/IDENTIFIER/cert.pem'.
+    The private key for the certificate is loaded from
     'CONFDIR/private/IDENTIFIER/key.pem'. If no such file exists,
     a new key is generated unless *-n, --never-create* is specified.
     Wildcard 'IDENTIFIERs' or 'ALTNAMEs' are dealt with correctly, as long
@@ -223,7 +218,20 @@ USAGE
     for example a certificate for '*.test.com' is saved to
     'CONFDIR/test.com/cert.pem'.
     IP address 'IDENTIFIERs' and 'ALTNAMEs' are also supported according to
-    <https://tools.ietf.org/html/rfc8738#section-3>
+    <https://tools.ietf.org/html/rfc8738#section-3>.
+    If a certificate is already available at 'CONFDIR/IDENTIFIER/cert.pem'
+    for the specified 'IDENTIFIER' and 'ALTNAMEs' and needs renewal,
+    it is hardlinked to 'CONFDIR/IDENTIFIER/cert-TIMESTAMP.pem'
+    before overwriting. Renewal happens if 
+        ::: *-f, --force* is specified,
+        ::: or the certificate expires in less than 'DAYS' and either
+        *-i, --no-ari* is specified or the server does not provide renewal
+        information,
+        ::: or *-i, --no-ari* is *not* specified and the server indicates
+        the certificate is due for renewal,
+        ::: or *-o, --no-ocsp* is *not* specified and the certificate is
+        reported as revoked by the OCSP server.
+
 
 *uacme* ['OPTIONS' ...] *issue* 'CSRFILE'::
     Issue a certificate based on a RFC2986 Certificate Signing Request
@@ -231,16 +239,32 @@ USAGE
     of issuance *uacme* neither needs nor generates the certificate private
     key, but it is of course the responsibility of the user to ensure that
     the CSR is constructed and signed appropriately.
-    If a certificate file 'CSRBASE-cert.pem' (where 'CSRBASE' is obtained
-    by stripping the extension, if any, from 'CSRFILE') is already available
-    in the same directory containing 'CSRFILE', and is still valid for longer
-    than 'DAYS' no action is taken unless *-f, --force* is specified or
-    *-o, --no-ocsp* is *not* specified and the certificate is reported as
-    revoked by the OCSP server.  If the certificate file already exists it
-    is hardlinked to 'BASENAME-cert-TIMESTAMP.pem' before overwriting.
     Wildcard identifiers in the CSR are dealt with correctly, as long as
     the ACME server supports them.  IP addresses are also supported
-    according to <https://tools.ietf.org/html/rfc8738#section-3>
+    according to <https://tools.ietf.org/html/rfc8738#section-3>.
+    If a certificate file 'CSRBASE-cert.pem' (where 'CSRBASE' is obtained
+    by stripping the extension, if any, from 'CSRFILE') is already available
+    in the same directory containing 'CSRFILE', it matches the identifiers
+    in 'CSRFILE' and needs renewal, it is hardlinked to 
+    'BASENAME-cert-TIMESTAMP.pem' before overwriting. Renewal happens if
+        ::: *-f, --force* is specified,
+        ::: or the certificate expires in less than 'DAYS' and either
+        *-i, --no-ari* is specified or the server does not provide renewal
+        information,
+        ::: or *-i, --no-ari* is *not* specified and the server indicates
+        the certificate is due for renewal,
+        ::: or *-o, --no-ocsp* is *not* specified and the certificate is
+        reported as revoked by the OCSP server.
+
+*uacme* ['OPTIONS' ...] *check* 'IDENTIFIER' ['ALTNAME' ...]::
+    Same as *uacme* ['OPTIONS' ...] *issue* 'IDENTIFIER' ['ALTNAME' ...],
+    except that no certificate is issued or renewed. The exit code
+    reflects existence and validity of the certificate.
+
+*uacme* ['OPTIONS' ...] *check* 'CSRFILE'::
+    Same as *uacme* ['OPTIONS' ...] *issue* 'CSRFILE',
+    except that no certificate is issued or renewed. The exit code
+    reflects existence and validity of the certificate.
 
 *uacme* ['OPTIONS' ...] *revoke* 'CERTFILE' ['CERTKEYFILE']::
     Revoke the certificate stored in 'CERTFILE'. The revocation request

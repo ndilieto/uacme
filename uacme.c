@@ -1440,7 +1440,8 @@ void usage(const char *progname)
         "\t[-r|--reason CODE] [-s|--staging] [-t|--type RSA | EC]\n"
         "\t[-v|--verbose ...] [-V|--version] [-y|--yes] [-?|--help]\n"
         "\tnew [EMAIL] | update [EMAIL] | deactivate | newkey |\n"
-        "\tissue IDENTIFIER [ALTNAME ...]] | issue CSRFILE |\n"
+        "\tissue IDENTIFIER [ALTNAME ...] | issue CSRFILE |\n"
+        "\tcheck IDENTIFIER [ALTNAME ...] | check CSRFILE |\n"
         "\trevoke CERTFILE [CERTKEYFILE]\n", progname);
 }
 
@@ -1711,7 +1712,7 @@ int main(int argc, char **argv)
             usage(basename(argv[0]));
             goto out;
         }
-    } else if (strcmp(action, "issue") == 0) {
+    } else if (strcmp(action, "issue") == 0 || strcmp(action, "check") == 0) {
         if (optind == argc) {
             usage(basename(argv[0]));
             goto out;
@@ -1856,7 +1857,12 @@ int main(int argc, char **argv)
         if (acme_bootstrap(&a) && account_retrieve(&a)
                 && account_deactivate(&a))
             ret = 0;
-    } else if (strcmp(action, "issue") == 0) {
+    } else if (strcmp(action, "revoke") == 0) {
+        if (acme_bootstrap(&a) && (!a.keyprefix || account_retrieve(&a)) &&
+                cert_revoke(&a, filename, reason))
+            ret = 0;
+    } else if (strcmp(action, "issue") == 0 || strcmp(action, "check") == 0) {
+        bool check = *action == 'c';
         if (filename) {
             int len = strlen(filename);
             char *dot = strrchr(filename, '.');
@@ -1875,17 +1881,17 @@ int main(int argc, char **argv)
                 goto out;
 
             if (status_req)
-                warnx("-m, --must-staple is ignored when issuing with a CSR");
+                warnx("-m, --must-staple is ignored with a CSR");
         } else {
-            if (!check_or_mkdir(!never, keyprefix, S_IRWXU))
+            if (!check_or_mkdir(!(never || check), keyprefix, S_IRWXU))
                 goto out;
 
-            if (!check_or_mkdir(!never, a.certprefix,
+            if (!check_or_mkdir(!(never || check), a.certprefix,
                         S_IRWXU|S_IRGRP|S_IXGRP|S_IROTH|S_IXOTH))
                 goto out;
 
-            key = key_load(never ? PK_NONE : type, bits, "%s/key.pem",
-                    keyprefix);
+            key = key_load((never || check) ? PK_NONE : type, bits,
+                    "%s/key.pem", keyprefix);
             if (!key)
                 goto out;
         }
@@ -1904,13 +1910,20 @@ int main(int argc, char **argv)
 
         msg(1, "checking existence and expiration of %s", filename);
         if (cert_valid(filename, names, ari_url, days, status_check)) {
-            if (force)
+            if (check) {
+                msg(1, "%s is valid", filename);
+                ret = 1;
+                goto out;
+            } else if (force)
                 msg(1, "forcing reissue of %s", filename);
             else {
                 msg(1, "skipping %s", filename);
                 ret = 1;
                 goto out;
             }
+        } else if (check) {
+            ret = 0;
+            goto out;
         }
 
         if (!csr) {
@@ -1923,10 +1936,6 @@ int main(int argc, char **argv)
         }
 
         if (account_retrieve(&a) && cert_issue(&a, names, csr))
-            ret = 0;
-    } else if (strcmp(action, "revoke") == 0) {
-        if (acme_bootstrap(&a) && (!a.keyprefix || account_retrieve(&a)) &&
-                cert_revoke(&a, filename, reason))
             ret = 0;
     }
 

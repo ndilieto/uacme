@@ -755,6 +755,7 @@ UACME(1) Manual Page
     [<strong>-v</strong>|<strong>--verbose</strong> &#8230;] [<strong>-V</strong>|<strong>--version</strong>] [<strong>-y</strong>|<strong>--yes</strong>] [<strong>-?</strong>|<strong>--help</strong>]
     <strong>new</strong> [<em>EMAIL</em>] | <strong>update</strong> [<em>EMAIL</em>] | <strong>deactivate</strong> | <strong>newkey</strong> |
     <strong>issue</strong> <em>IDENTIFIER</em> [<em>ALTNAME</em> &#8230;]] | <strong>issue</strong> <em>CSRFILE</em> |
+    <strong>check</strong> <em>IDENTIFIER</em> [<em>ALTNAME</em> &#8230;]] | <strong>check</strong> <em>CSRFILE</em> |
     <strong>revoke</strong> <em>CERTFILE</em> [<em>CERTKEYFILE</em>]</p></div>
 </div>
 </div>
@@ -1167,15 +1168,9 @@ The key authorization (for <strong>dns-01</strong> and <strong>tls-alpn-01</stro
 </dt>
 <dd>
 <p>
-    Issue a certificate for <em>IDENTIFIER</em> with zero or more <em>ALTNAMEs</em>.
-    If a certificate is already available at <em>CONFDIR/IDENTIFIER/cert.pem</em>
-    for the specified <em>IDENTIFIER</em> and <em>ALTNAMEs</em> and is still valid for
-    longer than <em>DAYS</em> no action is taken unless <strong>-f, --force</strong> is specified
-    or <strong>-o, --no-ocsp</strong> is <strong>not</strong> specified and the certificate is reported
-    as revoked by the OCSP server.  The new certificate is saved to
-    <em>CONFDIR/IDENTIFIER/cert.pem</em>.  If the certificate file already exists
-    it is hardlinked to <em>CONFDIR/IDENTIFIER/cert-TIMESTAMP.pem</em> before
-    overwriting.  The private key for the certificate is loaded from
+    Issue a certificate for <em>IDENTIFIER</em> with zero or more <em>ALTNAMEs</em> and
+    save it to <em>CONFDIR/IDENTIFIER/cert.pem</em>.
+    The private key for the certificate is loaded from
     <em>CONFDIR/private/IDENTIFIER/key.pem</em>. If no such file exists,
     a new key is generated unless <strong>-n, --never-create</strong> is specified.
     Wildcard <em>IDENTIFIERs</em> or <em>ALTNAMEs</em> are dealt with correctly, as long
@@ -1184,8 +1179,50 @@ The key authorization (for <strong>dns-01</strong> and <strong>tls-alpn-01</stro
     for example a certificate for <em>*.test.com</em> is saved to
     <em>CONFDIR/test.com/cert.pem</em>.
     IP address <em>IDENTIFIERs</em> and <em>ALTNAMEs</em> are also supported according to
-    <a href="https://tools.ietf.org/html/rfc8738#section-3">https://tools.ietf.org/html/rfc8738#section-3</a>
+    <a href="https://tools.ietf.org/html/rfc8738#section-3">https://tools.ietf.org/html/rfc8738#section-3</a>.
+    If a certificate is already available at <em>CONFDIR/IDENTIFIER/cert.pem</em>
+    for the specified <em>IDENTIFIER</em> and <em>ALTNAMEs</em> and needs renewal,
+    it is hardlinked to <em>CONFDIR/IDENTIFIER/cert-TIMESTAMP.pem</em>
+    before overwriting. Renewal happens if
 </p>
+<div class="dlist"><dl>
+<dt class="hdlist1">
+ 
+</dt>
+<dd>
+<p>
+<strong>-f, --force</strong> is specified,
+</p>
+</dd>
+<dt class="hdlist1">
+ 
+</dt>
+<dd>
+<p>
+or the certificate expires in less than <em>DAYS</em> and either
+        <strong>-i, --no-ari</strong> is specified or the server does not provide renewal
+        information,
+</p>
+</dd>
+<dt class="hdlist1">
+ 
+</dt>
+<dd>
+<p>
+or <strong>-i, --no-ari</strong> is <strong>not</strong> specified and the server indicates
+        the certificate is due for renewal,
+</p>
+</dd>
+<dt class="hdlist1">
+ 
+</dt>
+<dd>
+<p>
+or <strong>-o, --no-ocsp</strong> is <strong>not</strong> specified and the certificate is
+        reported as revoked by the OCSP server.
+</p>
+</dd>
+</dl></div>
 </dd>
 <dt class="hdlist1">
 <strong>uacme</strong> [<em>OPTIONS</em> &#8230;] <strong>issue</strong> <em>CSRFILE</em>
@@ -1197,16 +1234,72 @@ The key authorization (for <strong>dns-01</strong> and <strong>tls-alpn-01</stro
     of issuance <strong>uacme</strong> neither needs nor generates the certificate private
     key, but it is of course the responsibility of the user to ensure that
     the CSR is constructed and signed appropriately.
-    If a certificate file <em>CSRBASE-cert.pem</em> (where <em>CSRBASE</em> is obtained
-    by stripping the extension, if any, from <em>CSRFILE</em>) is already available
-    in the same directory containing <em>CSRFILE</em>, and is still valid for longer
-    than <em>DAYS</em> no action is taken unless <strong>-f, --force</strong> is specified or
-    <strong>-o, --no-ocsp</strong> is <strong>not</strong> specified and the certificate is reported as
-    revoked by the OCSP server.  If the certificate file already exists it
-    is hardlinked to <em>BASENAME-cert-TIMESTAMP.pem</em> before overwriting.
     Wildcard identifiers in the CSR are dealt with correctly, as long as
     the ACME server supports them.  IP addresses are also supported
-    according to <a href="https://tools.ietf.org/html/rfc8738#section-3">https://tools.ietf.org/html/rfc8738#section-3</a>
+    according to <a href="https://tools.ietf.org/html/rfc8738#section-3">https://tools.ietf.org/html/rfc8738#section-3</a>.
+    If a certificate file <em>CSRBASE-cert.pem</em> (where <em>CSRBASE</em> is obtained
+    by stripping the extension, if any, from <em>CSRFILE</em>) is already available
+    in the same directory containing <em>CSRFILE</em>, it matches the identifiers
+    in <em>CSRFILE</em> and needs renewal, it is hardlinked to
+    <em>BASENAME-cert-TIMESTAMP.pem</em> before overwriting. Renewal happens if
+</p>
+<div class="dlist"><dl>
+<dt class="hdlist1">
+ 
+</dt>
+<dd>
+<p>
+<strong>-f, --force</strong> is specified,
+</p>
+</dd>
+<dt class="hdlist1">
+ 
+</dt>
+<dd>
+<p>
+or the certificate expires in less than <em>DAYS</em> and either
+        <strong>-i, --no-ari</strong> is specified or the server does not provide renewal
+        information,
+</p>
+</dd>
+<dt class="hdlist1">
+ 
+</dt>
+<dd>
+<p>
+or <strong>-i, --no-ari</strong> is <strong>not</strong> specified and the server indicates
+        the certificate is due for renewal,
+</p>
+</dd>
+<dt class="hdlist1">
+ 
+</dt>
+<dd>
+<p>
+or <strong>-o, --no-ocsp</strong> is <strong>not</strong> specified and the certificate is
+        reported as revoked by the OCSP server.
+</p>
+</dd>
+</dl></div>
+</dd>
+<dt class="hdlist1">
+<strong>uacme</strong> [<em>OPTIONS</em> &#8230;] <strong>check</strong> <em>IDENTIFIER</em> [<em>ALTNAME</em> &#8230;]
+</dt>
+<dd>
+<p>
+    Same as <strong>uacme</strong> [<em>OPTIONS</em> &#8230;] <strong>issue</strong> <em>IDENTIFIER</em> [<em>ALTNAME</em> &#8230;],
+    except that no certificate is issued or renewed. The exit code
+    reflects existence and validity of the certificate.
+</p>
+</dd>
+<dt class="hdlist1">
+<strong>uacme</strong> [<em>OPTIONS</em> &#8230;] <strong>check</strong> <em>CSRFILE</em>
+</dt>
+<dd>
+<p>
+    Same as <strong>uacme</strong> [<em>OPTIONS</em> &#8230;] <strong>issue</strong> <em>CSRFILE</em>,
+    except that no certificate is issued or renewed. The exit code
+    reflects existence and validity of the certificate.
 </p>
 </dd>
 <dt class="hdlist1">
@@ -1484,7 +1577,7 @@ along with this program.  If not, see <a href="http://www.gnu.org/licenses/">htt
 <div id="footer-text">
 Version 1.7.6-dev<br>
 Last updated
- 2025-01-19 12:57:02 CET
+ 2025-07-05 12:41:41 CEST
 </div>
 </div>
 </body>

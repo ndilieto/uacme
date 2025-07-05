@@ -2,12 +2,12 @@
 .\"     Title: uacme
 .\"    Author: [see the "AUTHOR" section]
 .\" Generator: DocBook XSL Stylesheets v1.79.1 <http://docbook.sf.net/>
-.\"      Date: 01/19/2025
+.\"      Date: 07/05/2025
 .\"    Manual: User Commands
 .\"    Source: uacme 1.7.6-dev
 .\"  Language: English
 .\"
-.TH "UACME" "1" "01/19/2025" "uacme 1\&.7\&.6\-dev" "User Commands"
+.TH "UACME" "1" "07/05/2025" "uacme 1\&.7\&.6\-dev" "User Commands"
 .\" -----------------------------------------------------------------
 .\" * Define some portability stuff
 .\" -----------------------------------------------------------------
@@ -31,7 +31,7 @@
 uacme \- ACMEv2 client written in plain C with minimal dependencies
 .SH "SYNOPSIS"
 .sp
-\fBuacme\fR [\fB\-a\fR|\fB\-\-acme\-url\fR \fIURL\fR] [\fB\-b\fR|\fB\-\-bits\fR \fIBITS\fR] [\fB\-c\fR|\fB\-\-confdir\fR \fIDIR\fR] [\fB\-d\fR|\fB\-\-days\fR \fIDAYS\fR] [\fB\-e\fR|\fB\-\-eab\fR KEYID:KEY] [\fB\-f\fR|\fB\-\-force\fR] [\fB\-h\fR|\fB\-\-hook\fR \fIPROGRAM\fR] [\fB\-i\fR|\fB\-\-no\-ari\fR] [\fB\-l\fR|\fB\-\-alternate\fR \fIN\fR | \fIFP\fR] [\fB\-m\fR|\fB\-\-must\-staple\fR] [\fB\-n\fR|\fB\-\-never\-create\fR] [\fB\-o\fR|\fB\-\-no\-ocsp\fR] [\fB\-p\fR|\fB\-\-profile\fR PROFILE] [\fB\-r\fR|\fB\-\-reason\fR CODE] [\fB\-s\fR|\fB\-\-staging\fR] [\fB\-t\fR|\fB\-\-type\fR \fBRSA\fR|\fBEC\fR] [\fB\-v\fR|\fB\-\-verbose\fR \&...] [\fB\-V\fR|\fB\-\-version\fR] [\fB\-y\fR|\fB\-\-yes\fR] [\fB\-?\fR|\fB\-\-help\fR] \fBnew\fR [\fIEMAIL\fR] | \fBupdate\fR [\fIEMAIL\fR] | \fBdeactivate\fR | \fBnewkey\fR | \fBissue\fR \fIIDENTIFIER\fR [\fIALTNAME\fR \&...]] | \fBissue\fR \fICSRFILE\fR | \fBrevoke\fR \fICERTFILE\fR [\fICERTKEYFILE\fR]
+\fBuacme\fR [\fB\-a\fR|\fB\-\-acme\-url\fR \fIURL\fR] [\fB\-b\fR|\fB\-\-bits\fR \fIBITS\fR] [\fB\-c\fR|\fB\-\-confdir\fR \fIDIR\fR] [\fB\-d\fR|\fB\-\-days\fR \fIDAYS\fR] [\fB\-e\fR|\fB\-\-eab\fR KEYID:KEY] [\fB\-f\fR|\fB\-\-force\fR] [\fB\-h\fR|\fB\-\-hook\fR \fIPROGRAM\fR] [\fB\-i\fR|\fB\-\-no\-ari\fR] [\fB\-l\fR|\fB\-\-alternate\fR \fIN\fR | \fIFP\fR] [\fB\-m\fR|\fB\-\-must\-staple\fR] [\fB\-n\fR|\fB\-\-never\-create\fR] [\fB\-o\fR|\fB\-\-no\-ocsp\fR] [\fB\-p\fR|\fB\-\-profile\fR PROFILE] [\fB\-r\fR|\fB\-\-reason\fR CODE] [\fB\-s\fR|\fB\-\-staging\fR] [\fB\-t\fR|\fB\-\-type\fR \fBRSA\fR|\fBEC\fR] [\fB\-v\fR|\fB\-\-verbose\fR \&...] [\fB\-V\fR|\fB\-\-version\fR] [\fB\-y\fR|\fB\-\-yes\fR] [\fB\-?\fR|\fB\-\-help\fR] \fBnew\fR [\fIEMAIL\fR] | \fBupdate\fR [\fIEMAIL\fR] | \fBdeactivate\fR | \fBnewkey\fR | \fBissue\fR \fIIDENTIFIER\fR [\fIALTNAME\fR \&...]] | \fBissue\fR \fICSRFILE\fR | \fBcheck\fR \fIIDENTIFIER\fR [\fIALTNAME\fR \&...]] | \fBcheck\fR \fICSRFILE\fR | \fBrevoke\fR \fICERTFILE\fR [\fICERTKEYFILE\fR]
 .SH "DESCRIPTION"
 .sp
 \fBuacme\fR is a client for the ACMEv2 protocol described in RFC8555, written in plain C with minimal dependencies (libcurl and one of GnuTLS, OpenSSL or mbedTLS)\&. The ACMEv2 protocol allows a Certificate Authority (https://letsencrypt\&.org is a popular one) and an applicant to automate the process of verification and certificate issuance\&. The protocol also provides facilities for other certificate management functions, such as certificate revocation\&. For more information see https://tools\&.ietf\&.org/html/rfc8555
@@ -340,24 +340,9 @@ to
 Issue a certificate for
 \fIIDENTIFIER\fR
 with zero or more
-\fIALTNAMEs\fR\&. If a certificate is already available at
-\fICONFDIR/IDENTIFIER/cert\&.pem\fR
-for the specified
-\fIIDENTIFIER\fR
-and
 \fIALTNAMEs\fR
-and is still valid for longer than
-\fIDAYS\fR
-no action is taken unless
-\fB\-f, \-\-force\fR
-is specified or
-\fB\-o, \-\-no\-ocsp\fR
-is
-\fBnot\fR
-specified and the certificate is reported as revoked by the OCSP server\&. The new certificate is saved to
-\fICONFDIR/IDENTIFIER/cert\&.pem\fR\&. If the certificate file already exists it is hardlinked to
-\fICONFDIR/IDENTIFIER/cert\-TIMESTAMP\&.pem\fR
-before overwriting\&. The private key for the certificate is loaded from
+and save it to
+\fICONFDIR/IDENTIFIER/cert\&.pem\fR\&. The private key for the certificate is loaded from
 \fICONFDIR/private/IDENTIFIER/key\&.pem\fR\&. If no such file exists, a new key is generated unless
 \fB\-n, \-\-never\-create\fR
 is specified\&. Wildcard
@@ -372,7 +357,44 @@ is saved to
 and
 \fIALTNAMEs\fR
 are also supported according to
-https://tools\&.ietf\&.org/html/rfc8738#section\-3
+https://tools\&.ietf\&.org/html/rfc8738#section\-3\&. If a certificate is already available at
+\fICONFDIR/IDENTIFIER/cert\&.pem\fR
+for the specified
+\fIIDENTIFIER\fR
+and
+\fIALTNAMEs\fR
+and needs renewal, it is hardlinked to
+\fICONFDIR/IDENTIFIER/cert\-TIMESTAMP\&.pem\fR
+before overwriting\&. Renewal happens if
+.PP
+.RS 4
+\fB\-f, \-\-force\fR
+is specified,
+.RE
+.PP
+.RS 4
+or the certificate expires in less than
+\fIDAYS\fR
+and either
+\fB\-i, \-\-no\-ari\fR
+is specified or the server does not provide renewal information,
+.RE
+.PP
+.RS 4
+or
+\fB\-i, \-\-no\-ari\fR
+is
+\fBnot\fR
+specified and the server indicates the certificate is due for renewal,
+.RE
+.PP
+.RS 4
+or
+\fB\-o, \-\-no\-ocsp\fR
+is
+\fBnot\fR
+specified and the certificate is reported as revoked by the OCSP server\&.
+.RE
 .RE
 .PP
 \fBuacme\fR [\fIOPTIONS\fR \&...] \fBissue\fR \fICSRFILE\fR
@@ -380,24 +402,69 @@ https://tools\&.ietf\&.org/html/rfc8738#section\-3
 Issue a certificate based on a RFC2986 Certificate Signing Request contained in
 \fICSRFILE\fR, which must be in PEM format\&. In this mode of issuance
 \fBuacme\fR
-neither needs nor generates the certificate private key, but it is of course the responsibility of the user to ensure that the CSR is constructed and signed appropriately\&. If a certificate file
+neither needs nor generates the certificate private key, but it is of course the responsibility of the user to ensure that the CSR is constructed and signed appropriately\&. Wildcard identifiers in the CSR are dealt with correctly, as long as the ACME server supports them\&. IP addresses are also supported according to
+https://tools\&.ietf\&.org/html/rfc8738#section\-3\&. If a certificate file
 \fICSRBASE\-cert\&.pem\fR
 (where
 \fICSRBASE\fR
 is obtained by stripping the extension, if any, from
 \fICSRFILE\fR) is already available in the same directory containing
-\fICSRFILE\fR, and is still valid for longer than
-\fIDAYS\fR
-no action is taken unless
+\fICSRFILE\fR, it matches the identifiers in
+\fICSRFILE\fR
+and needs renewal, it is hardlinked to
+\fIBASENAME\-cert\-TIMESTAMP\&.pem\fR
+before overwriting\&. Renewal happens if
+.PP
+.RS 4
 \fB\-f, \-\-force\fR
-is specified or
+is specified,
+.RE
+.PP
+.RS 4
+or the certificate expires in less than
+\fIDAYS\fR
+and either
+\fB\-i, \-\-no\-ari\fR
+is specified or the server does not provide renewal information,
+.RE
+.PP
+.RS 4
+or
+\fB\-i, \-\-no\-ari\fR
+is
+\fBnot\fR
+specified and the server indicates the certificate is due for renewal,
+.RE
+.PP
+.RS 4
+or
 \fB\-o, \-\-no\-ocsp\fR
 is
 \fBnot\fR
-specified and the certificate is reported as revoked by the OCSP server\&. If the certificate file already exists it is hardlinked to
-\fIBASENAME\-cert\-TIMESTAMP\&.pem\fR
-before overwriting\&. Wildcard identifiers in the CSR are dealt with correctly, as long as the ACME server supports them\&. IP addresses are also supported according to
-https://tools\&.ietf\&.org/html/rfc8738#section\-3
+specified and the certificate is reported as revoked by the OCSP server\&.
+.RE
+.RE
+.PP
+\fBuacme\fR [\fIOPTIONS\fR \&...] \fBcheck\fR \fIIDENTIFIER\fR [\fIALTNAME\fR \&...]
+.RS 4
+Same as
+\fBuacme\fR
+[\fIOPTIONS\fR
+\&...]
+\fBissue\fR
+\fIIDENTIFIER\fR
+[\fIALTNAME\fR
+\&...], except that no certificate is issued or renewed\&. The exit code reflects existence and validity of the certificate\&.
+.RE
+.PP
+\fBuacme\fR [\fIOPTIONS\fR \&...] \fBcheck\fR \fICSRFILE\fR
+.RS 4
+Same as
+\fBuacme\fR
+[\fIOPTIONS\fR
+\&...]
+\fBissue\fR
+\fICSRFILE\fR, except that no certificate is issued or renewed\&. The exit code reflects existence and validity of the certificate\&.
 .RE
 .PP
 \fBuacme\fR [\fIOPTIONS\fR \&...] \fBrevoke\fR \fICERTFILE\fR [\fICERTKEYFILE\fR]
