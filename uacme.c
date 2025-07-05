@@ -1475,7 +1475,7 @@ int main(int argc, char **argv)
         {"must-staple",  no_argument,       NULL, 'm'},
         {"never-create", no_argument,       NULL, 'n'},
         {"no-ocsp",      no_argument,       NULL, 'o'},
-        {"profile",      no_argument,       NULL, 'p'},
+        {"profile",      required_argument, NULL, 'p'},
         {"reason",       required_argument, NULL, 'r'},
         {"staging",      no_argument,       NULL, 's'},
         {"type",         required_argument, NULL, 't'},
