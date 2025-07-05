@@ -3645,7 +3645,7 @@ static char *crt_ari_url(mbedtls_x509_crt *crt, const char *prefix)
     char akid_b64[base64_ENCODED_LEN(sizeof(akid),
             base64_VARIANT_URLSAFE_NO_PADDING)];
     unsigned char serial[128];
-    char serial_b64[base64_ENCODED_LEN(sizeof(akid),
+    char serial_b64[base64_ENCODED_LEN(sizeof(serial),
             base64_VARIANT_URLSAFE_NO_PADDING)];
     size_t alen = sizeof(akid);
     size_t slen = sizeof(serial);
