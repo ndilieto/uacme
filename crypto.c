@@ -2135,7 +2135,7 @@ bool is_ip(const char *s, unsigned char *ip, size_t *ip_len)
     return ret;
 }
 
-char *csr_gen(char * const *names, bool status_req, bool no_key_usage,
+char *csr_gen(char * const *names, bool status_req, bool no_key_usage_and_cn,
         privkey_t key)
 {
     char *req = NULL;
@@ -2238,11 +2238,20 @@ char *csr_gen(char * const *names, bool status_req, bool no_key_usage,
         goto out;
     }
 
-    r = gnutls_x509_crq_set_dn_by_oid(crq, GNUTLS_OID_X520_COMMON_NAME, 0,
-                *names, strlen(*names));
-    if (r != GNUTLS_E_SUCCESS) {
-        warnx("csr_gen: gnutls_x509_crq_set_dn_by_oid: %s", gnutls_strerror(r));
-        goto out;
+    if (!no_key_usage_and_cn) {
+        r = gnutls_x509_crq_set_dn_by_oid(crq, GNUTLS_OID_X520_COMMON_NAME, 0,
+                    *names, strlen(*names));
+        if (r != GNUTLS_E_SUCCESS) {
+            warnx("csr_gen: gnutls_x509_crq_set_dn_by_oid: %s", gnutls_strerror(r));
+            goto out;
+        }
+
+        r = gnutls_x509_crq_set_key_usage(crq, key_usage);
+        if (r != GNUTLS_E_SUCCESS) {
+            warnx("csr_gen: gnutls_x509_crq_set_key_usage: %s",
+                    gnutls_strerror(r));
+            goto out;
+        }
     }
 
     while (*names) {
@@ -2259,15 +2268,6 @@ char *csr_gen(char * const *names, bool status_req, bool no_key_usage,
             goto out;
         }
         names++;
-    }
-
-    if (!no_key_usage) {
-        r = gnutls_x509_crq_set_key_usage(crq, key_usage);
-        if (r != GNUTLS_E_SUCCESS) {
-            warnx("csr_gen: gnutls_x509_crq_set_key_usage: %s",
-                    gnutls_strerror(r));
-            goto out;
-        }
     }
 
     if (status_req) {
@@ -2356,22 +2356,24 @@ char *csr_gen(char * const *names, bool status_req, bool no_key_usage,
         openssl_error("csr_gen");
         goto out;
     }
-    if (!(name = X509_NAME_new())) {
-        openssl_error("csr_gen");
-        goto out;
-    }
     if (!X509_REQ_set_pubkey(crq, key)) {
         openssl_error("csr_gen");
         goto out;
     }
-    if (!X509_NAME_add_entry_by_txt(name, "CN",
-                MBSTRING_ASC, (unsigned char *)*names, -1, -1, 0)) {
-        openssl_error("csr_gen");
-        goto out;
-    }
-    if (!X509_REQ_set_subject_name(crq, name)) {
-        openssl_error("csr_gen");
-        goto out;
+    if (!no_key_usage_and_cn) {
+        if (!(name = X509_NAME_new())) {
+            openssl_error("csr_gen");
+            goto out;
+        }
+        if (!X509_NAME_add_entry_by_txt(name, "CN",
+                    MBSTRING_ASC, (unsigned char *)*names, -1, -1, 0)) {
+            openssl_error("csr_gen");
+            goto out;
+        }
+        if (!X509_REQ_set_subject_name(crq, name)) {
+            openssl_error("csr_gen");
+            goto out;
+        }
     }
     if (asprintf(&san, "%s:%s", is_ip(*names, NULL, NULL) ? "IP" : "DNS",
                 *names) < 0) {
@@ -2401,7 +2403,7 @@ char *csr_gen(char * const *names, bool status_req, bool no_key_usage,
         goto out;
     }
     sk_X509_EXTENSION_push(exts, ext);
-    if (!no_key_usage) {
+    if (!no_key_usage_and_cn) {
         ext = X509V3_EXT_conf_nid(NULL, NULL, NID_key_usage, key_usage);
         if (!ext) {
             openssl_error("csr_gen");
@@ -2452,26 +2454,26 @@ char *csr_gen(char * const *names, bool status_req, bool no_key_usage,
     mbedtls_x509write_csr_set_key(&csr, key);
     mbedtls_x509write_csr_set_md_alg(&csr, hash_type);
 
-    if (asprintf(&cn, "CN=%s", *names) < 0) {
-        warnx("csr_gen: asprintf failed");
-        cn = NULL;
-        goto out;
-    }
-
-    if (!no_key_usage) {
+    if (!no_key_usage_and_cn) {
         r = mbedtls_x509write_csr_set_key_usage(&csr, key_usage);
         if (r) {
             warnx("csr_gen: mbedtls_x509write_csr_set_key_usage failed: %s",
                     _mbedtls_strerror(r));
             goto out;
         }
-    }
 
-    r = mbedtls_x509write_csr_set_subject_name(&csr, cn);
-    if (r) {
-        warnx("csr_gen: mbedtls_x509write_csr_set_subject_name failed: %s",
-                _mbedtls_strerror(r));
-        goto out;
+        if (asprintf(&cn, "CN=%s", *names) < 0) {
+            warnx("csr_gen: asprintf failed");
+            cn = NULL;
+            goto out;
+        }
+
+        r = mbedtls_x509write_csr_set_subject_name(&csr, cn);
+        if (r) {
+            warnx("csr_gen: mbedtls_x509write_csr_set_subject_name failed: %s",
+                    _mbedtls_strerror(r));
+            goto out;
+        }
     }
 
     while (1) {
@@ -2680,7 +2682,8 @@ out:
 #elif defined(USE_MBEDTLS)
     mbedtls_x509write_csr_free(&csr);
     free(buf);
-    free(cn);
+    if (cn)
+        free(cn);
 #endif
     free(csrdata);
     return req;
