@@ -615,26 +615,6 @@ int auth_crt(const char *ident, const uint8_t *id, size_t id_len,
         return -1;
     }
 
-    rc = gnutls_x509_crt_set_dn_by_oid(c, GNUTLS_OID_X520_COMMON_NAME, 0,
-            ident, strlen(ident));
-    if (rc != GNUTLS_E_SUCCESS) {
-        warnx("auth_crt: gnutls_x509_crt_set_dn_by_oid: %s",
-                gnutls_strerror(rc));
-        gnutls_x509_privkey_deinit(k);
-        gnutls_x509_crt_deinit(c);
-        return -1;
-    }
-
-    rc = gnutls_x509_crt_set_issuer_dn_by_oid(c, GNUTLS_OID_X520_COMMON_NAME,
-            0, ident, strlen(ident));
-    if (rc != GNUTLS_E_SUCCESS) {
-        warnx("auth_crt: gnutls_x509_crt_set_issuer_dn_by_oid: %s",
-                gnutls_strerror(rc));
-        gnutls_x509_privkey_deinit(k);
-        gnutls_x509_crt_deinit(c);
-        return -1;
-    }
-
     rc = gnutls_rnd(GNUTLS_RND_NONCE, serial, sizeof(serial));
     serial[0] &= 0x7F;
     if (rc != GNUTLS_E_SUCCESS) {
@@ -798,7 +778,6 @@ int auth_crt(const char *ident, const uint8_t *id, size_t id_len,
 {
     EVP_PKEY_CTX *pc = NULL;
     EVP_PKEY *k = NULL;
-    X509_NAME *name = NULL;
     X509 *c = NULL;
     X509V3_CTX ctx;
     BIGNUM *bn = NULL;
@@ -825,13 +804,6 @@ int auth_crt(const char *ident, const uint8_t *id, size_t id_len,
         goto out;
     }
 
-    name = X509_NAME_new();
-    if (!name || !X509_NAME_add_entry_by_txt(name, "CN", MBSTRING_ASC,
-                (const unsigned char *)ident, -1, -1, 0)) {
-        openssl_error("auth_crt");
-        goto out;
-    }
-
     bn = BN_new();
     if (!bn || !BN_rand(bn, 127, BN_RAND_TOP_ANY, BN_RAND_BOTTOM_ANY)) {
         openssl_error("auth_crt");
@@ -840,8 +812,6 @@ int auth_crt(const char *ident, const uint8_t *id, size_t id_len,
 
     c = X509_new();
     if (!c || !X509_set_version(c, 2)
-            || !X509_set_subject_name(c, name)
-            || !X509_set_issuer_name(c, name)
             || !BN_to_ASN1_INTEGER(bn, X509_get_serialNumber(c))
             || !ASN1_TIME_adj(X509_getm_notBefore(c), now, -30, 0)
             || !ASN1_TIME_adj(X509_getm_notAfter(c), now, 30, 0)
@@ -947,7 +917,6 @@ int auth_crt(const char *ident, const uint8_t *id, size_t id_len,
 out:
     EVP_PKEY_CTX_free(pc);
     EVP_PKEY_free(k);
-    X509_NAME_free(name);
     X509_free(c);
     BN_free(bn);
     ASN1_OBJECT_free(acmeid);
@@ -978,7 +947,6 @@ int auth_crt(const char *ident, const uint8_t *id, size_t id_len,
     time_t tna = tnb + 60*24*3600;
     char nb[MBEDTLS_X509_RFC5280_UTC_TIME_LEN] = "";
     char na[MBEDTLS_X509_RFC5280_UTC_TIME_LEN] = "";
-    char *cn = NULL;
     int ret = -1;
     int rc;
     mbedtls_x509write_cert c;
@@ -1027,25 +995,6 @@ int auth_crt(const char *ident, const uint8_t *id, size_t id_len,
     mbedtls_x509write_crt_set_md_alg(&c, MBEDTLS_MD_SHA256);
     mbedtls_x509write_crt_set_subject_key(&c, &k);
     mbedtls_x509write_crt_set_issuer_key(&c, &k);
-    if (asprintf(&cn, "CN=%s", ident) < 0) {
-        warnx("auth_crt: asprintf failed");
-        cn = NULL;
-        goto out;
-    }
-
-    rc = mbedtls_x509write_crt_set_subject_name(&c, cn);
-    if (rc) {
-        warnx("auth_crt: mbedtls_x509write_crt_set_subject_name: %s",
-                _mbedtls_strerror(rc));
-        goto out;
-    }
-
-    rc = mbedtls_x509write_crt_set_issuer_name(&c, cn);
-    if (rc) {
-        warnx("auth_crt: mbedtls_x509write_crt_set_issuer_name: %s",
-                _mbedtls_strerror(rc));
-        goto out;
-    }
 
     rc = mbedtls_x509write_crt_set_basic_constraints(&c, 1, -1);
     if (rc) {
@@ -1264,7 +1213,6 @@ out:
     mbedtls_pk_free(&k);
     mbedtls_mpi_free(&sn);
     free(buf);
-    free(cn);
     if (ret != 0) {
         free(*key);
         *key = NULL;
