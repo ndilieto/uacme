@@ -16,7 +16,7 @@ SYNOPSIS
 *uacme* [*-a*|*--acme-url* 'URL'] [*-b*|*--bits* 'BITS']
     [*-c*|*--confdir* 'DIR'] [*-d*|*--days* 'DAYS'] [*-e*|*--eab* KEYID:KEY]
     [*-f*|*--force*] [*-h*|*--hook* 'PROGRAM'] [*-i*|*--no-ari*]
-    [*-l*|*--alternate* 'N' | 'FP'] [*-m*|*--must-staple*]
+    [*-k*|*--rotate-key*] [*-l*|*--alternate* 'N' | 'FP'] [*-m*|*--must-staple*]
     [*-n*|*--never-create*] [*-o*|*--no-ocsp*] [*-p*|*--profile* PROFILE]
     [*-r*|*--reason* CODE] [*-s*|*--staging*] [*-t*|*--type* *RSA*|*EC*]
     [*-v*|*--verbose* ...] [*-V*|*--version*] [*-y*|*--yes*] [*-?*|*--help*]
@@ -103,6 +103,9 @@ OPTIONS
     Do not query or use the server's certificate renewal information window
     to decide whether to reissue an existing certificate. See also
     *-d, --days* and *-o, --no-ocsp*.
+
+*-k, --rotate-key*::
+    Always generate a new private key when issuing a certificate.
 
 *-l, --alternate* 'N' | 'FP'::
     According to <https://tools.ietf.org/html/rfc8555#section-7.4.2>
@@ -212,6 +215,13 @@ USAGE
     The private key for the certificate is loaded from
     'CONFDIR/private/IDENTIFIER/key.pem'. If no such file exists,
     a new key is generated unless *-n, --never-create* is specified.
+    With *-k, --rotate-key*, the private key is loaded from
+    'CONFDIR/private/IDENTIFIER/newkey.pem' instead. If no such file
+    exists, it is generated. Upon successful certificate issuance,
+    the old private key is hardlinked to
+    'CONFDIR/private/IDENTIFIER/key-TIMESTAMP.pem' before renaming
+    'CONFDIR/private/IDENTIFIER/newkey.pem' to 
+    'CONFDIR/private/IDENTIFIER/key.pem'.
     Wildcard 'IDENTIFIERs' or 'ALTNAMEs' are dealt with correctly, as long
     as the ACME server supports them; note that any such wildcards are
     automatically removed from the configuration subdirectory name:

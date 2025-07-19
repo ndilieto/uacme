@@ -1435,10 +1435,11 @@ void usage(const char *progname)
     fprintf(stderr,
         "usage: %s [-a|--acme-url URL] [-b|--bits BITS] [-c|--confdir DIR]\n"
         "\t[-d|--days DAYS] [-e|--eab KEYID:KEY] [-f|--force] [-h|--hook PROG]\n"
-        "\t[-i|--no-ari] [-l|--alternate [N | SHA256]] [-m|--must-staple]\n"
-        "\t[-n|--never-create] [-o|--no-ocsp] [-p|--profile profile]\n"
-        "\t[-r|--reason CODE] [-s|--staging] [-t|--type RSA | EC]\n"
-        "\t[-v|--verbose ...] [-V|--version] [-y|--yes] [-?|--help]\n"
+        "\t[-i|--no-ari] [-k|--rotate-key] [-l|--alternate [N | SHA256]]\n"
+        "\t[-m|--must-staple] [-n|--never-create] [-o|--no-ocsp]\n"
+        "\t[-p|--profile profile] [-r|--reason CODE] [-s|--staging]\n"
+        "\t[-t|--type RSA | EC] [-v|--verbose ...] [-V|--version] [-y|--yes]\n"
+        "\t[-?|--help]\n"
         "\tnew [EMAIL] | update [EMAIL] | deactivate | newkey |\n"
         "\tissue IDENTIFIER [ALTNAME ...] | issue CSRFILE |\n"
         "\tcheck IDENTIFIER [ALTNAME ...] | check CSRFILE |\n"
@@ -1472,6 +1473,7 @@ int main(int argc, char **argv)
         {"help",         no_argument,       NULL, '?'},
         {"hook",         required_argument, NULL, 'h'},
         {"no-ari",       no_argument,       NULL, 'i'},
+        {"rotate-key",   no_argument,       NULL, 'k'},
         {"alternate",    required_argument, NULL, 'l'},
         {"must-staple",  no_argument,       NULL, 'm'},
         {"never-create", no_argument,       NULL, 'n'},
@@ -1495,6 +1497,7 @@ int main(int argc, char **argv)
     bool status_req = false;
     bool status_check = true;
     bool ari_check = true;
+    bool rotate = false;
     int days = 30;
     int bits = 0;
     int reason = 0;
@@ -1505,6 +1508,9 @@ int main(int argc, char **argv)
     char **names = NULL;
     const char *confdir = DEFAULT_CONFDIR;
     char *keyprefix = NULL;
+    char *keyfile = NULL;
+    char *newkeyfile = NULL;
+    char *bakkeyfile = NULL;
     privkey_t key = NULL;
     acme_t a;
     memset(&a, 0, sizeof(a));
@@ -1540,7 +1546,7 @@ int main(int argc, char **argv)
     while (1) {
         char *endptr;
         int option_index;
-        int c = getopt_long(argc, argv, "a:b:c:d:e:f?h:il:mnop:r:st:vVy",
+        int c = getopt_long(argc, argv, "a:b:c:d:e:f?h:ikl:mnop:r:st:vVy",
                 options, &option_index);
         if (c == -1) break;
         switch (c) {
@@ -1588,6 +1594,10 @@ int main(int argc, char **argv)
 
             case 'i':
                 ari_check = false;
+                break;
+
+            case 'k':
+                rotate = true;
                 break;
 
             case 'l':
@@ -1882,7 +1892,21 @@ int main(int argc, char **argv)
 
             if (status_req)
                 warnx("-m, --must-staple is ignored with a CSR");
+
+            if (rotate)
+                warnx("-k, --rotate-key is ignored with a CSR");
         } else {
+            if (rotate && never) {
+                warnx("-k, --rotate-key and -n, --never-create "
+                        "are incompatible");
+                goto out;
+            }
+
+            if (rotate && check) {
+                warnx("-k, --rotate-key is ignored with check");
+                rotate = false;
+            }
+
             if (!check_or_mkdir(!(never || check), keyprefix, S_IRWXU))
                 goto out;
 
@@ -1890,8 +1914,28 @@ int main(int argc, char **argv)
                         S_IRWXU|S_IRGRP|S_IXGRP|S_IROTH|S_IXOTH))
                 goto out;
 
+            if (asprintf(&keyfile, "%s/key.pem", keyprefix) < 0) {
+                keyfile = NULL;
+                warnx("asprintf failed");
+                goto out;
+            }
+
+            if (rotate) {
+                if (asprintf(&newkeyfile, "%s/newkey.pem", keyprefix) < 0) {
+                    newkeyfile = NULL;
+                    warnx("asprintf failed");
+                    goto out;
+                }
+                if (asprintf(&bakkeyfile, "%s/key-%llu.pem", keyprefix,
+                            (unsigned long long)time(NULL)) < 0) {
+                    bakkeyfile = NULL;
+                    warnx("asprintf failed");
+                    goto out;
+                }
+            }
+
             key = key_load((never || check) ? PK_NONE : type, bits,
-                    "%s/key.pem", keyprefix);
+                    newkeyfile ? newkeyfile : keyfile);
             if (!key)
                 goto out;
         }
@@ -1935,8 +1979,24 @@ int main(int argc, char **argv)
             }
         }
 
-        if (account_retrieve(&a) && cert_issue(&a, names, csr))
+        if (account_retrieve(&a) && cert_issue(&a, names, csr)) {
+            if (newkeyfile) {
+                if (link(keyfile, bakkeyfile) < 0) {
+                    if (errno != ENOENT)
+                        warn("failed to link %s to %s", bakkeyfile, keyfile);
+                } else
+                    msg(1, "backed up %s as %s", keyfile, bakkeyfile);
+                msg(1, "renaming %s to %s", newkeyfile, keyfile);
+                if (rename(newkeyfile, keyfile) < 0) {
+                    warn("failed to rename %s to %s", newkeyfile, keyfile);
+                    unlink(bakkeyfile);
+                    free(newkeyfile);
+                    newkeyfile = NULL;
+                    goto out;
+                }
+            }
             ret = 0;
+        }
     }
 
 out:
@@ -1956,6 +2016,11 @@ out:
     if (key)
         privkey_deinit(key);
     free(keyprefix);
+    free(keyfile);
+    if (newkeyfile)
+        unlink(newkeyfile);
+    free(newkeyfile);
+    free(bakkeyfile);
     free(csr);
     free(filename);
     for (int i = 0; names && names[i]; i++)

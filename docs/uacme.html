@@ -749,7 +749,7 @@ UACME(1) Manual Page
 <div class="paragraph"><p><strong>uacme</strong> [<strong>-a</strong>|<strong>--acme-url</strong> <em>URL</em>] [<strong>-b</strong>|<strong>--bits</strong> <em>BITS</em>]
     [<strong>-c</strong>|<strong>--confdir</strong> <em>DIR</em>] [<strong>-d</strong>|<strong>--days</strong> <em>DAYS</em>] [<strong>-e</strong>|<strong>--eab</strong> KEYID:KEY]
     [<strong>-f</strong>|<strong>--force</strong>] [<strong>-h</strong>|<strong>--hook</strong> <em>PROGRAM</em>] [<strong>-i</strong>|<strong>--no-ari</strong>]
-    [<strong>-l</strong>|<strong>--alternate</strong> <em>N</em> | <em>FP</em>] [<strong>-m</strong>|<strong>--must-staple</strong>]
+    [<strong>-k</strong>|<strong>--rotate-key</strong>] [<strong>-l</strong>|<strong>--alternate</strong> <em>N</em> | <em>FP</em>] [<strong>-m</strong>|<strong>--must-staple</strong>]
     [<strong>-n</strong>|<strong>--never-create</strong>] [<strong>-o</strong>|<strong>--no-ocsp</strong>] [<strong>-p</strong>|<strong>--profile</strong> PROFILE]
     [<strong>-r</strong>|<strong>--reason</strong> CODE] [<strong>-s</strong>|<strong>--staging</strong>] [<strong>-t</strong>|<strong>--type</strong> <strong>RSA</strong>|<strong>EC</strong>]
     [<strong>-v</strong>|<strong>--verbose</strong> &#8230;] [<strong>-V</strong>|<strong>--version</strong>] [<strong>-y</strong>|<strong>--yes</strong>] [<strong>-?</strong>|<strong>--help</strong>]
@@ -979,6 +979,14 @@ The key authorization (for <strong>dns-01</strong> and <strong>tls-alpn-01</stro
 </p>
 </dd>
 <dt class="hdlist1">
+<strong>-k, --rotate-key</strong>
+</dt>
+<dd>
+<p>
+    Always generate a new private key when issuing a certificate.
+</p>
+</dd>
+<dt class="hdlist1">
 <strong>-l, --alternate</strong> <em>N</em> | <em>FP</em>
 </dt>
 <dd>
@@ -1173,6 +1181,13 @@ The key authorization (for <strong>dns-01</strong> and <strong>tls-alpn-01</stro
     The private key for the certificate is loaded from
     <em>CONFDIR/private/IDENTIFIER/key.pem</em>. If no such file exists,
     a new key is generated unless <strong>-n, --never-create</strong> is specified.
+    With <strong>-k, --rotate-key</strong>, the private key is loaded from
+    <em>CONFDIR/private/IDENTIFIER/newkey.pem</em> instead. If no such file
+    exists, it is generated. Upon successful certificate issuance,
+    the old private key is hardlinked to
+    <em>CONFDIR/private/IDENTIFIER/key-TIMESTAMP.pem</em> before renaming
+    <em>CONFDIR/private/IDENTIFIER/newkey.pem</em> to
+    <em>CONFDIR/private/IDENTIFIER/key.pem</em>.
     Wildcard <em>IDENTIFIERs</em> or <em>ALTNAMEs</em> are dealt with correctly, as long
     as the ACME server supports them; note that any such wildcards are
     automatically removed from the configuration subdirectory name:
@@ -1577,7 +1592,7 @@ along with this program.  If not, see <a href="http://www.gnu.org/licenses/">htt
 <div id="footer-text">
 Version 1.7.6-dev<br>
 Last updated
- 2025-07-05 12:41:41 CEST
+ 2025-07-19 12:34:07 CEST
 </div>
 </div>
 </body>
