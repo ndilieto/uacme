@@ -36,25 +36,5 @@ if [ "$TYPE" != "tls-alpn-01" ]; then
     exit 1
 fi
 
-case "$METHOD" in
-    "begin")
-        UALPN_OUT=$(echo "auth $IDENT $AUTH" | ualpn)
-        if [ "x$UALPN_OUT" = "xOK" ]; then
-            exit 0
-        else
-            exit 1
-        fi
-        ;;
-    "done"|"failed")
-        UALPN_OUT=$(echo "unauth $IDENT" | ualpn)
-        if [ "x$UALPN_OUT" = "xOK" ]; then
-            exit 0
-        else
-            exit 1
-        fi
-        ;;
-    *)
-        echo "$0: invalid method" 1>&2 
-        exit 1
-esac
+exec ualpnc "$METHOD" "$TYPE" "$IDENT" "$TOKEN" "$AUTH"
 

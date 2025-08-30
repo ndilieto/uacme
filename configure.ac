@@ -324,6 +324,7 @@ if test "x$OPT_UALPN" != "xno"; then
         AC_MSG_ERROR([ualpn is not compatible with LibreSSL])
     fi
     AM_PROG_AR
+    LT_INIT
     AC_CHECK_HEADERS([netinet/tcp.h], [],
                      AC_MSG_ERROR([ualpn requires netinet/tcp.h]))
     AC_CHECK_HEADERS([sys/mman.h], [],

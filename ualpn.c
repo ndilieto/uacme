@@ -82,6 +82,7 @@
 #include "sglib.h"
 #include "base64.h"
 #include "log.h"
+#include "ualpn.h"
 
 #define MAXHOST 64
 #define MAXSERV 16
@@ -241,6 +242,8 @@ typedef struct controller {
     buffer_t buf_recv;
     buffer_t buf_send;
     bool done;
+    bool version_negotiated;
+    int protocol_version;
     struct controller *prev, *next;
 } controller_t;
 
@@ -480,6 +483,26 @@ static size_t buf_put(buffer_t *b, const void *data, size_t len)
 static size_t buf_puts(buffer_t *b, const char *data)
 {
     return buf_put(b, data, strlen(data));
+}
+
+static size_t buf_printf(buffer_t *b, const char *format, ...)
+{
+    va_list args;
+    char *str;
+    int len;
+    size_t result;
+
+    va_start(args, format);
+    len = vasprintf(&str, format, args);
+    va_end(args);
+
+    if (len == -1) {
+        return 0;
+    }
+
+    result = buf_puts(b, str);
+    free(str);
+    return result;
 }
 
 static ssize_t buf_readv(int fd, buffer_t *b)
@@ -1273,7 +1296,7 @@ static void cb_controller_timer(EV_P_ ev_timer *w, int revents)
     }
 }
 
-static void controller_handle_cmd(controller_t *c, char *line, ev_tstamp ts)
+static int controller_handle_cmd(controller_t *c, char *line, ev_tstamp ts)
 {
     char *saveptr;
     char *cmd = strtok_r(line, " \t", &saveptr);
@@ -1283,17 +1306,44 @@ static void controller_handle_cmd(controller_t *c, char *line, ev_tstamp ts)
     struct addrinfo *ai;
     char arpa[80];
 
+    if (!c->version_negotiated) {
+        if (!cmd || strcmp(cmd, "VERSION") != 0) {
+            buf_puts(&c->buf_send, "ERR protocol version required\n");
+            return -1;
+        }
+
+        char *version_str = strtok_r(NULL, " \t", &saveptr);
+        if (!version_str) {
+            buf_puts(&c->buf_send, "ERR invalid version format\n");
+            return -1;
+        }
+
+        int requested_version = atoi(version_str);
+        if (requested_version < UALPN_PROTOCOL_VERSION_MIN ||
+            requested_version > UALPN_PROTOCOL_VERSION_MAX) {
+            buf_printf(&c->buf_send, "ERR unsupported version %d (min=%d max=%d)\n",
+                      requested_version, UALPN_PROTOCOL_VERSION_MIN, UALPN_PROTOCOL_VERSION_MAX);
+            return -1;
+        }
+
+        c->protocol_version = requested_version;
+        c->version_negotiated = true;
+        buf_puts(&c->buf_send, "OK\n");
+        debugx("controller %08x: negotiated protocol version %d", c->id, requested_version);
+        return 0;
+    }
+
     if (!cmd || (strcmp(cmd, "auth") && strcmp(cmd, "unauth"))) {
         buf_puts(&c->buf_send,
                 "ERR usage: auth <ident> <auth> | unauth <ident>\n");
-        return;
+        return 0;
     }
 
     if (ident_len == 0 || ident_len > 250 ||
             ident_len != strspn(ident, "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
                 "abcdefghijklmnopqrstuvwxyz0123456789-_.:")) {
         buf_puts(&c->buf_send, "ERR invalid ident\n");
-        return;
+        return 0;
     }
 
     memset(arpa, 0, sizeof(arpa));
@@ -1331,13 +1381,13 @@ static void controller_handle_cmd(controller_t *c, char *line, ev_tstamp ts)
                     NULL, &id_len, NULL, base64_VARIANT_URLSAFE_NO_PADDING)
                 || id_len != sizeof(id) - 2) {
             buf_puts(&c->buf_send, "ERR invalid auth\n");
-            return;
+            return 0;
         }
 
         auth_t *a = get_auth(arpa[0] ? arpa : ident);
         if (a && strcmp(a->auth, auth) == 0) {
             buf_puts(&c->buf_send, "ERR already inserted\n");
-            return;
+            return 0;
         }
 
 #if defined(USE_GNUTLS)
@@ -1352,7 +1402,7 @@ static void controller_handle_cmd(controller_t *c, char *line, ev_tstamp ts)
                     &key.data, &key.size) != 0) {
 #endif
             buf_puts(&c->buf_send, "ERR crypto failure (auth_crt)\n");
-            return;
+            return 0;
         }
         if (crt.size > sizeof(a->crt) || key.size > sizeof(a->key)) {
             buf_puts(&c->buf_send, "ERR crypto failure (crt/key size)\n");
@@ -1366,7 +1416,7 @@ static void controller_handle_cmd(controller_t *c, char *line, ev_tstamp ts)
             free(key.data);
             free(crt.data);
 #endif
-            return;
+            return 0;
         }
 
         if (auth_lock(100) != 0) {
@@ -1381,7 +1431,7 @@ static void controller_handle_cmd(controller_t *c, char *line, ev_tstamp ts)
             free(key.data);
             free(crt.data);
 #endif
-            return;
+            return 0;
         }
 
         if (!a) {
@@ -1399,7 +1449,7 @@ static void controller_handle_cmd(controller_t *c, char *line, ev_tstamp ts)
                 free(key.data);
                 free(crt.data);
 #endif
-                return;
+                return 0;
             }
             a = g_shm->avail;
             SGLIB_DL_LIST_DELETE(auth_t, g_shm->avail, a, left, right);
@@ -1432,7 +1482,7 @@ static void controller_handle_cmd(controller_t *c, char *line, ev_tstamp ts)
     } else if (strcmp(cmd, "unauth") == 0) {
         if (auth) {
             buf_puts(&c->buf_send, "ERR too many parameters\n");
-            return;
+            return 0;
         }
 
         auth_t *a = get_auth(arpa[0] ? arpa : ident);
@@ -1440,12 +1490,12 @@ static void controller_handle_cmd(controller_t *c, char *line, ev_tstamp ts)
             infox("controller %08x: failed to remove missing auth for %s",
                     c->id, ident);
             buf_puts(&c->buf_send, "ERR not found\n");
-            return;
+            return 0;
         }
 
         if (auth_lock(100) != 0) {
             buf_puts(&c->buf_send, "ERR locked\n");
-            return;
+            return 0;
         }
 
         sglib_auth_t_delete(&g_shm->auths, a);
@@ -1459,6 +1509,7 @@ static void controller_handle_cmd(controller_t *c, char *line, ev_tstamp ts)
             noticex("controller %08x: removed auth for %s", c->id, ident);
     }
     buf_puts(&c->buf_send, "OK\n");
+    return 0;
 }
 
 static void cb_controller_recv(EV_P_ ev_io *w, int revents)
@@ -1504,8 +1555,11 @@ static void cb_controller_recv(EV_P_ ev_io *w, int revents)
             return;
 
         default:
-            controller_handle_cmd(c, line, ev_now(EV_A));
-            ev_io_start(EV_A_ &c->io_send);
+            if (controller_handle_cmd(c, line, ev_now(EV_A)) < 0) {
+                controller_done(EV_A_ c, false);
+            } else {
+                ev_io_start(EV_A_ &c->io_send);
+            }
             return;
     }
 }
@@ -1577,6 +1631,8 @@ static void cb_controller_accept(EV_P_ ev_io *w, int revents)
 
     SGLIB_DL_LIST_ADD(controller_t, g.controllers, c, prev, next);
     c->fd = fd;
+    c->version_negotiated = false;
+    c->protocol_version = 0;
 
     c->timestamp = ev_now(EV_A);
     ev_init(&c->timer, cb_controller_timer);
@@ -1585,7 +1641,10 @@ static void cb_controller_accept(EV_P_ ev_io *w, int revents)
 
     ev_io_init(&c->io_recv, cb_controller_recv, fd, EV_READ);
     ev_io_init(&c->io_send, cb_controller_send, fd, EV_WRITE);
+
+    buf_printf(&c->buf_send, "VERSION %d %d\n", UALPN_PROTOCOL_VERSION_MIN, UALPN_PROTOCOL_VERSION_MAX);
     ev_io_start(EV_A_ &c->io_recv);
+    ev_io_start(EV_A_ &c->io_send);
 }
 
 typedef enum {
@@ -4360,60 +4419,8 @@ int main(int argc, char **argv)
     }
 
     if (!server_mode) {
-        char *line = NULL;
-        size_t len = 0;
-
-        fd = socket(AF_UNIX, SOCK_STREAM, 0);
-        if (fd == -1) {
-            err("failed to create socket");
-            cleanup_and_exit(0, EXIT_FAILURE);
-        }
-
-        if (connect(fd, (struct sockaddr *)&sock_addr, sizeof(sock_addr))) {
-            err("failed to connect to unix://%s", g.socket);
-            close(fd);
-            cleanup_and_exit(0, EXIT_FAILURE);
-        }
-
-        f = fdopen(fd, "r+");
-        if (!f) {
-            err("fdopen failed");
-            close(fd);
-            cleanup_and_exit(0, EXIT_FAILURE);
-        }
-
-        rc = EXIT_SUCCESS;
-        while (1) {
-            ssize_t r = getline(&line, &len, stdin);
-            if (r == -1) {
-                if (!feof(stdin)) {
-                    rc = EXIT_FAILURE;
-                    err("failed to get line from stdin");
-                }
-                break;
-            }
-            if (fputs(line, f) < 0) {
-                rc = EXIT_FAILURE;
-                err("failed to write to %s", g.socket);
-                break;
-            }
-            r = getline(&line, &len, f);
-            if (r == -1) {
-                if (!feof(f)) {
-                    rc = EXIT_FAILURE;
-                    err("failed to read from %s", g.socket);
-                }
-                break;
-            }
-            if (fputs(line, stdout) < 0) {
-                rc = EXIT_FAILURE;
-                err("failed to write to stdout");
-                break;
-            }
-        }
-        free(line);
-        fclose(f);
-        cleanup_and_exit(0, rc);
+        errx("client mode removed - use ualpnc instead");
+        cleanup_and_exit(0, EXIT_FAILURE);
     }
 
     if (g.connect == NULL) {

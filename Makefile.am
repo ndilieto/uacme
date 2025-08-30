@@ -21,7 +21,8 @@ ARFLAGS=cr
 bin_PROGRAMS = uacme
 
 if ENABLE_UALPN
-bin_PROGRAMS += ualpn
+bin_PROGRAMS += ualpn ualpnc
+lib_LTLIBRARIES = libualpn.la
 
 ualpn_SOURCES = ualpn.c base64.c base64.h log.c log.h sglib.h
 ualpn_CPPFLAGS = -DRUNSTATEDIR="\"${runstatedir}\""
@@ -37,6 +38,17 @@ libev_a_SOURCES = libev/ev.c
 else
 ualpn_LDADD = $(UALPN_LDADD)
 endif
+
+libualpn_la_SOURCES = libualpn.c
+libualpn_la_CPPFLAGS = -DRUNSTATEDIR="\"${runstatedir}\"" \
+		       -DSYSCONFDIR="\"${sysconfdir}\""
+libualpn_la_CFLAGS = $(WCFLAGS)
+
+ualpnc_SOURCES = ualpnc.c
+ualpnc_CPPFLAGS = -DRUNSTATEDIR="\"${runstatedir}\""
+		 -DSYSCONFDIR="\"${sysconfdir}\""
+ualpnc_CFLAGS = $(WCFLAGS)
+ualpnc_LDADD = libualpn.la
 endif
 
 uacme_SOURCES = uacme.c base64.c base64.h crypto.c crypto.h \
