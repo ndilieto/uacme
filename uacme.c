@@ -20,6 +20,11 @@
 
 #include "config.h"
 
+#ifdef ENABLE_UALPN
+#include "ualpn.h"
+#include "ualpnc.h"
+#endif
+
 #include <ctype.h>
 #include <err.h>
 #include <errno.h>
@@ -68,6 +73,7 @@ typedef struct acme {
     const char *eab_key;
     const char *directory;
     const char *hook;
+    bool use_ualpn;
     const char *email;
     const char *profile;
     char *keyprefix;
@@ -374,6 +380,46 @@ int hook_run(const char *prog, const char *method, const char *type,
     }
     return ret;
 }
+
+#ifdef ENABLE_UALPN
+static int ualpn_client_connect(FILE **f)
+{
+    if (ualpn_connect(DEFAULT_UALPN_SOCKET, f) != 0) {
+        return -1;
+    }
+
+    if (ualpn_negotiate_version(*f) != 0) {
+        ualpn_disconnect(*f);
+        *f = NULL;
+        return -1;
+    }
+    
+    return 0;
+}
+
+static void ualpn_client_disconnect(FILE *f)
+{
+    if (f) {
+        ualpn_disconnect(f);
+    }
+}
+
+static int ualpn_challenge_begin(FILE *f, const char *ident, const char *auth)
+{
+    if (!f) {
+        return -1;
+    }
+    return ualpn_auth(f, ident, auth);
+}
+
+static int ualpn_challenge_done(FILE *f, const char *ident)
+{
+    if (!f) {
+        return -1;
+    }
+    return ualpn_unauth(f, ident);
+}
+#endif
 
 bool check_or_mkdir(bool allow_create, const char *dir, mode_t mode)
 {
@@ -924,6 +970,31 @@ bool authorize(acme_t *a)
                     warnx("failed to generate authorization key");
                     goto out;
                 }
+#ifdef ENABLE_UALPN
+                FILE *ualpn_f = NULL;
+                if (a->use_ualpn && ualpn_client_connect(&ualpn_f) != 0) {
+                    warnx("failed to connect to ualpn");
+                    free(key_auth);
+                    goto out;
+                }
+                if (a->use_ualpn) {
+                    msg(2, "type=%s", type);
+                    msg(2, "ident=%s", ident_value);
+                    msg(2, "token=%s", token);
+                    msg(2, "key_auth=%s", key_auth);
+                    msg(1, "ualpn begin %s %s", ident_value, key_auth);
+                    int r = ualpn_challenge_begin(ualpn_f, ident_value, key_auth);
+                    msg(2, "ualpn returned %d", r);
+                    if (r < 0) {
+                        free(key_auth);
+                        goto out;
+                    } else if (r > 0) {
+                        msg(1, "challenge %s declined", type);
+                        free(key_auth);
+                        continue;
+                    }
+                } else
+#endif
                 if (a->hook && strlen(a->hook) > 0) {
                     msg(2, "type=%s", type);
                     msg(2, "ident=%s", ident_value);
@@ -987,6 +1058,14 @@ bool authorize(acme_t *a)
                         break;
                     }
                 }
+#ifdef ENABLE_UALPN
+                if (a->use_ualpn) {
+                    const char *method = chlg_done ? "done" : "failed";
+                    msg(1, "ualpn %s %s", method, ident_value);
+                    ualpn_challenge_done(ualpn_f, ident_value);
+                    ualpn_client_disconnect(ualpn_f);
+                } else
+#endif
                 if (a->hook && strlen(a->hook) > 0) {
                     const char *method = chlg_done ? "done" : "failed";
                     msg(1, "running %s %s %s %s %s %s", a->hook, method,
@@ -1435,6 +1514,7 @@ void usage(const char *progname)
     fprintf(stderr,
         "usage: %s [-a|--acme-url URL] [-b|--bits BITS] [-c|--confdir DIR]\n"
         "\t[-d|--days DAYS] [-e|--eab KEYID:KEY] [-f|--force] [-h|--hook PROG]\n"
+        "\t[-D|--use-ualpn]\n"
         "\t[-i|--no-ari] [-k|--rotate-key] [-l|--alternate [N | SHA256]]\n"
         "\t[-m|--must-staple] [-n|--never-create] [-o|--no-ocsp]\n"
         "\t[-p|--profile profile] [-r|--reason CODE] [-s|--staging]\n"
@@ -1472,6 +1552,7 @@ int main(int argc, char **argv)
         {"force",        no_argument,       NULL, 'f'},
         {"help",         no_argument,       NULL, '?'},
         {"hook",         required_argument, NULL, 'h'},
+        {"use-ualpn",    no_argument,       NULL, 'D'},
         {"no-ari",       no_argument,       NULL, 'i'},
         {"rotate-key",   no_argument,       NULL, 'k'},
         {"alternate",    required_argument, NULL, 'l'},
@@ -1546,7 +1627,7 @@ int main(int argc, char **argv)
     while (1) {
         char *endptr;
         int option_index;
-        int c = getopt_long(argc, argv, "a:b:c:d:e:f?h:ikl:mnop:r:st:vVy",
+        int c = getopt_long(argc, argv, "a:b:c:d:e:f?h:Dikl:mnop:r:st:vVy",
                 options, &option_index);
         if (c == -1) break;
         switch (c) {
@@ -1590,6 +1671,15 @@ int main(int argc, char **argv)
 
             case 'h':
                 a.hook = optarg;
+                break;
+
+            case 'D':
+#ifdef ENABLE_UALPN
+                a.use_ualpn = true;
+#else
+                warnx("-D,--use-ualpn is not available (uacme was built without ualpn support)");
+                goto out;
+#endif
                 break;
 
             case 'i':

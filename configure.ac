@@ -384,6 +384,9 @@ if test "x$OPT_UALPN" != "xno"; then
 fi
 AC_SUBST(UALPN_LDADD)
 AM_CONDITIONAL(ENABLE_UALPN, test "x$OPT_UALPN" = "xyes")
+if test "x$OPT_UALPN" = "xyes"; then
+    AC_DEFINE(ENABLE_UALPN, 1, [if ualpn is enabled])
+fi
 AM_CONDITIONAL(ENABLE_LIBEV, test "x$with_included_libev" = "xyes")
 
 default_docs="yes"

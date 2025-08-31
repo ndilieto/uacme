@@ -60,6 +60,9 @@ uacme_CPPFLAGS = -DRUNSTATEDIR="\"${runstatedir}\"" \
 uacme_CFLAGS = $(CURL_CFLAGS) $(WCFLAGS)
 uacme_LDFLAGS = $(CURL_LDFLAGS)
 uacme_LDADD = $(CURL_LDADD)
+if ENABLE_UALPN
+uacme_LDADD += libualpn.la
+endif
 
 if ENABLE_READFILE
 uacme_SOURCES += read-file.c read-file.h
