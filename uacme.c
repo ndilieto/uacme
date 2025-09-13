@@ -64,6 +64,7 @@ typedef struct acme {
     unsigned char alt_fp[32];
     size_t alt_fp_len;
     size_t alt_n;
+    int eab_bits;
     const char *eab_keyid;
     const char *eab_key;
     const char *directory;
@@ -479,7 +480,7 @@ char *eab_encode(acme_t *a, const char *url)
     char *payload = NULL;
     char *jws = NULL;
 
-    protected = jws_protected_eab(256, a->eab_keyid, url);
+    protected = jws_protected_eab(a->eab_bits, a->eab_keyid, url);
     if (!protected) {
         warnx("eab_encode: jws_protected_eab failed");
         goto out;
@@ -491,7 +492,7 @@ char *eab_encode(acme_t *a, const char *url)
         goto out;
     }
 
-    jws = jws_encode_hmac(protected, payload, 256, a->eab_key);
+    jws = jws_encode_hmac(protected, payload, a->eab_bits, a->eab_key);
     if (!jws) {
         warnx("eab_encode: jws_encode_hmac failed");
         goto out;
@@ -536,7 +537,7 @@ bool account_new(acme_t *a, bool yes)
                         "externalAccountRequired");
                 if (ext && strcasecmp(ext, "true") == 0 && !a->eab_key) {
                     msg(0, "this ACME server requires external credentials, "
-                           "please supply them with -e KEYID:KEY");
+                           "please supply them with -e KEYID:KEY[:BITS]");
                     return false;
                 }
                 const char *terms = json_find_string(meta, "termsOfService");
@@ -1377,9 +1378,9 @@ bool validate_identifier_str(const char *s)
 
 bool eab_parse(acme_t *a, char *eab)
 {
-    regmatch_t m[3];
+    regmatch_t m[5];
     regex_t reg;
-    if (regcomp(&reg, "^([^:]+):([-_A-Za-z0-9]+)$",
+    if (regcomp(&reg, "^([^:]+):([-_A-Za-z0-9]+)(:([0-9]+))?$",
                 REG_EXTENDED | REG_NEWLINE)) {
         warnx("eab_parse: regcomp failed");
         return false;
@@ -1389,8 +1390,21 @@ bool eab_parse(acme_t *a, char *eab)
     regfree(&reg);
 
     if (r) {
-        warnx("-e credentials must be specified as 'KEYID:KEY', "
-                "with KEY base64url encoded");
+        warnx("EAB credentials must be specified as 'KEYID:KEY[:BITS]'. "
+                "KEY must be base64url encoded, "
+                "BITS must be 256 (default), 384 or 512");
+        return false;
+    }
+
+    eab[m[4].rm_eo] = 0;
+    if (strcmp(eab + m[4].rm_so, "512"))
+        a->eab_bits = 512;
+    else if (strcmp(eab + m[4].rm_so, "384"))
+        a->eab_bits = 384;
+    else if (strcmp(eab + m[4].rm_so, "256") || strlen(eab + m[4].rm_so) == 0)
+        a->eab_bits = 256;
+    else {
+        warnx("EAB credentials BITS must be 256 (default), 384 or 512");
         return false;
     }
 
@@ -1434,12 +1448,12 @@ void usage(const char *progname)
 {
     fprintf(stderr,
         "usage: %s [-a|--acme-url URL] [-b|--bits BITS] [-c|--confdir DIR]\n"
-        "\t[-d|--days DAYS] [-e|--eab KEYID:KEY] [-f|--force] [-h|--hook PROG]\n"
-        "\t[-i|--no-ari] [-k|--rotate-key] [-l|--alternate [N | SHA256]]\n"
-        "\t[-m|--must-staple] [-n|--never-create] [-o|--no-ocsp]\n"
-        "\t[-p|--profile profile] [-r|--reason CODE] [-s|--staging]\n"
-        "\t[-t|--type RSA | EC] [-v|--verbose ...] [-V|--version] [-y|--yes]\n"
-        "\t[-?|--help]\n"
+        "\t[-d|--days DAYS] [-e|--eab KEYID:KEY[:BITS]] [-f|--force]\n"
+        "\t[-h|--hook PROG] [-i|--no-ari] [-k|--rotate-key]\n"
+        "\t[-l|--alternate [N | SHA256]] [-m|--must-staple]\n"
+        "\t[-n|--never-create] [-o|--no-ocsp] [-p|--profile profile]\n"
+        "\t[-r|--reason CODE] [-s|--staging] [-t|--type RSA | EC]\n"
+        "\t[-v|--verbose ...] [-V|--version] [-y|--yes] [-?|--help]\n"
         "\tnew [EMAIL] | update [EMAIL] | deactivate | newkey |\n"
         "\tissue IDENTIFIER [ALTNAME ...] | issue CSRFILE |\n"
         "\tcheck IDENTIFIER [ALTNAME ...] | check CSRFILE |\n"

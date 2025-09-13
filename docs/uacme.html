@@ -747,12 +747,13 @@ UACME(1) Manual Page
 <h2 id="_synopsis">SYNOPSIS</h2>
 <div class="sectionbody">
 <div class="paragraph"><p><strong>uacme</strong> [<strong>-a</strong>|<strong>--acme-url</strong> <em>URL</em>] [<strong>-b</strong>|<strong>--bits</strong> <em>BITS</em>]
-    [<strong>-c</strong>|<strong>--confdir</strong> <em>DIR</em>] [<strong>-d</strong>|<strong>--days</strong> <em>DAYS</em>] [<strong>-e</strong>|<strong>--eab</strong> KEYID:KEY]
-    [<strong>-f</strong>|<strong>--force</strong>] [<strong>-h</strong>|<strong>--hook</strong> <em>PROGRAM</em>] [<strong>-i</strong>|<strong>--no-ari</strong>]
-    [<strong>-k</strong>|<strong>--rotate-key</strong>] [<strong>-l</strong>|<strong>--alternate</strong> <em>N</em> | <em>FP</em>] [<strong>-m</strong>|<strong>--must-staple</strong>]
-    [<strong>-n</strong>|<strong>--never-create</strong>] [<strong>-o</strong>|<strong>--no-ocsp</strong>] [<strong>-p</strong>|<strong>--profile</strong> PROFILE]
-    [<strong>-r</strong>|<strong>--reason</strong> CODE] [<strong>-s</strong>|<strong>--staging</strong>] [<strong>-t</strong>|<strong>--type</strong> <strong>RSA</strong>|<strong>EC</strong>]
-    [<strong>-v</strong>|<strong>--verbose</strong> &#8230;] [<strong>-V</strong>|<strong>--version</strong>] [<strong>-y</strong>|<strong>--yes</strong>] [<strong>-?</strong>|<strong>--help</strong>]
+    [<strong>-c</strong>|<strong>--confdir</strong> <em>DIR</em>] [<strong>-d</strong>|<strong>--days</strong> <em>DAYS</em>]
+    [<strong>-e</strong>|<strong>--eab</strong> KEYID:KEY[:BITS]] [<strong>-f</strong>|<strong>--force</strong>] [<strong>-h</strong>|<strong>--hook</strong> <em>PROGRAM</em>]
+    [<strong>-i</strong>|<strong>--no-ari</strong>] [<strong>-k</strong>|<strong>--rotate-key</strong>] [<strong>-l</strong>|<strong>--alternate</strong> <em>N</em> | <em>FP</em>]
+    [<strong>-m</strong>|<strong>--must-staple</strong>] [<strong>-n</strong>|<strong>--never-create</strong>] [<strong>-o</strong>|<strong>--no-ocsp</strong>]
+    [<strong>-p</strong>|<strong>--profile</strong> PROFILE] [<strong>-r</strong>|<strong>--reason</strong> CODE] [<strong>-s</strong>|<strong>--staging</strong>]
+    [<strong>-t</strong>|<strong>--type</strong> <strong>RSA</strong>|<strong>EC</strong>] [<strong>-v</strong>|<strong>--verbose</strong> &#8230;] [<strong>-V</strong>|<strong>--version</strong>]
+    [<strong>-y</strong>|<strong>--yes</strong>] [<strong>-?</strong>|<strong>--help</strong>]
     <strong>new</strong> [<em>EMAIL</em>] | <strong>update</strong> [<em>EMAIL</em>] | <strong>deactivate</strong> | <strong>newkey</strong> |
     <strong>issue</strong> <em>IDENTIFIER</em> [<em>ALTNAME</em> &#8230;]] | <strong>issue</strong> <em>CSRFILE</em> |
     <strong>check</strong> <em>IDENTIFIER</em> [<em>ALTNAME</em> &#8230;]] | <strong>check</strong> <em>CSRFILE</em> |
@@ -862,7 +863,7 @@ certificate for <em>IDENTIFIER</em>
 </p>
 </dd>
 <dt class="hdlist1">
-<strong>-e, --eab</strong> <em>KEYID:KEY</em>
+<strong>-e, --eab</strong> <em>KEYID:KEY[:BITS]</em>
 </dt>
 <dd>
 <p>
@@ -871,6 +872,8 @@ certificate for <em>IDENTIFIER</em>
     to associate a new ACME account with an existing account in a
     non-ACME system such as a CA customer database.
     <em>KEYID</em> must be an ASCII string. <em>KEY</em> must be base64url-encoded.
+    <em>BITS</em> is either 256, 384 or 512 and determines the number of bits
+    of the EAB signature algorithm (default HMAC-SHA-256 when omitted).
 </p>
 </dd>
 <dt class="hdlist1">
@@ -1592,7 +1595,7 @@ along with this program.  If not, see <a href="http://www.gnu.org/licenses/">htt
 <div id="footer-text">
 Version 1.7.6-dev<br>
 Last updated
- 2025-07-19 12:34:07 CEST
+ 2025-09-13 11:48:28 CEST
 </div>
 </div>
 </body>

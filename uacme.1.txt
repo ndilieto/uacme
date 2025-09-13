@@ -14,12 +14,13 @@ uacme - ACMEv2 client written in plain C with minimal dependencies
 SYNOPSIS
 --------
 *uacme* [*-a*|*--acme-url* 'URL'] [*-b*|*--bits* 'BITS']
-    [*-c*|*--confdir* 'DIR'] [*-d*|*--days* 'DAYS'] [*-e*|*--eab* KEYID:KEY]
-    [*-f*|*--force*] [*-h*|*--hook* 'PROGRAM'] [*-i*|*--no-ari*]
-    [*-k*|*--rotate-key*] [*-l*|*--alternate* 'N' | 'FP'] [*-m*|*--must-staple*]
-    [*-n*|*--never-create*] [*-o*|*--no-ocsp*] [*-p*|*--profile* PROFILE]
-    [*-r*|*--reason* CODE] [*-s*|*--staging*] [*-t*|*--type* *RSA*|*EC*]
-    [*-v*|*--verbose* ...] [*-V*|*--version*] [*-y*|*--yes*] [*-?*|*--help*]
+    [*-c*|*--confdir* 'DIR'] [*-d*|*--days* 'DAYS']
+    [*-e*|*--eab* KEYID:KEY[:BITS]] [*-f*|*--force*] [*-h*|*--hook* 'PROGRAM']
+    [*-i*|*--no-ari*] [*-k*|*--rotate-key*] [*-l*|*--alternate* 'N' | 'FP']
+    [*-m*|*--must-staple*] [*-n*|*--never-create*] [*-o*|*--no-ocsp*]
+    [*-p*|*--profile* PROFILE] [*-r*|*--reason* CODE] [*-s*|*--staging*]
+    [*-t*|*--type* *RSA*|*EC*] [*-v*|*--verbose* ...] [*-V*|*--version*]
+    [*-y*|*--yes*] [*-?*|*--help*]
     *new* ['EMAIL'] | *update* ['EMAIL'] | *deactivate* | *newkey* |
     *issue* 'IDENTIFIER' ['ALTNAME' ...]] | *issue* 'CSRFILE' |
     *check* 'IDENTIFIER' ['ALTNAME' ...]] | *check* 'CSRFILE' |
@@ -67,12 +68,14 @@ OPTIONS
     if no server renewal information is available. See also
     *-i, --no-ari* and *-o, --no-ocsp*.
 
-*-e, --eab* 'KEYID:KEY'::
+*-e, --eab* 'KEYID:KEY[:BITS]'::
     Specify RFC8555 External Account Binding credentials according
     to <https://tools.ietf.org/html/rfc8555#section-7.3.4>, in order
     to associate a new ACME account with an existing account in a
     non-ACME system such as a CA customer database.
     'KEYID' must be an ASCII string. 'KEY' must be base64url-encoded.
+    'BITS' is either 256, 384 or 512 and determines the number of bits
+    of the EAB signature algorithm (default HMAC-SHA-256 when omitted).
 
 *-f, --force*::
     Force certificate reissuance regardless of expiration date and
