@@ -18,12 +18,12 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 # Commands
-DIG=dig
-NSUPDATE=nsupdate
+DIG="${UACME_DIG_CMD:-dig}"
+NSUPDATE="${UACME_NSUPDATE_CMD:-nsupdate}"
 
 # Server to which updates will be sent. If not specified it will
 # be obtained from MNAME in the SOA record.
-NSUPDATE_SERVER=
+NSUPDATE_SERVER="${UACME_NSUPDATE_SERVER:-}"
 
 # Files
 # {NSUPDATE,DIG}_KEY
@@ -31,8 +31,8 @@ NSUPDATE_SERVER=
 #   here. If you do, also make sure named.conf specifies the
 #   key "KEYNAME"; in the zone that must be updated (and disallow
 #   all others for safety)
-NSUPDATE_KEY=
-DIG_KEY=
+NSUPDATE_KEY="${UACME_NSUPDATE_KEY:-}"
+DIG_KEY="${UACME_DIG_KEY:-}"
 
 ARGS=5
 E_BADARGS=85
