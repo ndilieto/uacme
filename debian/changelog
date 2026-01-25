@@ -1,3 +1,12 @@
+uacme (1.8.0-1) unstable; urgency=medium
+
+  * New upstream release
+  * debian/control:
+    - Update Standards-Version
+    - Remove Priority
+
+ -- Nicola Di Lieto <nicola.dilieto@gmail.com>  Sun, 25 Jan 2026 13:50:40 +0100
+
 uacme (1.7.6-1) unstable; urgency=medium
 
   * New upstream release
