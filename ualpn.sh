@@ -1,5 +1,5 @@
 #!/bin/sh
-# Copyright (C) 2019-2024 Nicola Di Lieto <nicola.dilieto@gmail.com>
+# Copyright (C) 2019-2026 Nicola Di Lieto <nicola.dilieto@gmail.com>
 #
 # This file is part of uacme.
 #

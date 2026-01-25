@@ -1,5 +1,5 @@
 uacme README 
-Copyright (C) 2019-2024 Nicola Di Lieto <nicola.dilieto@gmail.com>
+Copyright (C) 2019-2026 Nicola Di Lieto <nicola.dilieto@gmail.com>
 
 uacme is a client for the RFC8555 ACMEv2 protocol. Additional
 information can be found at <https://github.com/ndilieto/uacme>
