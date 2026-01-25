@@ -1,6 +1,5 @@
 Source: uacme
 Section: net
-Priority: optional
 Maintainer: Nicola Di Lieto <nicola.dilieto@gmail.com>
 Build-Depends: debhelper-compat (= 13),
                autoconf-archive,
@@ -15,7 +14,7 @@ Build-Depends: debhelper-compat (= 13),
                libxml2-utils,
                xsltproc
 Rules-Requires-Root: no
-Standards-Version: 4.7.0
+Standards-Version: 4.7.3
 Homepage: https://github.com/ndilieto/uacme
 Vcs-Git: https://github.com/ndilieto/uacme.git
 Vcs-Browser: https://github.com/ndilieto/uacme
