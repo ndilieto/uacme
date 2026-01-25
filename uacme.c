@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2019-2024 Nicola Di Lieto <nicola.dilieto@gmail.com>
+ * Copyright (C) 2019-2026 Nicola Di Lieto <nicola.dilieto@gmail.com>
  *
  * This file is part of uacme.
  *
@@ -26,6 +26,7 @@
 #include <fcntl.h>
 #include <getopt.h>
 #include <libgen.h>
+#include <limits.h>
 #include <locale.h>
 #include <regex.h>
 #include <stdarg.h>
@@ -36,6 +37,7 @@
 #include <string.h>
 #include <sys/stat.h>
 #include <sys/wait.h>
+#include <time.h>
 #include <unistd.h>
 
 #include "base64.h"
@@ -62,64 +64,116 @@ typedef struct acme {
     unsigned char alt_fp[32];
     size_t alt_fp_len;
     size_t alt_n;
+    int eab_bits;
     const char *eab_keyid;
     const char *eab_key;
     const char *directory;
     const char *hook;
     const char *email;
+    const char *profile;
     char *keyprefix;
     char *certprefix;
 } acme_t;
+
+unsigned int retry_after(const char *str, unsigned int d)
+{
+    long dt;
+    char *p;
+
+    if (!str || !*str)
+        return d;
+
+    dt = strtol(str, &p, 10);
+    if (*p) {
+        time_t now = time(NULL);
+        struct tm t, tnow;
+
+        gmtime_r(&now, &tnow);
+        p = strptime(str, "%a, %d %b %Y %T", &t);
+        if (!p)
+            p = strptime(str, "%a, %d-%b-%y %T", &t);
+        if (!p)
+            p = strptime(str, "%a %b %d %T %Y", &t);
+        if (!p)
+            return d;
+        dt = difftime(mktime(&t), mktime(&tnow));
+    }
+    if (dt > UINT_MAX)
+        return UINT_MAX;
+    else if (dt > 0)
+        return (unsigned int)dt;
+    else
+        return d;
+}
 
 int acme_get(acme_t *a, const char *url)
 {
     int ret = 0;
 
-    json_free(a->json);
-    a->json = NULL;
-    free(a->headers);
-    a->headers = NULL;
-    free(a->body);
-    a->body = NULL;
-    free(a->type);
-    a->type = NULL;
-
     if (!url) {
         warnx("acme_get: invalid URL");
         goto out;
     }
-    if (g_loglevel > 1)
-        warnx("acme_get: url=%s", url);
-    curldata_t *c = curl_get(url);
-    if (!c) {
-        warnx("acme_get: curl_get failed");
-        goto out;
+
+    for (int retry = 0; retry < 3; retry++) {
+        if (retry > 0)
+            msg(1, "acme_get: retrying");
+
+        json_free(a->json);
+        a->json = NULL;
+        free(a->headers);
+        a->headers = NULL;
+        free(a->body);
+        a->body = NULL;
+        free(a->type);
+        a->type = NULL;
+
+        if (g_loglevel > 1)
+            warnx("acme_get: url=%s", url);
+        curldata_t *c = curl_get(url);
+        if (!c) {
+            warnx("acme_get: curl_get failed");
+            goto out;
+        }
+        free(a->nonce);
+        a->nonce = find_header(c->headers, "Replay-Nonce");
+        a->type = find_header(c->headers, "Content-Type");
+        if (a->type && strcasestr(a->type, "json"))
+            a->json = json_parse(c->body, c->body_len);
+        a->headers = c->headers;
+        c->headers = NULL;
+        a->body = c->body;
+        c->body = NULL;
+        ret = c->code;
+        curldata_free(c);
+        if (g_loglevel > 2) {
+            if (a->headers)
+                warnx("acme_get: HTTP headers\n%s", a->headers);
+            if (a->body)
+                warnx("acme_get: HTTP body\n%s", a->body);
+        }
+        if (g_loglevel > 1) {
+            if (a->json) {
+                warnx("acme_get: return code %d, json=", ret);
+                json_dump(stderr, a->json);
+            } else
+                warnx("acme_get: return code %d", ret);
+        }
+        if (!a->type || !a->json ||
+                !strcasestr(a->type, "application/problem+json"))
+            break;
+        if (ret == 503 && json_compare_string(a->json, "type",
+                    "urn:ietf:params:acme:error:rateLimited") == 0) {
+            char *ra = find_header(a->headers, "Retry-After");
+            unsigned int dt = retry_after(ra, 60);
+            free(ra);
+            msg(1, "acme_get: server busy, waiting %u seconds", dt);
+            sleep(dt);
+            continue;
+        }
+        break;
     }
-    free(a->nonce);
-    a->nonce = find_header(c->headers, "Replay-Nonce");
-    a->type = find_header(c->headers, "Content-Type");
-    if (a->type && strcasestr(a->type, "json"))
-        a->json = json_parse(c->body, c->body_len);
-    a->headers = c->headers;
-    c->headers = NULL;
-    a->body = c->body;
-    c->body = NULL;
-    ret = c->code;
-    curldata_free(c);
 out:
-    if (g_loglevel > 2) {
-        if (a->headers)
-            warnx("acme_get: HTTP headers\n%s", a->headers);
-        if (a->body)
-            warnx("acme_get: HTTP body\n%s", a->body);
-    }
-    if (g_loglevel > 1) {
-        if (a->json) {
-            warnx("acme_get: return code %d, json=", ret);
-            json_dump(stderr, a->json);
-        } else
-            warnx("acme_get: return code %d", ret);
-    }
     if (!a->headers)
         a->headers = strdup("");
     if (!a->body)
@@ -185,11 +239,6 @@ int acme_post(acme_t *a, const char *url, const char *format, ...)
         return 0;
     }
 
-    if (!a->nonce && !acme_nonce(a)) {
-        warnx("acme_post: no nonce available");
-        return 0;
-    }
-
     va_list ap;
     va_start(ap, format);
     if (vasprintf(&payload, format, ap) < 0)
@@ -200,9 +249,14 @@ int acme_post(acme_t *a, const char *url, const char *format, ...)
         return 0;
     }
 
-    for (int retry = 0; a->nonce && retry < 3; retry++) {
+    for (int retry = 0; retry < 3; retry++) {
         if (retry > 0)
-            msg(1, "acme_post: server rejected nonce, retrying");
+            msg(1, "acme_post: retrying");
+
+        if (!a->nonce && !acme_nonce(a)) {
+            warnx("acme_post: no nonce available");
+            goto out;
+        }
 
         json_free(a->json);
         a->json = NULL;
@@ -260,11 +314,24 @@ int acme_post(acme_t *a, const char *url, const char *format, ...)
             } else
                 warnx("acme_post: return code %d", ret);
         }
-        if (ret != 400 || !a->type || !a->nonce || !a->json ||
-                !strcasestr(a->type, "application/problem+json") ||
-                json_compare_string(a->json, "type",
-                    "urn:ietf:params:acme:error:badNonce") != 0)
+        if (!a->type || !a->json ||
+                !strcasestr(a->type, "application/problem+json"))
             break;
+        if (ret == 400 && json_compare_string(a->json, "type",
+                    "urn:ietf:params:acme:error:badNonce") == 0) {
+            msg(1, "acme_post: server rejected nonce");
+            continue;
+        }
+        if (ret == 503 && json_compare_string(a->json, "type",
+                    "urn:ietf:params:acme:error:rateLimited") == 0) {
+            char *ra = find_header(a->headers, "Retry-After");
+            unsigned int dt = retry_after(ra, 60);
+            free(ra);
+            msg(1, "acme_post: server busy, waiting %u seconds", dt);
+            sleep(dt);
+            continue;
+        }
+        break;
     }
 out:
     free(payload);
@@ -352,7 +419,7 @@ char *identifiers(char * const *names)
 {
     char *ids = NULL;
     char *tmp = NULL;
-    if (asprintf(&tmp, "{\"identifiers\":[") < 0) {
+    if (asprintf(&tmp, "\"identifiers\":[") < 0) {
         warnx("identifiers: asprintf failed");
         return NULL;
     }
@@ -369,7 +436,7 @@ char *identifiers(char * const *names)
         names++;
     }
     tmp[strlen(tmp)-1] = 0;
-    if (asprintf(&ids, "%s]}", tmp) < 0) {
+    if (asprintf(&ids, "%s]", tmp) < 0) {
         warnx("identifiers: asprintf failed");
         ids = NULL;
     }
@@ -390,6 +457,20 @@ bool acme_bootstrap(acme_t *a)
     a->dir = a->json;
     a->json = NULL;
 
+    if (a->profile) {
+        const json_value_t *meta = json_find(a->dir, "meta");
+        const json_value_t *profiles  = json_find(meta, "profiles");
+        if (!profiles) {
+            warnx("server does not support profiles");
+            return false;
+        }
+        if (!json_find_string(profiles, a->profile)) {
+            warnx("profile must be a supported one:");
+            json_dump(stderr, profiles);
+            return false;
+        }
+    }
+
     return true;
 }
 
@@ -399,7 +480,7 @@ char *eab_encode(acme_t *a, const char *url)
     char *payload = NULL;
     char *jws = NULL;
 
-    protected = jws_protected_eab(256, a->eab_keyid, url);
+    protected = jws_protected_eab(a->eab_bits, a->eab_keyid, url);
     if (!protected) {
         warnx("eab_encode: jws_protected_eab failed");
         goto out;
@@ -411,7 +492,7 @@ char *eab_encode(acme_t *a, const char *url)
         goto out;
     }
 
-    jws = jws_encode_hmac(protected, payload, 256, a->eab_key);
+    jws = jws_encode_hmac(protected, payload, a->eab_bits, a->eab_key);
     if (!jws) {
         warnx("eab_encode: jws_encode_hmac failed");
         goto out;
@@ -456,7 +537,7 @@ bool account_new(acme_t *a, bool yes)
                         "externalAccountRequired");
                 if (ext && strcasecmp(ext, "true") == 0 && !a->eab_key) {
                     msg(0, "this ACME server requires external credentials, "
-                           "please supply them with -e KEYID:KEY");
+                           "please supply them with -e KEYID:KEY[:BITS]");
                     return false;
                 }
                 const char *terms = json_find_string(meta, "termsOfService");
@@ -826,19 +907,49 @@ bool authorize(acme_t *a)
                 const char *token = json_find_string(
                         chlgs->v.array.values+j, "token");
                 char *key_auth = NULL;
-                if (!type || !url || !token) {
+                if (!type || !url) {
                     warnx("failed to parse challenge");
                     goto out;
                 }
-                for (const char *t = token; *t; t++)
-                    if (!isalnum(*t) && *t != '-' && *t != '_') {
-                        warnx("failed to validate token");
+                if (strcmp(type, "dns-persist-01") == 0) {
+                    const json_value_t *idns = json_find(
+                            chlgs->v.array.values+j, "issuer-domain-names");
+                    if (!idns || idns->type != JSON_ARRAY ||
+                            idns->v.array.size < 1 ||
+                            idns->v.array.size > 10 ||
+                            idns->v.array.values[0].type != JSON_STRING ||
+                            idns->v.array.values[0].v.value == NULL ||
+                            strlen(idns->v.array.values[0].v.value) > 253 ||
+                            strlen(idns->v.array.values[0].v.value) == 0) {
+                        warnx("failed to parse challenge");
                         goto out;
                     }
+                    token = idns->v.array.values[0].v.value;
+                    for (const char *t = token; *t; t++)
+                        if ((!isascii(*t) || !isalnum(*t) || !islower(*t)) &&
+                                    *t != '-' && *t != '.') {
+                            warnx("failed to validate issuer domain name");
+                            goto out;
+                        }
+                } else {
+                    if (!token) {
+                        warnx("failed to parse challenge");
+                        goto out;
+                    }
+                    for (const char *t = token; *t; t++)
+                        if (!isalnum(*t) && *t != '-' && *t != '_') {
+                            warnx("failed to validate token");
+                            goto out;
+                        }
+                }
                 if (strcmp(type, "dns-01") == 0 ||
                         strcmp(type, "tls-alpn-01") == 0)
                     key_auth = sha2_base64url(256, "%s.%s", token, thumbprint);
-                else if (asprintf(&key_auth, "%s.%s", token, thumbprint) < 0)
+                else if (strcmp(type, "dns-persist-01") == 0) {
+                    if (asprintf(&key_auth, "\"%s; accounturi=%s\"", token,
+                                a->kid) < 0)
+                        key_auth = NULL;
+                } else if (asprintf(&key_auth, "%s.%s", token, thumbprint) < 0)
                     key_auth = NULL;
                 if (!key_auth) {
                     warnx("failed to generate authorization key");
@@ -895,9 +1006,12 @@ bool authorize(acme_t *a)
                         acme_error(a);
                         break;
                     } else if (u < 5*512) {
-                        msg(u > 40 ? 1 : 2, "%s, waiting %u seconds",
-                                status, u);
-                        sleep(u);
+                        char *ra = find_header(a->headers, "Retry-After");
+                        unsigned int dt = retry_after(ra, u);
+                        free(ra);
+                        msg(dt > 40 ? 1 : 2, "%s, waiting %u seconds",
+                                status, dt);
+                        sleep(dt);
                     } else {
                         warnx("timeout while polling challenge status at %s, "
                                 "giving up", url);
@@ -953,7 +1067,9 @@ bool cert_issue(acme_t *a, char * const *names, const char *csr)
     }
 
     msg(1, "creating new order at %s", url);
-    if (acme_post(a, url, ids) != 201)
+    if (acme_post(a, url, "{%s%s%s%s}", a->profile ? "\"profile\": \"" : "",
+                a->profile ? a->profile : "",
+                a->profile ? "\", " : "", ids) != 201)
     {
         warnx("failed to create new order at %s", url);
         acme_error(a);
@@ -999,8 +1115,11 @@ bool cert_issue(acme_t *a, char * const *names, const char *csr)
                 acme_error(a);
                 goto out;
             } else if (u < 5*512) {
-                msg(u > 40 ? 1 : 2, "waiting %u seconds", u);
-                sleep(u);
+                char *ra = find_header(a->headers, "Retry-After");
+                unsigned int dt = retry_after(ra, u);
+                free(ra);
+                msg(dt > 40 ? 1 : 2, "%s, waiting %u seconds", status, dt);
+                sleep(dt);
             } else {
                 warnx("timeout while polling order status at %s, giving up",
                         orderurl);
@@ -1042,8 +1161,11 @@ bool cert_issue(acme_t *a, char * const *names, const char *csr)
             acme_error(a);
             goto out;
         } else if (u < 5*512) {
-            msg(u > 40 ? 1 : 2, "waiting %u seconds", u);
-            sleep(u);
+            char *ra = find_header(a->headers, "Retry-After");
+            unsigned int dt = retry_after(ra, u);
+            free(ra);
+            msg(dt > 40 ? 1 : 2, "%s, waiting %u seconds", status, dt);
+            sleep(dt);
         } else {
             warnx("timeout while polling order status at %s, giving up",
                     orderurl);
@@ -1286,9 +1408,9 @@ bool validate_identifier_str(const char *s)
 
 bool eab_parse(acme_t *a, char *eab)
 {
-    regmatch_t m[3];
+    regmatch_t m[5];
     regex_t reg;
-    if (regcomp(&reg, "^([^:]+):([-_A-Za-z0-9]+)$",
+    if (regcomp(&reg, "^([^:]+):([-_A-Za-z0-9]+)(:([0-9]+))?$",
                 REG_EXTENDED | REG_NEWLINE)) {
         warnx("eab_parse: regcomp failed");
         return false;
@@ -1298,8 +1420,21 @@ bool eab_parse(acme_t *a, char *eab)
     regfree(&reg);
 
     if (r) {
-        warnx("-e credentials must be specified as 'KEYID:KEY', "
-                "with KEY base64url encoded");
+        warnx("EAB credentials must be specified as 'KEYID:KEY[:BITS]'. "
+                "KEY must be base64url encoded, "
+                "BITS must be 256 (default), 384 or 512");
+        return false;
+    }
+
+    eab[m[4].rm_eo] = 0;
+    if (strcmp(eab + m[4].rm_so, "512"))
+        a->eab_bits = 512;
+    else if (strcmp(eab + m[4].rm_so, "384"))
+        a->eab_bits = 384;
+    else if (strcmp(eab + m[4].rm_so, "256") || strlen(eab + m[4].rm_so) == 0)
+        a->eab_bits = 256;
+    else {
+        warnx("EAB credentials BITS must be 256 (default), 384 or 512");
         return false;
     }
 
@@ -1343,19 +1478,22 @@ void usage(const char *progname)
 {
     fprintf(stderr,
         "usage: %s [-a|--acme-url URL] [-b|--bits BITS] [-c|--confdir DIR]\n"
-        "\t[-d|--days DAYS] [-e|--eab KEYID:KEY] [-f|--force] [-h|--hook PROG]\n"
-        "\t[-i|--no-ari] [-l|--alternate [N | SHA256]] [-m|--must-staple]\n"
-        "\t[-n|--never-create] [-o|--no-ocsp] [-r|--reason CODE] [-s|--staging]\n"
-        "\t[-t|--type RSA | EC] [-v|--verbose ...] [-V|--version] [-y|--yes]\n"
-        "\t[-?|--help] new [EMAIL] | update [EMAIL] | deactivate | newkey |\n"
-        "\tissue IDENTIFIER [ALTNAME ...]] | issue CSRFILE |\n"
+        "\t[-d|--days DAYS] [-e|--eab KEYID:KEY[:BITS]] [-f|--force]\n"
+        "\t[-h|--hook PROG] [-i|--no-ari] [-k|--rotate-key]\n"
+        "\t[-l|--alternate [N | SHA256]] [-m|--must-staple]\n"
+        "\t[-n|--never-create] [-o|--no-ocsp] [-p|--profile profile]\n"
+        "\t[-r|--reason CODE] [-s|--staging] [-t|--type RSA | EC]\n"
+        "\t[-v|--verbose ...] [-V|--version] [-y|--yes] [-?|--help]\n"
+        "\tnew [EMAIL] | update [EMAIL] | deactivate | newkey |\n"
+        "\tissue IDENTIFIER [ALTNAME ...] | issue CSRFILE |\n"
+        "\tcheck IDENTIFIER [ALTNAME ...] | check CSRFILE |\n"
         "\trevoke CERTFILE [CERTKEYFILE]\n", progname);
 }
 
 void version(const char *progname)
 {
     fprintf(stderr, "%s: version " PACKAGE_VERSION "\n"
-            "Copyright (C) 2019-2024 Nicola Di Lieto\n\n"
+            "Copyright (C) 2019-2026 Nicola Di Lieto\n\n"
             "%s is free software: you can redistribute and/or modify\n"
             "it under the terms of the GNU General Public License as\n"
             "published by the Free Software Foundation, either version 3\n"
@@ -1379,10 +1517,12 @@ int main(int argc, char **argv)
         {"help",         no_argument,       NULL, '?'},
         {"hook",         required_argument, NULL, 'h'},
         {"no-ari",       no_argument,       NULL, 'i'},
+        {"rotate-key",   no_argument,       NULL, 'k'},
         {"alternate",    required_argument, NULL, 'l'},
         {"must-staple",  no_argument,       NULL, 'm'},
         {"never-create", no_argument,       NULL, 'n'},
         {"no-ocsp",      no_argument,       NULL, 'o'},
+        {"profile",      required_argument, NULL, 'p'},
         {"reason",       required_argument, NULL, 'r'},
         {"staging",      no_argument,       NULL, 's'},
         {"type",         required_argument, NULL, 't'},
@@ -1401,6 +1541,7 @@ int main(int argc, char **argv)
     bool status_req = false;
     bool status_check = true;
     bool ari_check = true;
+    bool rotate = false;
     int days = 30;
     int bits = 0;
     int reason = 0;
@@ -1411,6 +1552,9 @@ int main(int argc, char **argv)
     char **names = NULL;
     const char *confdir = DEFAULT_CONFDIR;
     char *keyprefix = NULL;
+    char *keyfile = NULL;
+    char *newkeyfile = NULL;
+    char *bakkeyfile = NULL;
     privkey_t key = NULL;
     acme_t a;
     memset(&a, 0, sizeof(a));
@@ -1446,7 +1590,7 @@ int main(int argc, char **argv)
     while (1) {
         char *endptr;
         int option_index;
-        int c = getopt_long(argc, argv, "a:b:c:d:e:f?h:il:mnor:st:vVy",
+        int c = getopt_long(argc, argv, "a:b:c:d:e:f?h:ikl:mnop:r:st:vVy",
                 options, &option_index);
         if (c == -1) break;
         switch (c) {
@@ -1496,6 +1640,10 @@ int main(int argc, char **argv)
                 ari_check = false;
                 break;
 
+            case 'k':
+                rotate = true;
+                break;
+
             case 'l':
                 if (!alt_parse(&a, optarg))
                     goto out;
@@ -1511,6 +1659,10 @@ int main(int argc, char **argv)
 
             case 'o':
                 status_check = false;
+                break;
+
+            case 'p':
+                a.profile = optarg;
                 break;
 
             case 'v':
@@ -1614,7 +1766,7 @@ int main(int argc, char **argv)
             usage(basename(argv[0]));
             goto out;
         }
-    } else if (strcmp(action, "issue") == 0) {
+    } else if (strcmp(action, "issue") == 0 || strcmp(action, "check") == 0) {
         if (optind == argc) {
             usage(basename(argv[0]));
             goto out;
@@ -1759,7 +1911,12 @@ int main(int argc, char **argv)
         if (acme_bootstrap(&a) && account_retrieve(&a)
                 && account_deactivate(&a))
             ret = 0;
-    } else if (strcmp(action, "issue") == 0) {
+    } else if (strcmp(action, "revoke") == 0) {
+        if (acme_bootstrap(&a) && (!a.keyprefix || account_retrieve(&a)) &&
+                cert_revoke(&a, filename, reason))
+            ret = 0;
+    } else if (strcmp(action, "issue") == 0 || strcmp(action, "check") == 0) {
+        bool check = *action == 'c';
         if (filename) {
             int len = strlen(filename);
             char *dot = strrchr(filename, '.');
@@ -1778,17 +1935,51 @@ int main(int argc, char **argv)
                 goto out;
 
             if (status_req)
-                warnx("-m, --must-staple is ignored when issuing with a CSR");
+                warnx("-m, --must-staple is ignored with a CSR");
+
+            if (rotate)
+                warnx("-k, --rotate-key is ignored with a CSR");
         } else {
-            if (!check_or_mkdir(!never, keyprefix, S_IRWXU))
+            if (rotate && never) {
+                warnx("-k, --rotate-key and -n, --never-create "
+                        "are incompatible");
+                goto out;
+            }
+
+            if (rotate && check) {
+                warnx("-k, --rotate-key is ignored with check");
+                rotate = false;
+            }
+
+            if (!check_or_mkdir(!(never || check), keyprefix, S_IRWXU))
                 goto out;
 
-            if (!check_or_mkdir(!never, a.certprefix,
+            if (!check_or_mkdir(!(never || check), a.certprefix,
                         S_IRWXU|S_IRGRP|S_IXGRP|S_IROTH|S_IXOTH))
                 goto out;
 
-            key = key_load(never ? PK_NONE : type, bits, "%s/key.pem",
-                    keyprefix);
+            if (asprintf(&keyfile, "%s/key.pem", keyprefix) < 0) {
+                keyfile = NULL;
+                warnx("asprintf failed");
+                goto out;
+            }
+
+            if (rotate) {
+                if (asprintf(&newkeyfile, "%s/newkey.pem", keyprefix) < 0) {
+                    newkeyfile = NULL;
+                    warnx("asprintf failed");
+                    goto out;
+                }
+                if (asprintf(&bakkeyfile, "%s/key-%llu.pem", keyprefix,
+                            (unsigned long long)time(NULL)) < 0) {
+                    bakkeyfile = NULL;
+                    warnx("asprintf failed");
+                    goto out;
+                }
+            }
+
+            key = key_load((never || check) ? PK_NONE : type, bits,
+                    newkeyfile ? newkeyfile : keyfile);
             if (!key)
                 goto out;
         }
@@ -1807,30 +1998,49 @@ int main(int argc, char **argv)
 
         msg(1, "checking existence and expiration of %s", filename);
         if (cert_valid(filename, names, ari_url, days, status_check)) {
-            if (force)
+            if (check) {
+                msg(1, "%s is valid", filename);
+                ret = 1;
+                goto out;
+            } else if (force)
                 msg(1, "forcing reissue of %s", filename);
             else {
                 msg(1, "skipping %s", filename);
                 ret = 1;
                 goto out;
             }
+        } else if (check) {
+            ret = 0;
+            goto out;
         }
 
         if (!csr) {
             msg(1, "generating certificate request");
-            csr = csr_gen(names, status_req, key);
+            csr = csr_gen(names, status_req, a.profile != NULL, key);
             if (!csr) {
                 warnx("failed to generate certificate request");
                 goto out;
             }
         }
 
-        if (account_retrieve(&a) && cert_issue(&a, names, csr))
+        if (account_retrieve(&a) && cert_issue(&a, names, csr)) {
+            if (newkeyfile) {
+                if (link(keyfile, bakkeyfile) < 0) {
+                    if (errno != ENOENT)
+                        warn("failed to link %s to %s", bakkeyfile, keyfile);
+                } else
+                    msg(1, "backed up %s as %s", keyfile, bakkeyfile);
+                msg(1, "renaming %s to %s", newkeyfile, keyfile);
+                if (rename(newkeyfile, keyfile) < 0) {
+                    warn("failed to rename %s to %s", newkeyfile, keyfile);
+                    unlink(bakkeyfile);
+                    free(newkeyfile);
+                    newkeyfile = NULL;
+                    goto out;
+                }
+            }
             ret = 0;
-    } else if (strcmp(action, "revoke") == 0) {
-        if (acme_bootstrap(&a) && (!a.keyprefix || account_retrieve(&a)) &&
-                cert_revoke(&a, filename, reason))
-            ret = 0;
+        }
     }
 
 out:
@@ -1850,6 +2060,11 @@ out:
     if (key)
         privkey_deinit(key);
     free(keyprefix);
+    free(keyfile);
+    if (newkeyfile)
+        unlink(newkeyfile);
+    free(newkeyfile);
+    free(bakkeyfile);
     free(csr);
     free(filename);
     for (int i = 0; names && names[i]; i++)

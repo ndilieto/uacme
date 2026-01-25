@@ -1,3 +1,26 @@
+2026-01-25 Nicola Di Lieto <nicola.dilieto@gmail.com>
+	* Release 1.8.0
+	- uacme: Add support for dns-persist-01 challenge
+	  See https://datatracker.ietf.org/doc/draft-ietf-acme-dns-persist/
+	- uacme: Add support for certificate profiles
+	  Closes https://github.com/ndilieto/uacme/issues/90
+	  See also https://letsencrypt.org/2025/01/09/acme-profiles/
+	- uacme: Use Retry-After header when server sends it
+	- uacme: Add method to check certificate existence and validity
+	  Closes https://github.com/ndilieto/uacme/issues/93
+	- uacme: Parse RFC3339 timestamps directly
+	  Closes https://github.com/ndilieto/uacme/issues/91
+	- uacme: Omit Common Name in certificate for IP identifiers
+	  See https://github.com/ndilieto/uacme/pull/96
+	- uacme: Add support for certificate key rotation
+	  Closes https://github.com/ndilieto/uacme/issues/92
+	- uacme: Add support for HMAC-SHA-{384,512} in EAB Signatures
+	  Closes https://github.com/ndilieto/uacme/issues/98
+	- uacme: Support settings from environment in nsupdate.sh
+	- ualpn: Check that authorization isn't missing
+	- ualpn: Bump embedded libev to version 4.33
+	- Documentation update including copyright year
+
 2024-12-29 Nicola Di Lieto <nicola.dilieto@gmail.com>
 	* Release 1.7.6
 	- Fix OpenSSL 3.x deprecated APIs
