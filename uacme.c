@@ -1427,11 +1427,12 @@ bool eab_parse(acme_t *a, char *eab)
     }
 
     eab[m[4].rm_eo] = 0;
-    if (strcmp(eab + m[4].rm_so, "512"))
+    if (strcmp(eab + m[4].rm_so, "512") == 0)
         a->eab_bits = 512;
-    else if (strcmp(eab + m[4].rm_so, "384"))
+    else if (strcmp(eab + m[4].rm_so, "384") == 0)
         a->eab_bits = 384;
-    else if (strcmp(eab + m[4].rm_so, "256") || strlen(eab + m[4].rm_so) == 0)
+    else if (strcmp(eab + m[4].rm_so, "256") == 0
+            || strlen(eab + m[4].rm_so) == 0)
         a->eab_bits = 256;
     else {
         warnx("EAB credentials BITS must be 256 (default), 384 or 512");
