@@ -1,3 +1,11 @@
+2026-04-05 Nicola Di Lieto <nicola.dilieto@gmail.com>
+	* Release 1.8.1
+	- uacme: Fix EAB bit parsing logic
+	  Closes https://github.com/ndilieto/uacme/issues/108
+	- ualpn: Manage TLS alerts when built with mbedTLS
+	  Closes https://github.com/ndilieto/uacme/issues/109
+	  See also https://github.com/openwrt/packages/issues/29003
+
 2026-01-25 Nicola Di Lieto <nicola.dilieto@gmail.com>
 	* Release 1.8.0
 	- uacme: Add support for dns-persist-01 challenge

@@ -225,6 +225,9 @@ typedef struct client {
     mbedtls_ssl_config cnf;
     mbedtls_x509_crt crt;
     mbedtls_pk_context key;
+    size_t tls_record_offset;
+    size_t tls_record_size;
+    uint8_t tls_record_type;
 #endif
     char ident[0x100];
     char auth[0x30];
@@ -994,7 +997,9 @@ int auth_crt(const char *ident, const uint8_t *id, size_t id_len,
     mbedtls_x509write_crt_set_version(&c, MBEDTLS_X509_CRT_VERSION_3);
     mbedtls_x509write_crt_set_md_alg(&c, MBEDTLS_MD_SHA256);
     mbedtls_x509write_crt_set_subject_key(&c, &k);
+    mbedtls_x509write_crt_set_subject_name(&c, "CN=ualpn");
     mbedtls_x509write_crt_set_issuer_key(&c, &k);
+    mbedtls_x509write_crt_set_issuer_name(&c, "CN=ualpn");
 
     rc = mbedtls_x509write_crt_set_basic_constraints(&c, 1, -1);
     if (rc) {
@@ -2166,6 +2171,35 @@ static int bio_write(void *ctx, const unsigned char *data, size_t size)
     EV_P = c->loop;
 #endif
     if (c->state != STATE_ACME) {
+        // Since only "acme-tls/1" ALPN extensions are supported, normal
+        // traffic makes the handshake fail, which in turn starts the
+        // proxying to the backend.
+        // Since commit https://github.com/Mbed-TLS/mbedtls/commit/e7047819ee
+        // mbedTLS sends TLS alerts before returning a failed handshake.
+        // Returning MBEDTLS_ERR_SSL_WANT_WRITE here would therefore loop
+        // forever.
+        // Therefore, parse the TLS records that mbedTLS sends and break the
+        // loop by returning MBEDTLS_ERR_SSL_INTERNAL_ERROR.
+        for (size_t i = 0; i < size; i++) {
+            switch (c->tls_record_offset) {
+                case 0:
+                    c->tls_record_type = data[i];
+                    break;
+                case 3:
+                    c->tls_record_size = data[i] << 8;
+                    break;
+                case 4:
+                    c->tls_record_size += data[i];
+                    break;
+            }
+            if (c->tls_record_offset < c->tls_record_size + 4) {
+                c->tls_record_offset++;
+                continue;
+            }
+            c->tls_record_offset = 0;
+            if (c->tls_record_type == 21)
+                return MBEDTLS_ERR_SSL_INTERNAL_ERROR;
+        }
         // prevent sending data to client until PROXY/ACME decision
         return MBEDTLS_ERR_SSL_WANT_WRITE;
     }
@@ -2387,6 +2421,9 @@ static int tls_session_init(client_t *c, uint8_t *buf, size_t buf_len)
     SSL_set0_wbio(c->ssl, bio);
     SSL_set_accept_state(c->ssl);
 #elif defined(USE_MBEDTLS)
+    c->tls_record_offset = 0;
+    c->tls_record_size = 0;
+    c->tls_record_type = 0;
     mbedtls_ssl_config_init(&c->cnf);
     int rc = mbedtls_ssl_config_defaults(&c->cnf, MBEDTLS_SSL_IS_SERVER,
                     MBEDTLS_SSL_TRANSPORT_STREAM, MBEDTLS_SSL_PRESET_DEFAULT);
