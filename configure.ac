@@ -299,7 +299,7 @@ if test "x$OPT_MBEDTLS" != "xno"; then
     LIBS="$addlib $LIBS"
     LDFLAGS="$LDFLAGS $addld"
     CPPFLAGS="$CPPFLAGS $addcflags"
-    AC_CHECK_LIB(mbedtls, mbedtls_entropy_init,
+    AC_CHECK_LIB(mbedtls, mbedtls_ssl_init,
                  [AC_DEFINE(USE_MBEDTLS, 1, [if mbedTLS is enabled])
                   AC_SUBST(USE_MBEDTLS, [1])
                   USE_MBEDTLS="yes"],

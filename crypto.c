@@ -74,18 +74,25 @@
 #include <openssl/x509.h>
 #include <openssl/x509v3.h>
 #elif defined(USE_MBEDTLS)
+#include <mbedtls/version.h>
 #include <mbedtls/asn1write.h>
 #include <mbedtls/base64.h>
+#if MBEDTLS_VERSION_NUMBER < 0x04000000
 #include <mbedtls/ctr_drbg.h>
 #include <mbedtls/entropy.h>
+#endif
 #include <mbedtls/error.h>
 #include <mbedtls/md.h>
 #include <mbedtls/oid.h>
 #include <mbedtls/pem.h>
 #include <mbedtls/pk.h>
 #include <mbedtls/platform.h>
+#if MBEDTLS_VERSION_NUMBER < 0x04000000
 #include <mbedtls/sha1.h>
-#include <mbedtls/version.h>
+#else
+#include <mbedtls/psa_util.h>
+#include <psa/crypto.h>
+#endif
 #include <mbedtls/x509_crt.h>
 #include <mbedtls/x509_csr.h>
 #endif
@@ -192,8 +199,10 @@ static bool openssl_hmac_fast(const EVP_MD *type, const void *key,
 #error mbedTLS 3.x version 3.2 or later is required
 #endif
 
+#if MBEDTLS_VERSION_NUMBER < 0x04000000
 static mbedtls_entropy_context entropy;
 static mbedtls_ctr_drbg_context ctr_drbg;
+#endif
 
 static const char *_mbedtls_strerror(int code)
 {
@@ -215,6 +224,14 @@ bool crypto_init(void)
         return false;
     }
 #endif
+#if MBEDTLS_VERSION_NUMBER >= 0x04000000
+    /* Mbed TLS 4.x uses the PSA random generator internally */
+    psa_status_t st = psa_crypto_init();
+    if (st != PSA_SUCCESS) {
+        warnx("crypto_init: psa_crypto_init failed: %d", (int)st);
+        return false;
+    }
+#else
     mbedtls_entropy_init(&entropy);
     mbedtls_ctr_drbg_init(&ctr_drbg);
     int r = mbedtls_ctr_drbg_seed(&ctr_drbg, mbedtls_entropy_func,
@@ -224,13 +241,18 @@ bool crypto_init(void)
                 _mbedtls_strerror(r));
         return false;
     }
+#endif
     return true;
 }
 
 void crypto_deinit(void)
 {
+#if MBEDTLS_VERSION_NUMBER >= 0x04000000
+    mbedtls_psa_crypto_free();
+#else
     mbedtls_ctr_drbg_free(&ctr_drbg);
     mbedtls_entropy_free(&entropy);
+#endif
 }
 
 static int mbedtls_hash_fast(mbedtls_md_type_t md_type,
@@ -247,13 +269,61 @@ static int mbedtls_hash_fast(mbedtls_md_type_t md_type,
 static int mbedtls_hmac_fast(mbedtls_md_type_t md_type, const void *key,
         size_t keylen, const void *input, size_t len, unsigned char *output)
 {
+#if MBEDTLS_VERSION_NUMBER >= 0x04000000
+    /* mbedtls_md_hmac() was removed in Mbed TLS 4.x, use PSA */
+    psa_algorithm_t alg = PSA_ALG_HMAC(mbedtls_md_psa_alg_from_type(md_type));
+    psa_key_attributes_t attr = PSA_KEY_ATTRIBUTES_INIT;
+    psa_key_id_t id;
+    size_t olen;
+    psa_status_t st;
+
+    psa_set_key_type(&attr, PSA_KEY_TYPE_HMAC);
+    psa_set_key_usage_flags(&attr, PSA_KEY_USAGE_SIGN_MESSAGE);
+    psa_set_key_algorithm(&attr, alg);
+    st = psa_import_key(&attr, key, keylen, &id);
+    if (st != PSA_SUCCESS) {
+        warnx("mbedtls_hmac_fast: psa_import_key failed: %d", (int)st);
+        return MBEDTLS_ERR_MD_BAD_INPUT_DATA;
+    }
+    st = psa_mac_compute(id, alg, input, len, output,
+            PSA_HASH_LENGTH(PSA_ALG_HMAC_GET_HASH(alg)), &olen);
+    psa_destroy_key(id);
+    if (st != PSA_SUCCESS) {
+        warnx("mbedtls_hmac_fast: psa_mac_compute failed: %d", (int)st);
+        return MBEDTLS_ERR_MD_BAD_INPUT_DATA;
+    }
+    return 0;
+#else
     const mbedtls_md_info_t *mdi = mbedtls_md_info_from_type(md_type);
     if (!mdi) {
         warnx("mbedtls_hmac_fast: md_info not found");
         return MBEDTLS_ERR_MD_FEATURE_UNAVAILABLE;
     }
     return mbedtls_md_hmac(mdi, key, keylen, input, len, output);
+#endif
 }
+
+#if MBEDTLS_VERSION_NUMBER >= 0x04000000
+/*
+ * Export the public key in the PSA format, the DER RSAPublicKey for RSA
+ * keys and the uncompressed point for EC keys, as Mbed TLS 4.x makes the
+ * RSA and EC key structures private. The caller must free *data.
+ */
+static int mbedtls_pubkey_raw(const mbedtls_pk_context *key,
+        unsigned char **data, size_t *len)
+{
+    *data = calloc(1, PSA_EXPORT_PUBLIC_KEY_MAX_SIZE);
+    if (!*data)
+        return MBEDTLS_ERR_PK_ALLOC_FAILED;
+    int r = mbedtls_pk_write_pubkey_psa(key, *data,
+            PSA_EXPORT_PUBLIC_KEY_MAX_SIZE, len);
+    if (r) {
+        free(*data);
+        *data = NULL;
+    }
+    return r;
+}
+#endif
 #endif
 
 #if !HAVE_STRCASESTR
@@ -620,6 +690,49 @@ static bool rsa_params(privkey_t key, char **m, char **e)
         warnx("rsa_params: bn2str failed");
         goto out;
     }
+#elif defined(USE_MBEDTLS) && MBEDTLS_VERSION_NUMBER >= 0x04000000
+    unsigned char *data = NULL;
+    unsigned char *p, *mp = NULL, *ep = NULL;
+    size_t len, mlen = 0, elen = 0;
+    if (!PSA_KEY_TYPE_IS_RSA(mbedtls_pk_get_key_type(key))) {
+        warnx("rsa_params: not a RSA key");
+        goto out;
+    }
+    r = mbedtls_pubkey_raw(key, &data, &len);
+    if (r) {
+        warnx("rsa_params: mbedtls_pk_write_pubkey_psa failed: %s",
+                _mbedtls_strerror(r));
+        goto out;
+    }
+    /* RSAPublicKey ::= SEQUENCE { modulus INTEGER, publicExponent INTEGER } */
+    p = data;
+    const unsigned char *end = data + len;
+    r = mbedtls_asn1_get_tag(&p, end, &len,
+            MBEDTLS_ASN1_CONSTRUCTED | MBEDTLS_ASN1_SEQUENCE);
+    if (r == 0) {
+        r = mbedtls_asn1_get_tag(&p, end, &mlen, MBEDTLS_ASN1_INTEGER);
+        mp = p;
+        p += mlen;
+    }
+    if (r == 0) {
+        r = mbedtls_asn1_get_tag(&p, end, &elen, MBEDTLS_ASN1_INTEGER);
+        ep = p;
+    }
+    if (r) {
+        warnx("rsa_params: mbedtls_asn1_get_tag failed: %s",
+                _mbedtls_strerror(r));
+        goto out;
+    }
+    _m = bn2str(mp, mlen, 0);
+    if (!_m) {
+        warnx("rsa_params: bn2str failed");
+        goto out;
+    }
+    _e = bn2str(ep, elen, 0);
+    if (!_e) {
+        warnx("rsa_params: bn2str failed");
+        goto out;
+    }
 #elif defined(USE_MBEDTLS)
     unsigned char *data = NULL;
     size_t len;
@@ -687,8 +800,10 @@ out:
 #endif
 #elif defined(USE_MBEDTLS)
     free(data);
+#if MBEDTLS_VERSION_NUMBER < 0x04000000
     mbedtls_mpi_free(&mn);
     mbedtls_mpi_free(&me);
+#endif
 #endif
     if (_e && _m) {
         if (e)
@@ -848,6 +963,47 @@ static size_t ec_params(privkey_t key, char **x, char **y)
         warnx("ec_params: bn2str failed");
         goto out;
     }
+#elif defined(USE_MBEDTLS) && MBEDTLS_VERSION_NUMBER >= 0x04000000
+    unsigned char *data = NULL;
+    size_t len, plen;
+    psa_key_type_t type = mbedtls_pk_get_key_type(key);
+    if (!PSA_KEY_TYPE_IS_ECC(type)) {
+        warnx("ec_params: not a EC key");
+        goto out;
+    }
+    if (PSA_KEY_TYPE_ECC_GET_FAMILY(type) == PSA_ECC_FAMILY_SECP_R1 &&
+            (mbedtls_pk_get_bitlen(key) == 256 ||
+             mbedtls_pk_get_bitlen(key) == 384))
+        bits = mbedtls_pk_get_bitlen(key);
+    else {
+        warnx("ec_params: only \"prime256v1\" and \"secp384r1\" "
+                "Elliptic Curves supported");
+        goto out;
+    }
+    r = mbedtls_pubkey_raw(key, &data, &len);
+    if (r) {
+        warnx("ec_params: mbedtls_pk_write_pubkey_psa failed: %s",
+                _mbedtls_strerror(r));
+        bits = 0;
+        goto out;
+    }
+    /* The uncompressed point: 0x04 || X || Y */
+    plen = (bits + 7) / 8;
+    if (len != 1 + 2 * plen || data[0] != 0x04) {
+        warnx("ec_params: unexpected public key format");
+        bits = 0;
+        goto out;
+    }
+    _x = bn2str(data + 1, plen, plen);
+    if (!_x) {
+        warnx("ec_params: bn2str failed");
+        goto out;
+    }
+    _y = bn2str(data + 1 + plen, plen, plen);
+    if (!_y) {
+        warnx("ec_params: bn2str failed");
+        goto out;
+    }
 #elif defined(USE_MBEDTLS)
     unsigned char *data = NULL;
     size_t len, olen, plen;
@@ -943,8 +1099,10 @@ out:
     free(data);
 #elif defined(USE_MBEDTLS)
     free(data);
+#if MBEDTLS_VERSION_NUMBER < 0x04000000
     mbedtls_ecp_group_free(&grp);
     mbedtls_ecp_point_free(&Q);
+#endif
 #endif
     if (_x && _y) {
         if (x)
@@ -977,6 +1135,14 @@ keytype_t key_type(privkey_t key)
             return PK_RSA;
         case EVP_PKEY_EC:
             return PK_EC;
+#elif defined(USE_MBEDTLS) && MBEDTLS_VERSION_NUMBER >= 0x04000000
+    /* mbedtls_pk_get_type() is private in Mbed TLS 4.x */
+    psa_key_type_t type = mbedtls_pk_get_key_type(key);
+    if (PSA_KEY_TYPE_IS_RSA(type))
+        return PK_RSA;
+    if (PSA_KEY_TYPE_IS_ECC(type))
+        return PK_EC;
+    switch (type) {
 #elif defined(USE_MBEDTLS)
     switch (mbedtls_pk_get_type(key)) {
         case MBEDTLS_PK_RSA:
@@ -1584,14 +1750,14 @@ char *jws_encode(const char *protected, const char *payload,
                 _mbedtls_strerror(r));
         goto out;
     }
-    switch (mbedtls_pk_get_type(key)) {
-        case MBEDTLS_PK_RSA:
-            signature_size = mbedtls_pk_get_len(key);
+    switch (key_type(key)) {
+        case PK_RSA:
+            signature_size = (mbedtls_pk_get_bitlen(key) + 7) / 8;
             signature = calloc(1, signature_size);
             break;
 
-        case MBEDTLS_PK_ECKEY:
-            signature_size = 9+2*mbedtls_pk_get_len(key);
+        case PK_EC:
+            signature_size = 9 + 2 * ((mbedtls_pk_get_bitlen(key) + 7) / 8);
             signature = calloc(1, signature_size);
             break;
 
@@ -1607,7 +1773,11 @@ char *jws_encode(const char *protected, const char *payload,
 #if MBEDTLS_VERSION_NUMBER >= 0x03000000
             signature_size,
 #endif
+#if MBEDTLS_VERSION_NUMBER >= 0x04000000
+            &signature_size);
+#else
             &signature_size, mbedtls_ctr_drbg_random, &ctr_drbg);
+#endif
     if (r != 0) {
         warnx("jws_encode: mbedtls_pk_sign failed: %s",
                 _mbedtls_strerror(r));
@@ -1823,7 +1993,69 @@ static bool key_gen(keytype_t type, int bits, const char *keyfile)
         openssl_error("key_gen");
         goto out;
     }
- #elif defined(USE_MBEDTLS)
+ #elif defined(USE_MBEDTLS) && MBEDTLS_VERSION_NUMBER >= 0x04000000
+    /* Mbed TLS 4.x generates keys through PSA only */
+    mbedtls_pk_context key;
+    mbedtls_pk_init(&key);
+    psa_key_attributes_t attr = PSA_KEY_ATTRIBUTES_INIT;
+    psa_key_id_t id = PSA_KEY_ID_NULL;
+    psa_status_t st;
+    switch (type) {
+        case PK_RSA:
+            msg(1, "generating new %d-bit RSA key", bits);
+            psa_set_key_type(&attr, PSA_KEY_TYPE_RSA_KEY_PAIR);
+            break;
+
+        case PK_EC:
+            if (bits != 256 && bits != 384) {
+                warnx("key_gen: EC key size must be either 256 or 384");
+                goto out;
+            }
+            msg(1, "generating new %d-bit EC key", bits);
+            psa_set_key_type(&attr,
+                    PSA_KEY_TYPE_ECC_KEY_PAIR(PSA_ECC_FAMILY_SECP_R1));
+            break;
+
+        default:
+            warnx("key_gen: only RSA/EC keys are supported");
+            goto out;
+    }
+    psa_set_key_bits(&attr, bits);
+    /* The key is only exported to write it in PEM format */
+    psa_set_key_usage_flags(&attr, PSA_KEY_USAGE_EXPORT);
+    st = psa_generate_key(&attr, &id);
+    if (st != PSA_SUCCESS) {
+        warnx("key_gen: psa_generate_key failed: %d", (int)st);
+        goto out;
+    }
+    r = mbedtls_pk_copy_from_psa(id, &key);
+    psa_destroy_key(id);
+    if (r) {
+        warnx("key_gen: mbedtls_pk_copy_from_psa failed: %s",
+                _mbedtls_strerror(r));
+        goto out;
+    }
+    pem_size = 4096;
+    while (1) {
+        pem_data = calloc(1, pem_size);
+        if (!pem_data) {
+            warn("key_gen: calloc failed");
+            goto out;
+        }
+        r = mbedtls_pk_write_key_pem(&key, pem_data, pem_size);
+        if (r == 0)
+            break;
+        else if (r == MBEDTLS_ERR_BASE64_BUFFER_TOO_SMALL) {
+            free(pem_data);
+            pem_size *= 2;
+        } else {
+            warnx("key_gen: mbedtls_pk_write_key_pem failed: %s",
+                    _mbedtls_strerror(r));
+            goto out;
+        }
+    }
+    pem_size = strlen(pem_data);
+#elif defined(USE_MBEDTLS)
     mbedtls_pk_context key;
     mbedtls_pk_init(&key);
     const mbedtls_pk_info_t *pki;
@@ -2059,7 +2291,7 @@ privkey_t key_load(keytype_t type, int bits, const char *format, ...)
     }
     mbedtls_pk_init(key);
     r = mbedtls_pk_parse_key(key, keydata, keysize+1, NULL, 0
-#if MBEDTLS_VERSION_NUMBER >= 0x03000000
+#if MBEDTLS_VERSION_NUMBER >= 0x03000000 && MBEDTLS_VERSION_NUMBER < 0x04000000
                 , mbedtls_ctr_drbg_random, &ctr_drbg
 #endif
             );
@@ -2634,8 +2866,11 @@ char *csr_gen(char * const *names, bool status_req, bool no_key_usage,
     }
 
     while (1) {
-        r = mbedtls_x509write_csr_der(&csr, buf, buflen,
-                mbedtls_ctr_drbg_random, &ctr_drbg);
+        r = mbedtls_x509write_csr_der(&csr, buf, buflen
+#if MBEDTLS_VERSION_NUMBER < 0x04000000
+                , mbedtls_ctr_drbg_random, &ctr_drbg
+#endif
+                );
         if (r > 0)
             break;
         else if (r == MBEDTLS_ERR_ASN1_BUF_TOO_SMALL) {
@@ -4277,6 +4512,15 @@ static int ocsp_req(mbedtls_x509_crt *crt, unsigned char *req, size_t size,
         unsigned char *buf = mbedtls_calloc(1, buf_size);
         if (!buf)
             return MBEDTLS_ERR_X509_ALLOC_FAILED;
+#if MBEDTLS_VERSION_NUMBER >= 0x04000000
+        /* The PSA format is the content of subjectPublicKey */
+        size_t pk_len;
+        ret = mbedtls_pk_write_pubkey_psa(&issuer->pk, buf, buf_size, &pk_len);
+        if (ret == MBEDTLS_ERR_PK_BUFFER_TOO_SMALL)
+            ret = MBEDTLS_ERR_ASN1_BUF_TOO_SMALL;
+        else if (ret == 0)
+            ret = mbedtls_hash_fast(MBEDTLS_MD_SHA1, buf, pk_len, hash);
+#else
         unsigned char *c = buf + buf_size;
         ret = mbedtls_pk_write_pubkey(&c, buf, &issuer->pk);
         if (ret >= 0)
@@ -4284,6 +4528,7 @@ static int ocsp_req(mbedtls_x509_crt *crt, unsigned char *req, size_t size,
             ret = mbedtls_sha1_ret(buf + buf_size - ret, ret, hash);
 #else
             ret = mbedtls_sha1(buf + buf_size - ret, ret, hash);
+#endif
 #endif
         mbedtls_free(buf);
         if (ret == MBEDTLS_ERR_ASN1_BUF_TOO_SMALL) {
@@ -4298,7 +4543,10 @@ static int ocsp_req(mbedtls_x509_crt *crt, unsigned char *req, size_t size,
     MBEDTLS_ASN1_CHK_ADD(len, mbedtls_asn1_write_octet_string(&p, req,
                 hash, sizeof(hash)));
 
-#if MBEDTLS_VERSION_NUMBER < 0x03000000
+#if MBEDTLS_VERSION_NUMBER >= 0x04000000
+    ret = mbedtls_hash_fast(MBEDTLS_MD_SHA1, crt->issuer_raw.p,
+            crt->issuer_raw.len, hash);
+#elif MBEDTLS_VERSION_NUMBER < 0x03000000
     ret = mbedtls_sha1_ret(crt->issuer_raw.p, crt->issuer_raw.len, hash);
 #else
     ret = mbedtls_sha1(crt->issuer_raw.p, crt->issuer_raw.len, hash);
@@ -4309,9 +4557,15 @@ static int ocsp_req(mbedtls_x509_crt *crt, unsigned char *req, size_t size,
     MBEDTLS_ASN1_CHK_ADD(len, mbedtls_asn1_write_octet_string(&p, req,
                 hash, sizeof(hash)));
 
+#if MBEDTLS_VERSION_NUMBER >= 0x04000000
+    /* mbedtls_oid_get_oid_by_md() is private in Mbed TLS 4.x */
+    alg_oid = MBEDTLS_OID_DIGEST_ALG_SHA1;
+    alg_oid_len = MBEDTLS_OID_SIZE(MBEDTLS_OID_DIGEST_ALG_SHA1);
+#else
     ret = mbedtls_oid_get_oid_by_md(MBEDTLS_MD_SHA1, &alg_oid, &alg_oid_len);
     if (ret)
         return ret;
+#endif
 
     MBEDTLS_ASN1_CHK_ADD(len, mbedtls_asn1_write_algorithm_identifier(&p, req,
                 alg_oid, alg_oid_len, 0));
