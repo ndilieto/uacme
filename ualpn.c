@@ -3800,6 +3800,18 @@ static void spawn_worker(ev_tstamp timestamp)
 
         noticex("new worker starting");
 
+#if defined(USE_MBEDTLS)
+        /* The random generator state was copied from the parent, as for
+         * all other workers. Reseed it with fresh entropy so that the
+         * workers do not produce the same random numbers. */
+        int rc = mbedtls_ctr_drbg_reseed(&g.ctr_drbg,
+                (const unsigned char *)&worker->pid, sizeof(worker->pid));
+        if (rc) {
+            errx("mbedtls_ctr_drbg_reseed failed: %s", _mbedtls_strerror(rc));
+            cleanup_and_exit(UINT_MAX, EXIT_FAILURE);
+        }
+#endif
+
         close(worker->sv[1]);
         worker->sv[1] = -1;
 
