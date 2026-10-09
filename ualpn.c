@@ -65,10 +65,15 @@
 #include <openssl/x509.h>
 #include <openssl/x509v3.h>
 #elif defined(USE_MBEDTLS)
+#include <mbedtls/version.h>
 #include <mbedtls/asn1write.h>
+#if MBEDTLS_VERSION_NUMBER < 0x04000000
 #include <mbedtls/bignum.h>
 #include <mbedtls/ctr_drbg.h>
 #include <mbedtls/entropy.h>
+#else
+#include <psa/crypto.h>
+#endif
 #include <mbedtls/error.h>
 #include <mbedtls/md.h>
 #include <mbedtls/oid.h>
@@ -314,8 +319,10 @@ static struct globs {
     unsigned char *key;
     unsigned int crt_len;
     unsigned int key_len;
+#if MBEDTLS_VERSION_NUMBER < 0x04000000
     mbedtls_entropy_context entropy;
     mbedtls_ctr_drbg_context ctr_drbg;
+#endif
 #endif
     ev_io controller;
     ev_cleanup cleanup;
@@ -954,13 +961,45 @@ int auth_crt(const char *ident, const uint8_t *id, size_t id_len,
     int rc;
     mbedtls_x509write_cert c;
     mbedtls_pk_context k;
+#if MBEDTLS_VERSION_NUMBER >= 0x04000000
+    unsigned char sn[16];
+    psa_key_attributes_t attr = PSA_KEY_ATTRIBUTES_INIT;
+    psa_key_id_t kid = PSA_KEY_ID_NULL;
+    psa_status_t st;
+#else
     mbedtls_mpi sn;
+#endif
 
     strftime(nb, sizeof(nb), "%Y%m%d%H%M%S", gmtime_r(&tnb, &t));
     strftime(na, sizeof(na), "%Y%m%d%H%M%S", gmtime_r(&tna, &t));
 
     mbedtls_x509write_crt_init(&c);
     mbedtls_pk_init(&k);
+#if MBEDTLS_VERSION_NUMBER >= 0x04000000
+    /* A random positive 128-bit serial number */
+    st = psa_generate_random(sn, sizeof(sn));
+    if (st != PSA_SUCCESS) {
+        warnx("auth_crt: psa_generate_random: %d", (int)st);
+        goto out;
+    }
+    sn[0] &= 0x7f;
+
+    /* Mbed TLS 4.x generates keys through PSA only */
+    psa_set_key_type(&attr, PSA_KEY_TYPE_ECC_KEY_PAIR(PSA_ECC_FAMILY_SECP_R1));
+    psa_set_key_bits(&attr, 256);
+    psa_set_key_usage_flags(&attr, PSA_KEY_USAGE_EXPORT);
+    st = psa_generate_key(&attr, &kid);
+    if (st != PSA_SUCCESS) {
+        warnx("auth_crt: psa_generate_key: %d", (int)st);
+        goto out;
+    }
+    rc = mbedtls_pk_copy_from_psa(kid, &k);
+    psa_destroy_key(kid);
+    if (rc) {
+        warnx("auth_crt: mbedtls_pk_copy_from_psa: %s", _mbedtls_strerror(rc));
+        goto out;
+    }
+#else
     mbedtls_mpi_init(&sn);
 
     rc = mbedtls_mpi_fill_random(&sn, 16, mbedtls_ctr_drbg_random, &g.ctr_drbg);
@@ -993,6 +1032,7 @@ int auth_crt(const char *ident, const uint8_t *id, size_t id_len,
         warnx("auth_crt: mbedtls_ecp_gen_key: %s", _mbedtls_strerror(rc));
         goto out;
     }
+#endif
 
     mbedtls_x509write_crt_set_version(&c, MBEDTLS_X509_CRT_VERSION_3);
     mbedtls_x509write_crt_set_md_alg(&c, MBEDTLS_MD_SHA256);
@@ -1008,7 +1048,11 @@ int auth_crt(const char *ident, const uint8_t *id, size_t id_len,
         goto out;
     }
 
+#if MBEDTLS_VERSION_NUMBER >= 0x04000000
+    rc = mbedtls_x509write_crt_set_serial_raw(&c, sn, sizeof(sn));
+#else
     rc = mbedtls_x509write_crt_set_serial(&c, &sn);
+#endif
     if (rc) {
         warnx("auth_crt: mbedtls_x509write_crt_set_serial: %s",
                 _mbedtls_strerror(rc));
@@ -1160,8 +1204,11 @@ int auth_crt(const char *ident, const uint8_t *id, size_t id_len,
     }
 
     while (1) {
-        rc = mbedtls_x509write_crt_der(&c, buf, buf_len,
-                mbedtls_ctr_drbg_random, &g.ctr_drbg);
+        rc = mbedtls_x509write_crt_der(&c, buf, buf_len
+#if MBEDTLS_VERSION_NUMBER < 0x04000000
+                , mbedtls_ctr_drbg_random, &g.ctr_drbg
+#endif
+                );
         if (rc > 0) {
             *crt_len = rc;
             *crt = calloc(1, *crt_len);
@@ -1216,7 +1263,9 @@ int auth_crt(const char *ident, const uint8_t *id, size_t id_len,
 out:
     mbedtls_x509write_crt_free(&c);
     mbedtls_pk_free(&k);
+#if MBEDTLS_VERSION_NUMBER < 0x04000000
     mbedtls_mpi_free(&sn);
+#endif
     free(buf);
     if (ret != 0) {
         free(*key);
@@ -2291,7 +2340,7 @@ int cert_select(client_t *c)
         mbedtls_pk_free(&c->key);
         rc = mbedtls_pk_parse_key(&c->key, auth->key,
                 auth->key_size, NULL, 0
-#if MBEDTLS_VERSION_NUMBER >= 0x03000000
+#if MBEDTLS_VERSION_NUMBER >= 0x03000000 && MBEDTLS_VERSION_NUMBER < 0x04000000
                 , mbedtls_ctr_drbg_random, &g.ctr_drbg
 #endif
                 );
@@ -2445,7 +2494,9 @@ static int tls_session_init(client_t *c, uint8_t *buf, size_t buf_len)
                 _mbedtls_strerror(rc));
         return -1;
     }
+#if MBEDTLS_VERSION_NUMBER < 0x04000000
     mbedtls_ssl_conf_rng(&c->cnf, mbedtls_ctr_drbg_random, &g.ctr_drbg);
+#endif
     mbedtls_ssl_conf_sni(&c->cnf, sni_callback, c);
 #if MBEDTLS_VERSION_NUMBER >= 0x03000000
     mbedtls_ssl_conf_cert_cb(&c->cnf, cert_callback);
@@ -2476,7 +2527,7 @@ static int tls_session_init(client_t *c, uint8_t *buf, size_t buf_len)
 #endif
     mbedtls_pk_init(&c->key);
     rc = mbedtls_pk_parse_key(&c->key, g.key, g.key_len, NULL, 0
-#if MBEDTLS_VERSION_NUMBER >= 0x03000000
+#if MBEDTLS_VERSION_NUMBER >= 0x03000000 && MBEDTLS_VERSION_NUMBER < 0x04000000
             , mbedtls_ctr_drbg_random, &g.ctr_drbg
 #endif
             );
@@ -3678,8 +3729,12 @@ static void cleanup_and_exit(int stage, int return_code)
             if (g.bio_meth)
                 BIO_meth_free(g.bio_meth);
 #elif defined(USE_MBEDTLS)
+#if MBEDTLS_VERSION_NUMBER >= 0x04000000
+            mbedtls_psa_crypto_free();
+#else
             mbedtls_ctr_drbg_free(&g.ctr_drbg);
             mbedtls_entropy_free(&g.entropy);
+#endif
             free(g.key);
             free(g.crt);
 #endif
@@ -3799,6 +3854,28 @@ static void spawn_worker(ev_tstamp timestamp)
             syslog_init();
 
         noticex("new worker starting");
+
+#if defined(USE_MBEDTLS)
+        /* The random generator state was copied from the parent, as for
+         * all other workers. Reseed it with fresh entropy so that the
+         * workers do not produce the same random numbers. */
+#if MBEDTLS_VERSION_NUMBER >= 0x04000000
+        /* Restarting PSA reseeds its internal random generator */
+        mbedtls_psa_crypto_free();
+        psa_status_t st = psa_crypto_init();
+        if (st != PSA_SUCCESS) {
+            errx("psa_crypto_init failed: %d", (int)st);
+            cleanup_and_exit(UINT_MAX, EXIT_FAILURE);
+        }
+#else
+        int rc = mbedtls_ctr_drbg_reseed(&g.ctr_drbg,
+                (const unsigned char *)&worker->pid, sizeof(worker->pid));
+        if (rc) {
+            errx("mbedtls_ctr_drbg_reseed failed: %s", _mbedtls_strerror(rc));
+            cleanup_and_exit(UINT_MAX, EXIT_FAILURE);
+        }
+#endif
+#endif
 
         close(worker->sv[1]);
         worker->sv[1] = -1;
@@ -4612,6 +4689,14 @@ int main(int argc, char **argv)
 #warning mbedTLS runtime version check disabled. Consider reconfiguring \
     mbedTLS with MBEDTLS_VERSION_C
 #endif
+#if MBEDTLS_VERSION_NUMBER >= 0x04000000
+    /* Mbed TLS 4.x uses the PSA random generator internally */
+    psa_status_t st = psa_crypto_init();
+    if (st != PSA_SUCCESS) {
+        errx("psa_crypto_init failed: %d", (int)st);
+        cleanup_and_exit(1, EXIT_FAILURE);
+    }
+#else
     mbedtls_entropy_init(&g.entropy);
     mbedtls_ctr_drbg_init(&g.ctr_drbg);
     rc = mbedtls_ctr_drbg_seed(&g.ctr_drbg, mbedtls_entropy_func,
@@ -4620,6 +4705,7 @@ int main(int argc, char **argv)
         errx("mbedtls_ctr_dbg_seed failed: %s", _mbedtls_strerror(rc));
         cleanup_and_exit(1, EXIT_FAILURE);
     }
+#endif
     const unsigned char id[] = {0x4, 0x1, 0x0};
     if (auth_crt("dummy", id, sizeof(id), &g.crt, &g.crt_len,
                 &g.key, &g.key_len))
