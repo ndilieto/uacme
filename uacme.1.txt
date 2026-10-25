@@ -216,6 +216,15 @@ USAGE
     is hardlinked to 'CONFDIR/private/key-TIMESTAMP.pem' before
     renaming 'CONFDIR/private/newkey.pem' to 'CONFDIR/private/key.pem'.
 
+*uacme* ['OPTIONS' ...] *persist-txt* ['IDENTIFIER']::
+    print content of txt record required to authorize a domain with
+    dns-persist-01 challenge. if no identifier was given it will valid for
+    any domain, but if a domain name is given resulting record
+    will be only valid for that specific domain.
+    if connection ACME server does not support newest standard,
+    this command will print old draft-01 format to support 
+    ACME servers using old draft (ex. Google Trust Service)
+
 *uacme* ['OPTIONS' ...] *issue* 'IDENTIFIER' ['ALTNAME' ...]::
     Issue a certificate for 'IDENTIFIER' with zero or more 'ALTNAMEs' and
     save it to 'CONFDIR/IDENTIFIER/cert.pem'.
