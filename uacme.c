@@ -833,6 +833,63 @@ bool account_deactivate(acme_t *a)
     return true;
 }
 
+bool validate_identifier_str(const char *s); // function prototype to call function defined below
+
+// return malloced string filled with valid hashed accountURI for this domain:
+// domain here are already striped of *. for wildcard, so need to set manually.
+int make_hashed_accountURI(char** reply, acme_t *a, const char* domain, bool iswild) {
+    int err = 0;
+    char len = strlen(domain);
+    if (len != 1 && !validate_identifier_str(domain)) {
+        return 1;
+    }
+
+    // <hash-input> = len(domain) + domain + thumbprint(b64uri) + uri
+    char *thumbprint = jws_thumbprint(a->key);
+    char *thumbhash = sha2_base64url(256, "%c%s%s%s", len, domain, thumbprint, a->kid);
+    free(thumbprint);
+    const json_value_t *meta = json_find(a->dir, "meta");
+    const char *hashprefix = json_find_string(meta, "accountHashPrefix");
+    const json_value_t *issuer_domain_names = json_find(meta, "issuerDomainNames");\
+    if (!issuer_domain_names)
+        issuer_domain_names = json_find(meta, "caaIdentities");
+    // safe to defefreance issuer_domain_name without check because it's already checked t ofill token
+    if (hashprefix == NULL || issuer_domain_names == NULL) {
+        // server doesn't have issuerDomainName, if implemented it'd implementing first draft (using raw accoutnuri)
+        warnx("dns-persist-01: ACME server %s may not support dns-persist-01 or implementing old draft\n", a->directory);
+        err = asprintf(reply, "%s; accounturi=%s%s", issuer_domain_names->v.array.values[0].v.value, a->kid, (iswild ? "; policy=wildcard" : ""));
+    } else {
+    err = asprintf(reply, "%s; accounturi=%ssha-256/%s%s", issuer_domain_names->v.array.values[0].v.value, hashprefix, thumbhash, (iswild ? "; policy=wildcard" : ""));
+    }
+    return err;
+}
+
+// Makes <hashed URI identifying the ACME account> for dns-persist-01 challenge updated in draft-ietf-acme-dns-persist-02
+bool print_hashed_accountURI(acme_t *a, const char *domain) {
+   
+    char len = strlen(domain);
+    char *record = NULL;
+    bool iswildcard = false;
+    if (len != 1 && !validate_identifier_str(domain)) {
+        warnx("invalid domain");
+        return false;
+    }
+
+    // wildcard detect, "*" is global so consider it wants wildcard too.
+    if (domain [0] == '*') {
+        iswildcard = true;
+        if (len > 1) {
+            len = len-2;
+            domain = domain + 2;
+        }
+    }
+    
+    make_hashed_accountURI(&record, a, domain, iswildcard);
+    fprintf(stdout, "Example dns-persist-01 txt record for authorize this account for %s%s\n", domain, (iswildcard ? ", wildcard scope": ""));
+    fprintf(stdout, "%s\n", record);
+    return true;
+}
+
 bool authorize(acme_t *a)
 {
     bool success = false;
@@ -849,6 +906,7 @@ bool authorize(acme_t *a)
         goto out;
 
     for (size_t i=0; i<auths->v.array.size; i++) {
+        bool iswild = false;
         if (auths->v.array.values[i].type != JSON_STRING) {
             warnx("failed to parse authorizations URL");
             goto out;
@@ -871,6 +929,14 @@ bool authorize(acme_t *a)
             acme_error(a);
             goto out;
         }
+
+        const json_value_t *wildcard = json_find(a->json, "wildcard");
+        if (wildcard) {
+            iswild = true;
+        } else {
+            iswild = false;
+        }
+
         const json_value_t *ident = json_find(a->json, "identifier");
         const char *ident_type = json_find_string(ident, "type");
         if (!ident_type || (strcmp(ident_type, "dns") != 0 &&
@@ -913,8 +979,13 @@ bool authorize(acme_t *a)
                     goto out;
                 }
                 if (strcmp(type, "dns-persist-01") == 0) {
-                    const json_value_t *idns = json_find(
-                            chlgs->v.array.values+j, "issuer-domain-names");
+                    // Google Trust service doesn't put issuerdomainname in dns-persiste-01 challenge object
+                    // so use issuerdomainanme in directory meta page
+                    const json_value_t *meta = json_find(a->dir, "meta");
+                    // const char *hashprefix = json_find_string(meta, "accountHashPrefix");
+                    const json_value_t *idns = json_find(meta, "issuerDomainNames");
+                    if (!idns) //fallback to caaIdentities for GTS (2026-10-25)
+                        idns = json_find(meta, "caaIdentities");
                     if (!idns || idns->type != JSON_ARRAY ||
                             idns->v.array.size < 1 ||
                             idns->v.array.size > 10 ||
@@ -922,7 +993,7 @@ bool authorize(acme_t *a)
                             idns->v.array.values[0].v.value == NULL ||
                             strlen(idns->v.array.values[0].v.value) > 253 ||
                             strlen(idns->v.array.values[0].v.value) == 0) {
-                        warnx("failed to parse challenge");
+                        warnx("failed to parse issuer Domaine Name in directory");
                         goto out;
                     }
                     token = idns->v.array.values[0].v.value;
@@ -947,11 +1018,11 @@ bool authorize(acme_t *a)
                         strcmp(type, "tls-alpn-01") == 0)
                     key_auth = sha2_base64url(256, "%s.%s", token, thumbprint);
                 else if (strcmp(type, "dns-persist-01") == 0) {
-                    if (asprintf(&key_auth, "\"%s; accounturi=%s\"", token,
-                                a->kid) < 0)
+                    if (make_hashed_accountURI(&key_auth, a, ident_value, iswild) < 0)
                         key_auth = NULL;
                 } else if (asprintf(&key_auth, "%s.%s", token, thumbprint) < 0)
                     key_auth = NULL;
+                warnx("%s fesijfo",key_auth);
                 if (!key_auth) {
                     warnx("failed to generate authorization key");
                     goto out;
@@ -1778,6 +1849,10 @@ int main(int argc, char **argv)
             usage(basename(argv[0]));
             goto out;
         }
+    } else if (strcmp(action, "persist-txt") == 0) {
+        if (optind < argc) {
+            ident = strdup(argv[optind++]);
+        }
     } else if (strcmp(action, "issue") == 0 || strcmp(action, "check") == 0) {
         if (optind == argc) {
             usage(basename(argv[0]));
@@ -1914,6 +1989,10 @@ int main(int argc, char **argv)
             ret = 0;
     } else if (strcmp(action, "update") == 0) {
         if (acme_bootstrap(&a) && account_retrieve(&a) && account_update(&a))
+            ret = 0;
+    } else if (strcmp(action, "persist-txt") == 0 ) {
+        if (acme_bootstrap(&a) && account_retrieve(&a) 
+                && print_hashed_accountURI(&a, (ident != NULL ?  ident : "*")))
             ret = 0;
     } else if (strcmp(action, "newkey") == 0) {
         if (acme_bootstrap(&a) && account_retrieve(&a)
