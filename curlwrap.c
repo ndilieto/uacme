@@ -189,10 +189,8 @@ curldata_t *curl_post(const char *url, void *post_data, size_t post_size,
         curl_easy_setopt(curl, CURLOPT_POSTFIELDS, post_data);
         curl_easy_setopt(curl, CURLOPT_POSTFIELDSIZE, post_size);
         va_start(ap, header);
-        while (header) {
-            list = curl_slist_append(list, header);
-            header = va_arg(ap, const char *);
-        }
+        for (const char *h = header; h; h = va_arg(ap, const char *))
+            list = curl_slist_append(list, h);
         va_end(ap);
         curl_easy_setopt(curl, CURLOPT_HTTPHEADER, list);
         res = curl_easy_perform(curl);
